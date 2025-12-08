@@ -36,7 +36,7 @@ This application was generated using http://start.vertx.io
 
 7. **Deletion**: Deletes text within the cursor selection for all quantums, enhancing text editing capabilities.
 
-8. **Typing**: Full support for user input anywhere in the document, allowing smooth text addition. i and a move to beginning and end quantum before insertion, respectively
+8. **Typing**: Full support for user input anywhere in the document, allowing smooth text addition. `i` and `a` move to beginning and end quantum before insertion, respectively
 
 9. **Spans 0-1**: Indicates how many quantums the cursor occupies. A span of 0 collapses the cursor into a thin line, akin to insert mode in Vim.
 
@@ -46,14 +46,14 @@ This application was generated using http://start.vertx.io
 
 12. **Searching**: Enters searchForward or searchBackward submodes for finding matches, moving the cursor to the first occurrence within scope.
 
-13. **Repeat Last Search**: Implements movement to next or previous search results, starting from the current cursor position.
+13. **Repeat Last Search**: Implements movement to next or previous search results, starting from the current cursor position. (Behaves like `n` and `N` in vim).
 
 14. **Scope Changing**: Users can modify the search scope dynamically to any of the supported quantums, making search operations flexible.
 
 ### Future Visur Features:
 1. Edit objects not just text files. Type-sensitive editor. Because of that, it is also language-independent
 2. Client-server architetures. Multiple users can edit the same files at the same time. Like Google Docs
-3. Conditional logic & arithmetic operation within macro definition
+3. Conditional logic & arithmetic operation within macro definition (imagine having if statements in vim macros & movements)
 4. Interface independent. Can be used in the browser, command line, or within a graphical window
 5. Can edit streams of data instead of just static files. For example, a network flow. Can work like a network analysis tool, capturing data in the moment
 

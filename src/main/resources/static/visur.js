@@ -14,7 +14,7 @@ let canvas = document.getElementById("mainCanvas")
 if((window.innerWidth - 5) % 21 == 0) {
   canvas.width = window.innerWidth
 } else {
-  canvas.width = window.innerWidth - (window.innerWidth - 5) % 21
+  canvas.width = window.innerWidth - (window.innerWidth - 5) % 21 //words get cut off when changing window size if I don't do this
 }
 canvas.height = window.innerHeight
 console.log("canvas width = " + canvas.width)
@@ -94,17 +94,17 @@ eb.onopen = function() {
     } else {
       document.getElementById("currentEditorModeDisplay").innerHTML = submode.toUpperCase() + " SUBMODE";
     }
-      if(submode == "searchForward" || submode == "searchBackward") {
-        document.getElementById("currentEditorModeDisplay").innerHTML = " " + scopeQuantum.toUpperCase()
-        if(submode == "searchForward") {
-          document.getElementById("currentEditorModeDisplay").innerHTML += " (f) "
-        } else {
-          document.getElementById("currentEditorModeDisplay").innerHTML += " (F) "
-        }
-        document.getElementById("currentEditorModeDisplay").innerHTML += searchTarget
+    if(submode == "searchForward" || submode == "searchBackward") {
+      document.getElementById("currentEditorModeDisplay").innerHTML = " " + scopeQuantum.toUpperCase()
+      if(submode == "searchForward") {
+        document.getElementById("currentEditorModeDisplay").innerHTML += " (f) "
       } else {
-        document.getElementById("currentEditorModeDisplay").innerHTML += "; SPAN = " + span
+        document.getElementById("currentEditorModeDisplay").innerHTML += " (F) "
       }
+      document.getElementById("currentEditorModeDisplay").innerHTML += searchTarget
+    } else {
+      document.getElementById("currentEditorModeDisplay").innerHTML += "; SPAN = " + span
+    }
   })
 
   let canvasInfo = {

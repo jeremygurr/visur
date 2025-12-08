@@ -64,7 +64,6 @@ public class EditorContentService {
     editorModel.put(editorContent, contentLines);
   }
 
-
   public void putEditorContent(String contentLines, LocalMap<EditorModelKey, Object> editorModel) {
     editorModel.put(editorContent, contentLines);
     updateNextLineIndices(editorModel);

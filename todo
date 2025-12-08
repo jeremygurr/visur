@@ -1,0 +1,5 @@
+design a distinction between regular quantum movement view (NormalView?) and filesystem navigation (FilesystemView?)
+implement the distinction noted above (probably in ModelWasChangedVerticle?)
+make FileQuantum
+make DirectoryQuantum
+implement filesystems (big one) by letting files be read from and written to (make it basic at first)

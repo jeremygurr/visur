@@ -53,11 +53,11 @@ public class MainVerticle extends AbstractVerticle {
       // Get the response object
       HttpServerResponse response = routingContext.response();
 
-      // Set the HTTP status code to 302 (Found) for a temporary redirect
+      // Set the HTTP status code to 302 (Found) for a temporary redirect. Note that if I want changes to be cached I can change this to 301 for permanent redirect
       response.setStatusCode(302);
 
       // Set the "Location" header to the target URL
-      response.putHeader("Location", "http://localHost:8888/static/visur.html");
+      response.putHeader("Location", "http://localhost:8888/static/visur.html");
 
       // End the response to perform the redirect
       response.end();

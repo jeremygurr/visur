@@ -9,9 +9,8 @@ public class InsertNewlineOp implements Operator {
     String contentBeforeChar = editorContent.substring(0, ca);
     String contentAfterChar = editorContent.substring(ca, editorContent.length());
     String resultingEditorContent = contentBeforeChar + "\n" + contentAfterChar;
-    emc.putEditorContent(resultingEditorContent);
     emc.putCA(++ca);
-    emc.updateNextLineIndices();
+    emc.putEditorContent(resultingEditorContent);
     Quantum cursorQuantum = emc.getCursorQuantum();
     int[] bounds = cursorQuantum.getBoundaries(ca, emc.getNextLineIndices(), emc.getSpan(), false);
     emc.putCursorQuantumStartAndScroll(bounds[0]);
