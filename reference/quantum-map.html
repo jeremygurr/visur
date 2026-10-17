@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reference — Quantum Map</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+
+  <div class="lesson-header">
+    <div class="lesson-number">Reference · Unit of Learning</div>
+    <h1>Quantum Map</h1>
+    <div class="lesson-meta">
+      A boundary strategy, not a region · 4 registered quantums, 3 roles, 2 maps ·
+      companion to <a href="../lessons/0006-the-quantum-system.html">Lesson 6</a>
+    </div>
+  </div>
+
+  <p class="lead">
+    A <code>Quantum</code> computes a region; it does not store one. The region
+    lives in the model as <code>cursorQuantumStart</code>,
+    <code>cursorQuantumEnd</code>, and <code>span</code>. This page is the
+    compressed map of the strategy, the four implementations, and the operators
+    that read them.
+  </p>
+
+  <h2 id="contract">The Contract</h2>
+
+  <table>
+    <thead>
+      <tr><th>Method</th><th>Purpose</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>getBoundaries(ca, nl, span, includeTail)</code></td>
+        <td>Return <code>{start, end}</code> for the region around <code>ca</code></td>
+      </tr>
+      <tr>
+        <td><code>move(content, nl, mv)</code></td>
+        <td>Return the new absolute cursor position after a movement vector</td>
+      </tr>
+      <tr>
+        <td><code>getName()</code></td>
+        <td>Return the registry name (<code>character</code>, <code>word</code>, …)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/Quantum.java#L8-11">Quantum.java:8–11</a>.
+    <code>includeTail</code> is passed <code>false</code> at every call site and
+    never read — dead.
+  </p>
+
+  <h2 id="four">The Four Registered Quantums</h2>
+
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Class</th><th>Key</th><th><code>span == 0</code></th><th><code>span &gt; 0</code></th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>character</code></td>
+        <td><code>CharacterQuantum</code></td>
+        <td><code>q</code></td>
+        <td><code>{ca, ca+1}</code> (or <code>{ca,ca}</code> at sentinel)</td>
+        <td>same</td>
+      </tr>
+      <tr>
+        <td><code>word</code></td>
+        <td><code>RegexQuantum("word", "\\S+")</code></td>
+        <td><code>w</code></td>
+        <td>the matching position</td>
+        <td>the whole matching run</td>
+      </tr>
+      <tr>
+        <td><code>line</code></td>
+        <td><code>LineQuantum</code></td>
+        <td><code>e</code></td>
+        <td>the line anchor</td>
+        <td><code>{nl[cy-1], nl[cy]-1}</code></td>
+      </tr>
+      <tr>
+        <td><code>document</code></td>
+        <td><code>DocumentQuantum</code></td>
+        <td><code>r</code></td>
+        <td><code>{0,0}</code> (and sets <code>ca</code> to 0)</td>
+        <td><code>{0, content.length()}</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    Registered at
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L157-172">InitializerService.java:157–172</a>.
+    Bounds are half-open: <code>[start, end)</code>.
+  </p>
+
+  <h2 id="maps">Key → Name → Instance</h2>
+
+  <table>
+    <thead>
+      <tr><th>Map</th><th>Type</th><th>Contents</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>KeyToQuantumName</code></td>
+        <td><code>Map&lt;String,String&gt;</code></td>
+        <td><code>q→character</code>, <code>w→word</code>, <code>e→line</code>, <code>r→document</code></td>
+      </tr>
+      <tr>
+        <td><code>QuantumNameToQuantum</code></td>
+        <td><code>Map&lt;String,Quantum&gt;</code></td>
+        <td>the four singleton instances above</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>
+    The same key table feeds four operations:
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Gesture</th><th>Program</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>w</code></td><td><code>"word" changeCursorQuantum</code></td></tr>
+      <tr><td><code>[w</code></td><td><code>"word" quantumStart removeSubmode</code></td></tr>
+      <tr><td><code>]w</code></td><td><code>"word" quantumEnd removeSubmode</code></td></tr>
+      <tr><td><code>/w</code></td><td><code>"word" changeScope</code></td></tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/KeyToQuantumName.java">KeyToQuantumName.java</a> ·
+    <a href="../src/main/java/com/ple/visur/QuantumNameToQuantum.java">QuantumNameToQuantum.java</a> ·
+    <a href="../src/main/java/com/ple/visur/ChangeCursorQuantumHandler.java">ChangeCursorQuantumHandler.java</a> ·
+    <a href="../src/main/java/com/ple/visur/QuantumStartSubmodeHandler.java">QuantumStartSubmodeHandler.java</a> ·
+    <a href="../src/main/java/com/ple/visur/ChangeScopeSubmodeHandler.java">ChangeScopeSubmodeHandler.java</a>
+  </p>
+
+  <h2 id="roles">The Three Roles</h2>
+
+  <table>
+    <thead>
+      <tr><th>Role</th><th>Stored as</th><th>Read by</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Cursor quantum</td>
+        <td><code>cursorQuantum</code> global var</td>
+        <td><code>move</code>, <code>deleteCursorQuantum</code>, highlight</td>
+      </tr>
+      <tr>
+        <td>Scope quantum</td>
+        <td><code>scopeQuantum</code> global var (default <code>line</code>)</td>
+        <td><code>searchForward</code>, <code>searchBackward</code> only</td>
+      </tr>
+      <tr>
+        <td>Span</td>
+        <td><code>span</code> global var (0 or 1)</td>
+        <td><code>getBoundaries</code>, highlight, status bar</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="nl">The <code>nl</code> Array and Line Metrics</h2>
+
+  <table>
+    <thead>
+      <tr><th>Fact</th><th>Value</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>What <code>nl[i]</code> holds</td><td>absolute index where line <code>i+1</code> begins (one past each <code>'\n'</code>)</td></tr>
+      <tr><td>Last element</td><td><code>content.length()</code> (sentinel)</td></tr>
+      <tr><td>Line start for <code>cy</code></td><td><code>cy &gt; 0 ? nl[cy-1] : 0</code></td></tr>
+      <tr><td>Long-line length</td><td><code>nl[cy] - nl[cy-1]</code> (includes newline)</td></tr>
+      <tr><td>Short-line bounds</td><td><code>RelativeLineBoundCalculator.getShort(cx, cy, nl)</code></td></tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    Built in
+    <a href="../src/main/java/CursorPositionDC/EditorContentService.java#L84-99">EditorContentService.java:84–99</a> ·
+    long/short math in
+    <a href="../src/main/java/com/ple/visur/RelativeLineBoundCalculator.java">RelativeLineBoundCalculator.java</a>
+  </p>
+
+  <h2 id="operators">Operators That Touch Quantums</h2>
+
+  <table>
+    <thead>
+      <tr><th>Operator</th><th>Effect</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>changeCursorQuantum</code></td><td>set the cursor quantum; recompute bounds; reset span if zero-width</td></tr>
+      <tr><td><code>changeScope</code></td><td>set the scope quantum (search fence)</td></tr>
+      <tr><td><code>setSpan</code></td><td>compute bounds at span 1; normalize any positive value to 1</td></tr>
+      <tr><td><code>deleteCursorQuantum</code></td><td>delete <code>[start, end)</code> when <code>span &gt; 0</code></td></tr>
+      <tr><td><code>quantumStart</code> / <code>quantumEnd</code></td><td>pick scope vs cursor by region size, then jump to its start / end</td></tr>
+      <tr><td><code>relativeMove</code></td><td>delegate to <code>cursorQuantum.move</code>, then recompute bounds</td></tr>
+      <tr><td><code>searchForward</code> / <code>searchBackward</code></td><td>scan between the scope quantum's bounds using <code>String.indexOf</code></td></tr>
+    </tbody>
+  </table>
+
+  <h2 id="gotchas">Gotchas</h2>
+
+  <ul>
+    <li><strong>The registered name is <code>word</code>, not <code>regex</code>.</strong>
+      <code>RegexQuantum</code> is a class; the instance is keyed <code>"word"</code>
+      and is the only regex-backed quantum.</li>
+    <li><strong>Search does not use <code>RegexQuantum</code>.</strong> It uses the
+      <em>scope quantum</em> plus a literal <code>indexOf</code>.</li>
+    <li><strong><code>includeTail</code> is dead.</strong> Always <code>false</code>,
+      never read.</li>
+    <li><strong><code>getBoundaries</code> has side effects.</strong>
+      <code>RegexQuantum</code> writes <code>ca</code>; <code>DocumentQuantum</code>
+      can reset span and move <code>ca</code> to 0.</li>
+    <li><strong><code>LineQuantum.getBoundaries</code> inlines its own
+      arithmetic.</strong> It does <em>not</em> call
+      <code>RelativeLineBoundCalculator</code>; only its <code>move</code> path does.</li>
+    <li><strong>The declaration comment is stale.</strong> It says newline indices
+      are "only needed in CustomQuantums", but <code>LineQuantum</code> reads them.</li>
+    <li><strong>Bounds are half-open.</strong> A character at index 3 is
+      <code>{3,4}</code>; the last two elements of a document are
+      <code>{0, length}</code>.</li>
+  </ul>
+
+  <h2 id="related">Related</h2>
+
+  <ul>
+    <li><a href="../lessons/0006-the-quantum-system.html">Lesson 6 — The Quantum System: Defining Edit Scope</a> (the teaching version)</li>
+    <li><a href="../lessons/0005-editor-modes-and-submodes.html">Lesson 5 — Editor Modes and Submodes</a> (the submodes that select quantums)</li>
+    <li><a href="mode-submode-map.html">Mode &amp; Submode Map</a> — the key→quantum table in context</li>
+    <li><a href="operator-catalog.html">Operator Catalog</a> — every editing action's stack signature</li>
+    <li><a href="../src/main/java/com/ple/visur/Quantum.java">Quantum.java</a> ·
+      <a href="../src/main/java/com/ple/visur/CharacterQuantum.java">CharacterQuantum.java</a> ·
+      <a href="../src/main/java/com/ple/visur/LineQuantum.java">LineQuantum.java</a> ·
+      <a href="../src/main/java/com/ple/visur/RegexQuantum.java">RegexQuantum.java</a> ·
+      <a href="../src/main/java/com/ple/visur/DocumentQuantum.java">DocumentQuantum.java</a></li>
+  </ul>
+
+  <div class="annotation">
+    <p>
+      <strong>Ask your teacher</strong> to expand any row into a worked example,
+      or to trace one gesture (<code>[e</code>, <code>s 2 w</code>,
+      <code>/ e</code>) through the compile → execute → bounds pipeline.
+    </p>
+  </div>
+
+  <div class="lesson-nav">
+    <a href="../lessons/0005-editor-modes-and-submodes.html">← Lesson 5: Modes &amp; Submodes</a>
+    <a href="../lessons/0006-the-quantum-system.html">Lesson 6: Quantum System →</a>
+  </div>
+
+</body>
+</html>

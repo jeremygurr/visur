@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reference — Mode &amp; Submode Map</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+
+  <div class="lesson-header">
+    <div class="lesson-number">Reference · Unit of Learning</div>
+    <h1>Mode &amp; Submode Map</h1>
+    <div class="lesson-meta">
+      The context layer · 1 router, 2 enums, 9 submodes · companion to
+      <a href="../lessons/0005-editor-modes-and-submodes.html">Lesson 5</a>
+    </div>
+  </div>
+
+  <p class="lead">
+    Keystrokes are routed by <strong>one</strong> thing: the top of the
+    <code>EditorSubmode</code> stack. The <code>EditorMode</code> is a separate,
+    mostly cosmetic value. This page is the compressed map of both.
+  </p>
+
+  <h2 id="two-layers">The Two Layers</h2>
+
+  <table>
+    <thead>
+      <tr><th>Layer</th><th>Enum</th><th>Stored as</th><th>Drives routing?</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Mode</td>
+        <td><code>EditorMode</code></td>
+        <td>one value</td>
+        <td><strong>No</strong> — display only</td>
+      </tr>
+      <tr>
+        <td>Submode</td>
+        <td><code>EditorSubmode</code></td>
+        <td>a <code>Stack</code></td>
+        <td><strong>Yes</strong> — <code>keymapMap.get(peek())</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/EditorMode.java">EditorMode.java</a> ·
+    <a href="../src/main/java/com/ple/visur/EditorSubmode.java">EditorSubmode.java</a> ·
+    router at
+    <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java#L22-24">KeyWasPressedVerticle.java:22–24</a>
+  </p>
+
+  <h3>The enum members, exactly</h3>
+
+  <table>
+    <thead>
+      <tr><th><code>EditorMode</code> (3)</th><th><code>EditorSubmode</code> (9)</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>navigate</code></td><td><code>navigate</code></td></tr>
+      <tr><td><code>insert</code></td><td><code>insert</code></td></tr>
+      <tr><td><code>reading</code> <em>(never assigned)</em></td><td><code>replace</code></td></tr>
+      <tr><td></td><td><code>span</code></td></tr>
+      <tr><td></td><td><code>changeScope</code></td></tr>
+      <tr><td></td><td><code>searchForward</code></td></tr>
+      <tr><td></td><td><code>searchBackward</code></td></tr>
+      <tr><td></td><td><code>quantumStart</code></td></tr>
+      <tr><td></td><td><code>quantumEnd</code></td></tr>
+    </tbody>
+  </table>
+
+  <ul>
+    <li><code>navigate</code> and <code>insert</code> exist in <strong>both</strong> enums.</li>
+    <li><code>replace</code> is a submode only.</li>
+    <li><code>reading</code> is a mode only, and is <a href="../src/main/java/com/ple/visur/EditorMode.java#L6">never assigned</a>.</li>
+  </ul>
+
+  <h2 id="stack-rules">Submode Stack Rules</h2>
+
+  <table>
+    <thead>
+      <tr><th>Operation</th><th>Code</th><th>Effect</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>read top</td>
+        <td><code>getEditorSubmode()</code></td>
+        <td><code>peek()</code> — the router's input</td>
+      </tr>
+      <tr>
+        <td>push a submode</td>
+        <td><code>putEditorSubmode(s)</code></td>
+        <td><code>push(s)</code></td>
+      </tr>
+      <tr>
+        <td>push <code>navigate</code></td>
+        <td><code>PushSubmodeOp</code></td>
+        <td>pop until size&nbsp;==&nbsp;1 (<strong>reset</strong>)</td>
+      </tr>
+      <tr>
+        <td>pop one</td>
+        <td><code>removeSubmode</code></td>
+        <td><code>pop()</code> if size&nbsp;&gt;&nbsp;1</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L115-121">EditorModelCoupler.java:115–121</a>,
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L242-249">242–249</a> ·
+    <a href="../src/main/java/com/ple/visur/PushSubmodeOp.java">PushSubmodeOp.java</a> ·
+    <a href="../src/main/java/com/ple/visur/RemoveSubmodeOp.java">RemoveSubmodeOp.java</a>
+  </p>
+
+  <div class="callout">
+    <strong>A stack, not a flag.</strong> Entering <code>span</code> inside
+    <code>searchForward</code> would nest. In practice every entry either
+    <code>removeSubmode</code>s back or pushes <code>navigate</code>, which
+    collapses the whole stack—so the depth stays at 1 or 2.
+  </div>
+
+  <h2 id="submode-table">Every Submode, Entry to Exit</h2>
+
+  <table>
+    <thead>
+      <tr><th>Submode</th><th>Entered by</th><th>Keymap handler</th><th>Handler compiles</th><th>Exit route</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>navigate</code></td>
+        <td>startup; <code>"navigate" pushSubmode</code></td>
+        <td><code>ChangeCursorQuantumHandler</code> (fallback)</td>
+        <td><code>"q|w|e|r" changeCursorQuantum</code></td>
+        <td>replaced by next push</td>
+      </tr>
+      <tr>
+        <td><code>insert</code></td>
+        <td><code>i</code>, <code>a</code> → <code>"insert" changeMode</code></td>
+        <td><code>InsertModeHandler</code></td>
+        <td><code>"c" insertChar 1 0 relativeMove</code></td>
+        <td><code>Escape</code> → <code>"navigate" changeMode</code></td>
+      </tr>
+      <tr>
+        <td><code>replace</code></td>
+        <td><code>o</code> → <code>"replace" changeMode</code></td>
+        <td><code>ReplaceModeHandler</code></td>
+        <td><code>"c" replaceChar 1 0 relativeMove</code>; <code>Enter</code> → <code>0 1 relativeMove</code></td>
+        <td><code>Escape</code> → <code>"navigate" changeMode</code></td>
+      </tr>
+      <tr>
+        <td><code>span</code></td>
+        <td><code>s</code> → <code>"span" pushSubmode</code></td>
+        <td><code>SpanSubmodeHandler</code></td>
+        <td><code>&lt;d&gt; setSpan</code>, then <code>removeSubmode</code></td>
+        <td><code>removeSubmode</code></td>
+      </tr>
+      <tr>
+        <td><code>changeScope</code></td>
+        <td><code>/</code> → <code>"changeScope" pushSubmode</code></td>
+        <td><code>ChangeScopeSubmodeHandler</code></td>
+        <td><code>"&lt;quantum&gt;" changeScope</code>, then <code>"navigate" pushSubmode</code></td>
+        <td>navigate push (reset)</td>
+      </tr>
+      <tr>
+        <td><code>searchForward</code></td>
+        <td><code>f</code> → <code>clearEDS "searchForward" pushSubmode</code></td>
+        <td><code>SearchForwardSubmodeHandler</code></td>
+        <td>chars build the EDS; <code>Enter</code> → <code>searchForward "navigate" pushSubmode</code></td>
+        <td><code>Enter</code> / <code>Escape</code> → navigate push</td>
+      </tr>
+      <tr>
+        <td><code>searchBackward</code></td>
+        <td><code>F</code> → <code>clearEDS "searchBackward" pushSubmode</code></td>
+        <td><code>SearchBackwardSubmodeHandler</code></td>
+        <td>chars build the EDS; <code>Enter</code> → <code>searchBackward "navigate" pushSubmode</code></td>
+        <td><code>Enter</code> / <code>Escape</code> → navigate push</td>
+      </tr>
+      <tr>
+        <td><code>quantumStart</code></td>
+        <td><code>[</code> → <code>"quantumStart" pushSubmode</code></td>
+        <td><code>QuantumStartSubmodeHandler</code></td>
+        <td><code>"&lt;quantum&gt;" quantumStart</code>, then <code>removeSubmode</code></td>
+        <td><code>removeSubmode</code></td>
+      </tr>
+      <tr>
+        <td><code>quantumEnd</code></td>
+        <td><code>]</code> → <code>"quantumEnd" pushSubmode</code></td>
+        <td><code>QuantumEndSubmodeHandler</code></td>
+        <td><code>"&lt;quantum&gt;" quantumEnd</code>, then <code>removeSubmode</code></td>
+        <td><code>removeSubmode</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    Bindings:
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L254-291">InitializerService.java:254–291</a>
+    (navigate keymap, where every submode is entered). Handlers live in
+    <code>src/main/java/com/ple/visur/*SubmodeHandler.java</code> and
+    <code>*ModeHandler.java</code>.
+  </p>
+
+  <h2 id="key-to-quantum">Key → Quantum Name</h2>
+
+  <p>
+    Four handlers resolve the pressed key through the same map before compiling a
+    command. It is registered once:
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Key</th><th>Quantum name</th><th>Used by</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>q</code></td><td><code>character</code></td><td><code>changeCursorQuantum</code>, <code>changeScope</code>, <code>quantumStart</code>, <code>quantumEnd</code></td></tr>
+      <tr><td><code>w</code></td><td><code>word</code></td><td>same four</td></tr>
+      <tr><td><code>e</code></td><td><code>line</code></td><td>same four</td></tr>
+      <tr><td><code>r</code></td><td><code>document</code></td><td>same four</td></tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L167-172">InitializerService.java:167–172</a> ·
+    <a href="../src/main/java/com/ple/visur/KeyToQuantumName.java">KeyToQuantumName.java</a>
+  </p>
+
+  <h2 id="gotchas">Gotchas</h2>
+
+  <ul>
+    <li><strong>Routing is by submode, not mode.</strong>
+      <code>keymapMap</code> is a
+      <code>Map&lt;EditorSubmode, Keymap&gt;</code>, and
+      <code>KeyWasPressedVerticle</code> looks up the current submode.</li>
+    <li><strong><code>putEditorSubmode</code> pushes.</strong> The name says
+      "put"; the body pushes onto the stack.</li>
+    <li><strong><code>"navigate"</code> means reset.</strong> Pushing it pops the
+      stack down to one entry, which is why Escape is one word.</li>
+    <li><strong><code>changeMode</code> writes twice:</strong> it <em>peeks</em>
+      to set the mode, then <code>PushSubmodeOp</code> <em>pops</em> the same
+      string as a submode name.</li>
+    <li><strong><code>changeMode "replace"</code> leaves the mode unchanged</strong>
+      because <code>replace</code> is not an <code>EditorMode</code>. Only the
+      submode changes.</li>
+    <li><strong><code>EditingModeHandler</code> is dead.</strong> It is never
+      placed on any keymap; the navigate fallback is
+      <code>ChangeCursorQuantumHandler</code>.</li>
+    <li><strong><code>ModeSwitchService</code> is dead.</strong> Its
+      <code>execute</code> body is commented out.</li>
+    <li><strong>Handlers are fallbacks.</strong> <code>Keymap.get</code> tries
+      explicit bindings first, then each handler until one returns non-null.</li>
+  </ul>
+
+  <h2 id="related">Related</h2>
+
+  <ul>
+    <li><a href="../lessons/0005-editor-modes-and-submodes.html">Lesson 5 — Editor Modes and Submodes: The Context Layer</a> (the teaching version)</li>
+    <li><a href="../lessons/0004-operators-the-30-editing-actions.html">Lesson 4 — Operators</a> (where <code>changeMode</code>, <code>pushSubmode</code>, <code>setSpan</code> live)</li>
+    <li><a href="operator-catalog.html">Operator Catalog</a> — every editing action's stack signature</li>
+    <li><a href="../src/main/java/com/ple/visur/EditorMode.java">EditorMode.java</a> ·
+      <a href="../src/main/java/com/ple/visur/EditorSubmode.java">EditorSubmode.java</a> — the enums</li>
+    <li><a href="../src/main/java/com/ple/visur/Keymap.java">Keymap.java</a> ·
+      <a href="../src/main/java/com/ple/visur/KeymapMap.java">KeymapMap.java</a> — routing structures</li>
+  </ul>
+
+  <div class="annotation">
+    <p>
+      <strong>Ask your teacher</strong> to trace any one row end to end, or to add
+      the missing reference unit for quantum types (Lesson&nbsp;6).
+    </p>
+  </div>
+
+  <div class="lesson-nav">
+    <a href="../lessons/0004-operators-the-30-editing-actions.html">← Lesson 4: Operators</a>
+    <a href="../lessons/0005-editor-modes-and-submodes.html">Lesson 5: Modes &amp; Submodes →</a>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reference — Cursor Coordinates Map</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+
+  <div class="lesson-header">
+    <div class="lesson-number">Reference · Unit of Learning</div>
+    <h1>Cursor Coordinates Map</h1>
+    <div class="lesson-meta">
+      One persisted fact (<code>ca</code>) · two mutually exclusive views
+      (<code>caAndNL</code> ↔ <code>cxcyAndNL</code>) · three coordinate spaces ·
+      companion to <a href="../lessons/0008-cursor-position-coordinates-and-display.html">Lesson 8</a>
+    </div>
+  </div>
+
+  <p class="lead">
+    The cursor is stored once and displayed in several coordinate systems. The
+    persistent truth is <code>ca</code>, the absolute character index. Logical
+    line/column (<code>cx</code>, <code>cy</code>) is derived from
+    <code>ca</code> and the shared read-only <code>nl</code> list, and the
+    viewport is a third, purely visual space on top. This page is the compressed
+    map.
+  </p>
+
+  <h2 id="graph">The Coordinate Graph</h2>
+
+  <table>
+    <thead>
+      <tr><th>Node</th><th>Kind</th><th>Required</th><th>Inners</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>cursorPositionDCB</code></td><td>Layered</td><td>all layers</td><td>layer 0 = <code>coordinatesDCB</code></td></tr>
+      <tr><td><code>coordinatesDCB</code></td><td>Compound</td><td><code>1</code></td><td><code>caAndNL</code> · <code>cxcyAndNL</code></td></tr>
+      <tr><td><code>caAndNLDCB</code></td><td>Compound</td><td><code>2</code></td><td><code>ca</code> · <code>nl</code></td></tr>
+      <tr><td><code>cxcyAndNLDCB</code></td><td>Compound</td><td><code>3</code></td><td><code>cx</code> · <code>cy</code> · <code>nl</code></td></tr>
+      <tr><td><code>nlDCB</code></td><td>Primitive · read-only</td><td>—</td><td><strong>two outers:</strong> <code>caAndNL</code> + <code>cxcyAndNL</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    <code>requiredSetValues = 1</code> on <code>coordinatesDCB</code> is the whole
+    trick: exactly one of the two decompositions is materialized, so
+    <code>ca</code> and <code>cx</code>/<code>cy</code> are never independently
+    authoritative.
+  </p>
+
+  <p class="source-ref">
+    <a href="../src/main/java/CursorPositionDC/CursorPositionDCHolder.java#L10-15">CursorPositionDCHolder.java:10–15</a> ·
+    <a href="../src/main/java/CursorPositionDC/CursorPositionDC.java#L8-24">CursorPositionDC.java:8–24</a> ·
+    <a href="../src/main/java/CursorPositionDC/CoordinatesDC.java#L15-32">CoordinatesDC.java:15–32</a>
+  </p>
+
+  <h2 id="formulas">The Two Formulas</h2>
+
+  <p>
+    The math lives on the <em>layer</em> in
+    <code>CoordinatesDC.calcInternal</code>, dispatched by target name. The
+    sub-compounds' own <code>calcInternal</code> methods return <code>null</code>.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Asked for</th><th>Needs</th><th>Formula</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>ca</code></td>
+        <td><code>cx</code>, <code>cy</code>, <code>nl</code></td>
+        <td><code>ca = (cy &gt; 0 ? nl[cy-1] : 0) + cx</code></td>
+      </tr>
+      <tr>
+        <td><code>cx</code> or <code>cy</code></td>
+        <td><code>ca</code>, <code>nl</code></td>
+        <td>first <code>cy</code> where <code>nl[cy] &gt; ca</code> (or the last index), then <code>cx = ca − (cy &gt; 0 ? nl[cy-1] : 0)</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/CursorPositionDC/CoordinatesDC.java#L36-58">CoordinatesDC.java:36–58</a> ·
+    <a href="../src/main/java/CursorPositionDC/CoordinatesDC.java#L60-72">CoordinatesDC.java:60–72</a> (<code>calcCAAndNL</code>) ·
+    <a href="../src/main/java/CursorPositionDC/CoordinatesDC.java#L74-99">CoordinatesDC.java:74–99</a> (<code>calcCXCYAndNL</code>)
+  </p>
+
+  <h3>Worked examples, <code>nl = [12, 25, 32]</code></h3>
+
+  <table>
+    <thead>
+      <tr><th>ca</th><th>cx</th><th>cy</th><th>Why</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>5</td><td>5</td><td>0</td><td>line 0 starts at 0</td></tr>
+      <tr><td>14</td><td>2</td><td>1</td><td><code>nl[0]=12</code> is the last start ≤ 14</td></tr>
+      <tr><td>17</td><td>5</td><td>1</td><td><code>12 + 5</code></td></tr>
+      <tr><td>25</td><td>0</td><td>2</td><td>boundary: <code>nl[1]=25</code> is <em>not</em> <code>&gt; 25</code></td></tr>
+      <tr><td>32</td><td>7</td><td>2</td><td>tail: falls through to <code>nl.size()-1</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    <code>nl</code> is <em>next-line indices</em>: <code>nl[k]</code> is where
+    logical line <code>k+1</code> starts. Its final element is the content
+    length, not a newline position. So <code>[12, 25, 32]</code> is three lines
+    starting at 0, 12, and 25, with the document ending at 32.
+  </p>
+
+  <p class="source-ref">
+    <a href="../src/main/java/CursorPositionDC/EditorContentService.java#L86-98">EditorContentService.java:86–98</a> builds
+    <code>nl</code> (newline index <code>i</code> → <code>i+1</code>, then the length) ·
+    traces in <a href="../src/test/CursorPositionDC/TestCursorPositionDC.java#L266-343">TestCursorPositionDC.java:266–343</a>
+  </p>
+
+  <h2 id="read-path">The Read Path (Lazy Derivation)</h2>
+
+  <figure>
+    <diagram>
+emc.getCX()  →  getGlobalVar("cx")  →  BrickVisurVar.getVal()
+                                        │ brick incomplete?
+                                        ▼
+                              brick.getOrCalc()          PrimitiveDataClassBrick:27
+                                        │
+                                        ▼
+                              calcFromOuter()            :49
+                                        │  outer.isComplete()?
+                                        ▼
+                       coordinatesDCB.calc("cx")         OuterDataClassBrick:12
+                                        │
+                                        ▼
+                 CoordinatesDC.calcInternal("cx", …)     :36
+                                        │
+                                        ▼
+                 calcCXCYAndNL(...): caches BOTH cx and cy, returns one
+    </diagram>
+    <figcaption>
+      <code>cacheVal</code> writes the value directly and does <em>not</em> call
+      <code>put</code>, so derivation never triggers conflict removal. That is why
+      both decompositions can be complete at once after a read.
+    </figcaption>
+  </figure>
+
+  <h2 id="spaces">Three Coordinate Spaces</h2>
+
+  <table>
+    <thead>
+      <tr><th>Space</th><th>Meaning</th><th>Stored at</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>ca</code></td><td>Absolute character index in the document</td><td>global var <code>"ca"</code> → <code>caDCB</code></td></tr>
+      <tr><td><code>cx</code>, <code>cy</code></td><td>Column in the <em>logical</em> line, and logical line number</td><td>global vars <code>"cx"</code>, <code>"cy"</code> → derived/cached</td></tr>
+      <tr><td><code>virtualCX</code></td><td>The column the user <em>wants</em>, preserved across vertical moves</td><td><code>EditorModelKey.virtualCX</code></td></tr>
+      <tr><td><code>canvasWidth</code></td><td>Visible cells per wrapped (short) line</td><td><code>EditorModelKey.canvasWidth</code></td></tr>
+      <tr><td><code>canvasStart</code></td><td><code>ca</code> of the viewport's first cell</td><td><code>EditorModelKey.canvasStart</code></td></tr>
+      <tr><td><code>fy</code></td><td>Focus row: top visible logical row</td><td><code>EditorModelKey.fy</code></td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    A logical line (between newlines) is a <strong>long line</strong>. When it is
+    wider than <code>canvasWidth</code> it wraps into several
+    <strong>short lines</strong>. <code>cx</code> can therefore exceed
+    <code>canvasWidth</code>: it is a long-line column, not a screen cell.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Helper</th><th>Returns</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>RelativeLineBoundCalculator.getLongLineLength(cy, nl)</code></td><td><code>nl[cy] − (cy &gt; 0 ? nl[cy-1] : 0)</code></td></tr>
+      <tr><td><code>RelativeLineBoundCalculator.getShort(cx, cy, nl)</code></td><td>start/end of the short line containing <code>cx</code>, using <code>cx % canvasWidth</code></td></tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L52-69">EditorModelCoupler.java:52–69</a> ·
+    <a href="../src/main/java/com/ple/visur/RelativeLineBoundCalculator.java#L7-50">RelativeLineBoundCalculator.java:7–50</a> ·
+    <a href="../src/main/java/com/ple/visur/CharacterQuantum.java#L58-92">CharacterQuantum.java:58–92</a> ·
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L304-366">EditorModelCoupler.java:304–366</a> (scroll)
+  </p>
+
+  <h2 id="stubs">Display Types: What Is Real</h2>
+
+  <table>
+    <thead>
+      <tr><th>Type</th><th>Reality</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>Coordinate</code></td><td>Unused stub: private ctor, <code>make(x, y)</code>, <code>equals</code>/<code>hashCode</code>. Never constructed anywhere.</td></tr>
+      <tr><td><code>ViewCell</code></td><td>Unused: <code>char</code> + foreground/background colors; the ctor sets only the character.</td></tr>
+      <tr><td><code>VisurColor</code></td><td>Unused: a single <code>String color</code> field. No color model.</td></tr>
+      <tr><td><code>LineWrapping</code></td><td>Two-value enum <code>{wrapped, unwrapped}</code>. Stored in the model, never read to change behavior.</td></tr>
+      <tr><td><code>MovementVector</code></td><td>Real: public <code>dx</code>/<code>dy</code> fields, built by <code>RelativeMoveOp</code> and consumed by every quantum's <code>move</code>.</td></tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/Coordinate.java">Coordinate.java</a> ·
+    <a href="../src/main/java/com/ple/visur/ViewCell.java">ViewCell.java</a> ·
+    <a href="../src/main/java/com/ple/visur/VisurColor.java">VisurColor.java</a> ·
+    <a href="../src/main/java/com/ple/visur/LineWrapping.java">LineWrapping.java</a> ·
+    <a href="../src/main/java/com/ple/visur/MovementVector.java">MovementVector.java</a> ·
+    <a href="../src/main/java/com/ple/visur/RelativeMoveOp.java#L11-26">RelativeMoveOp.java:11–26</a>
+  </p>
+
+  <h2 id="gotchas">Gotchas</h2>
+
+  <ul>
+    <li><strong><code>ca</code> is the only persisted truth.</strong> <code>cx</code>/<code>cy</code> exist only while some caller reads them.</li>
+    <li><strong>Derivation bypasses conflict removal.</strong> <code>cacheVal</code> is not <code>put</code>, so the "only one decomposition" rule is not re-enforced on reads.</li>
+    <li><strong><code>calcCXCYAndNL</code> caches both <code>cx</code> and <code>cy</code></strong> even when asked for just one.</li>
+    <li><strong>The reverse scan is strict:</strong> <code>nl[cy] &gt; ca</code>. At <code>ca == nl[k]</code> the cursor belongs to line <code>k+1</code>, <code>cx = 0</code>.</li>
+    <li><strong><code>nl</code>'s last element is the content length,</strong> so the final line has no following newline index.</li>
+    <li><strong>Primitive <code>cx</code>/<code>cy</code> are non-negative:</strong> <code>WholeNumberDC.isValidInput</code> rejects negative integers.</li>
+    <li><strong>Setting <code>cx</code>/<code>cy</code> unsets <code>ca</code></strong> (and vice versa) through Catalyst Permanence — see the <a href="data-class-map.html">Data Class Map</a>.</li>
+  </ul>
+
+  <h2 id="related">Related</h2>
+
+  <ul>
+    <li><a href="../lessons/0008-cursor-position-coordinates-and-display.html">Lesson 8 — Cursor Position: One Fact, Two Coordinate Systems</a> (the teaching version)</li>
+    <li><a href="../lessons/0007-the-data-class-hierarchy.html">Lesson 7 — The Data Class Hierarchy</a> (the machinery under this graph)</li>
+    <li><a href="../lessons/0006-the-quantum-system.html">Lesson 6 — The Quantum System</a> (where <code>nl</code> first appeared)</li>
+    <li><a href="data-class-map.html">Data Class Map</a> — the two conflict rules this graph obeys</li>
+    <li><a href="quantum-map.html">Quantum Map</a> — the quantums that call <code>move()</code></li>
+    <li><a href="../lessons/0002-editor-lifecycle-one-complete-request.html">Lesson 2 — The Editor Lifecycle</a> — where a keystroke becomes a move</li>
+  </ul>
+
+  <div class="annotation">
+    <p>
+      <strong>Ask your teacher</strong> to trace a specific keystroke: which
+      global variable is read first, which decomposition materializes, which one
+      is dropped, and what the viewport does.
+    </p>
+  </div>
+
+  <div class="lesson-nav">
+    <a href="../lessons/0007-the-data-class-hierarchy.html">← Lesson 7: Data Class Hierarchy</a>
+    <a href="../lessons/0008-cursor-position-coordinates-and-display.html">Lesson 8: Cursor Position →</a>
+  </div>
+
+</body>
+</html>

@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 3 — The Command Language: Words, Operators, and Pipelines</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="lesson-header">
+    <div class="lesson-number">Lesson 3 of 10</div>
+    <h1>The Command Language: Words, Operators, and Pipelines</h1>
+    <div class="lesson-meta">
+      Reads ~20 min · Hands-on: compile &amp; trace a command in 10 min
+    </div>
+  </div>
+
+  <h2 id="mission">Mission Anchor</h2>
+
+  <p>
+    In <a href="0002-editor-lifecycle-one-complete-request.html">Lesson 2</a> you
+    watched a keypress travel through the editor and stop at this line: the
+    keymap hands the <code>KeyWasPressedVerticle</code> a
+    <code>VisurCommand</code>, and
+    <a href="../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService</a>
+    runs it. This lesson opens that command up.
+  </p>
+
+  <p>
+    Almost every feature you will add to Visur—a new editing action, a new key
+    binding, a new compound gesture like <code>"span" pushSubmode</code>—is
+    written in this small language. If you can read and write Visur command
+    strings, you can extend the editor without touching a single line of Java.
+    That is the leverage this lesson gives you.
+  </p>
+
+  <div class="callout">
+    <strong>Goal this lesson:</strong> Understand the two-phase pipeline
+    (<em>compile</em> then <em>execute</em>), name the four word types that
+    tokenize a command string, explain why operands travel on an
+    <code>ExecutionDataStack</code> instead of as Java arguments, and hand-compile
+    the real command <code>"span" "tempSpan" -&gt; 0 setSpan</code>.
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="big-idea">1. The Big Idea: Visur Is a Stack Language</h2>
+
+  <p>
+    Before any class names, hold on to one idea. The Visur command language is a
+    <strong>concatenative, stack-based language</strong>—a thin cousin of Forth
+    and PostScript. There are no parentheses and no named arguments. Instead:
+  </p>
+
+  <ul>
+    <li><strong>Literals push.</strong> A number or a quoted string pushes its
+      value onto a shared stack.</li>
+    <li><strong>Operators pop.</strong> An action takes its operands off the top
+      of the same stack, does its work, and (usually) pushes a result back.</li>
+    <li><strong>Order is everything.</strong> <code>5 j</code> and <code>j 5</code>
+      are different programs, exactly as they are in Forth.</li>
+  </ul>
+
+  <p>
+    The stack is a real object—<a href="../src/main/java/com/ple/visur/ExecutionDataStack.java">ExecutionDataStack.java</a>—a plain
+    <code>Stack&lt;Object&gt;</code> with <code>push</code>, <code>pop</code>,
+    <code>peek</code>, and <code>size</code>. It is stored in the shared editor
+    model, so every operator reaches it through
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler</a>.getExecutionDataStack().
+  </p>
+
+  <div class="callout warning">
+    <strong>Why a stack, and not Java arguments?</strong> A method call like
+    <code>relativeMove(dx, dy)</code> needs a Java caller that already knows the
+    argument types. A stack lets the same generic executor run <em>any</em>
+    command: it just walks a list of operators, and each one pulls whatever it
+    needs off the shared stack. This is what makes the keymaps data—strings
+    compiled at startup—rather than code (<a href="0002-editor-lifecycle-one-complete-request.html#init">Lesson 2, §4</a>).
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="phases">2. Two Phases: Compile, Then Execute</h2>
+
+  <p>
+    The language is split across two services with a clean seam between them. A
+    <strong>string</strong> goes in one end; a <strong>list of operators</strong>
+    comes out the other; then a separate service runs that list.
+  </p>
+
+  <figure>
+    <pre class="diagram">
+  COMPILE PHASE                              EXECUTE PHASE
+  ─────────────                              ─────────────
+
+  "0 1 relativeMove"
+        │
+        ▼
+  ┌──────────────────────────┐
+  │ CommandCompileService     │
+  │  .compile(sentence)       │
+  │                           │
+  │  try each Word in order:  │
+  │   LiteralNumberWord       │
+  │   LiteralStringWord       │
+  │   AssignmentWord          │
+  │   NativeOpWord            │
+  │   RecallWord              │
+  │                           │
+  │  first match wins ──► pair (Operator, opInfo)
+  │  strip token, repeat      │
+  └──────────────────────────┘
+        │
+        ▼
+  VisurCommand {
+    ops    = [LiteralNumberOp,
+              LiteralNumberOp,
+              RelativeMoveOp]
+    opInfo = [0, 1, null]
+  }
+        │
+        ▼
+  ┌──────────────────────────┐
+  │ CommandExecutionService   │
+  │  .execute(command)        │
+  │                           │
+  │  for each op i:           │
+  │    op[i].execute(info[i]) │
+  └──────────────────────────┘
+        │
+        ▼
+  EditorModelCoupler  (shared state mutates)
+    </pre>
+    <figcaption>Figure 1: The seam between the two phases. Compilation is pure
+ string work and happens once per command—often at startup, when keymaps are
+ built. Execution is the side-effecting phase that mutates the editor model.
+ Separating them means a command string is validated long before it runs.</figcaption>
+  </figure>
+
+  <p>
+    Two files own this contract: <a href="../src/main/java/com/ple/visur/Word.java">Word.java</a>
+    (compile side) and <a href="../src/main/java/com/ple/visur/Operator.java">Operator.java</a>
+    (execute side). Each is a one-method interface:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// Word.java:14  — turns text into an operator + operand
+public interface Word {
+  public CompiledWordResponse compile(String sentence);
+}
+
+// Operator.java:9  — performs the editing action
+public interface Operator {
+  public void execute(Object opInfo);
+}
+    </pre>
+    <figcaption>Every word type you will meet implements <code>Word</code>; every
+ action implements <code>Operator</code>. The entire 26-file command system hangs
+ off these two tiny interfaces.</figcaption>
+  </figure>
+
+  <hr class="divider">
+
+  <h2 id="words">3. The Four Words (and the Fifth)</h2>
+
+  <p>
+    A <strong>Word</strong> is a lexical token class. Each <code>Word</code>
+    implementation tries its own regex against the front of the remaining
+    sentence; the first one that matches claims the token and reports what
+    operator it produced. Visur registers <em>five</em> word types—the itinerary
+    names four, but the compiled list in
+    <a href="../src/main/java/com/ple/visur/CommandCompileService.java">CommandCompileService.java</a>
+    includes a fifth, <code>RecallWord</code>, which is how global-variable names
+    enter a command.
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Word</th><th>Matches</th><th>Produces</th><th>opInfo</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><a href="../src/main/java/com/ple/visur/LiteralNumberWord.java">LiteralNumberWord</a></td>
+        <td><code>5</code>, <code>-1</code>, <code>3.14</code></td>
+        <td><code>LiteralNumberOp</code></td>
+        <td>the parsed number</td>
+      </tr>
+      <tr>
+        <td><a href="../src/main/java/com/ple/visur/LiteralStringWord.java">LiteralStringWord</a></td>
+        <td><code>"span"</code></td>
+        <td><code>LiteralStringOp</code></td>
+        <td>the quoted text</td>
+      </tr>
+      <tr>
+        <td><a href="../src/main/java/com/ple/visur/AssignmentWord.java">AssignmentWord</a></td>
+        <td><code>-&gt;</code></td>
+        <td><code>AssignmentOp</code></td>
+        <td>the text after the arrow</td>
+      </tr>
+      <tr>
+        <td><a href="../src/main/java/com/ple/visur/NativeOpWord.java">NativeOpWord</a></td>
+        <td><code>relativeMove</code>, <code>+</code></td>
+        <td>one of ~24 operators</td>
+        <td><code>null</code></td>
+      </tr>
+      <tr>
+        <td><a href="../src/main/java/com/ple/visur/RecallWord.java">RecallWord</a></td>
+        <td><code>previousSearchTarget</code></td>
+        <td><code>RecallOp</code></td>
+        <td>the variable name</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3 id="literal-number">LiteralNumberWord and LiteralStringWord — the pushers</h3>
+
+  <p>
+    These two are the only words that exist purely to put a value on the stack.
+    Their regexes capture the literal and hand the rest of the sentence onward:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// LiteralNumberWord.java:10
+Pattern.compile("^(-?[0-9]+\\.?[0-9]*)(.*)");
+  //  group(1) = the number       group(2) = everything after
+
+// LiteralStringWord.java:10
+Pattern.compile("(\"[^\"]*\"*)(.*)");
+  //  group(1) = the quoted string  group(2) = everything after
+    </pre>
+    <figcaption>Both keep the quoted form in <code>opInfo</code> for strings. The
+ quote stripping happens later, in the operator—not the word.</figcaption>
+  </figure>
+
+  <p>
+    The matching operator,
+    <a href="../src/main/java/com/ple/visur/LiteralStringOp.java">LiteralStringOp</a>,
+    strips the surrounding quotes before pushing:
+    <code>opInfoAsString.substring(1, length - 1)</code>. So <code>"span"</code>
+    goes on the stack as <code>span</code>.
+    <a href="../src/main/java/com/ple/visur/LiteralNumberOp.java">LiteralNumberOp</a>
+    pushes the integer unchanged. Neither reads the editor model—they only
+    <code>putOnExecutionDataStack</code>.
+  </p>
+
+  <h3 id="native-op">NativeOpWord — the dispatcher</h3>
+
+  <p>
+    <code>NativeOpWord</code> is where the names you type become Java objects. It
+    grabs one whitespace-delimited token and runs it through a
+    <code>switch</code> that maps the keyword to a concrete operator
+    (<a href="../src/main/java/com/ple/visur/NativeOpWord.java">NativeOpWord.java:18–76</a>):
+  </p>
+
+  <figure>
+    <pre class="diagram">
+case "relativeMove":      op = new RelativeMoveOp();      break;
+case "absoluteMove":      op = new AbsoluteMoveOp();      break;
+case "+":                 op = new AddOperator();          break;
+case "clearEDS":          op = new ClearEDSOp();           break;
+case "setSpan":           op = new SetSpanOp();            break;
+case "changeMode":        op = new ChangeModeOp();         break;
+case "pushSubmode":       op = new PushSubmodeOp();        break;
+case "quantumStart":      op = new QuantumStartOp();       break;
+case "searchForward":     op = new SearchForwardOp();      break;
+...                       (about two dozen in all)
+default:
+  System.out.println("operator " + opSource + " not recognized.");
+    </pre>
+    <figcaption>This table <em>is</em> the editor's instruction set. Adding a new
+ native action means adding a case here and writing one <code>Operator</code>
+ class—nothing else in the pipeline changes.</figcaption>
+  </figure>
+
+  <h3 id="assignment">AssignmentWord — the arrow</h3>
+
+  <p>
+    The token <code>-&gt;</code> matches
+    <code>Pattern.compile("(-&gt;*[^\\s]+)(.*)")</code>. Its operator,
+    <a href="../src/main/java/com/ple/visur/AssignmentOp.java">AssignmentOp</a>,
+    ignores <code>opInfo</code> entirely and instead pops <strong>two</strong>
+    strings off the stack:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// AssignmentOp.java:13 — executed after literals have pushed
+String nameToPut = (String)es.pop();              // the variable to write
+String nameOfValueToRetrieve = (String)es.pop();  // the variable to read
+VisurVar value = emc.getGlobalVar(nameOfValueToRetrieve);
+emc.putGlobalVar(nameToPut, value);               // copy: nameToPut := value
+    </pre>
+    <figcaption>This is why <code>"span" "tempSpan" -&gt;</code> means <em>copy
+ span into tempSpan</em>, not the other way around: the destination was pushed
+ last, so it pops first. The arrow is a marker that triggers the copy; the names
+ came from the stack.</figcaption>
+  </figure>
+
+  <h3 id="recall">RecallWord — global-variable names</h3>
+
+  <p>
+    <code>RecallWord</code> is the catch-all at the end of the list. It takes the
+    next token and asks: <em>is this the name of a global variable?</em> If yes, it
+    emits a <code>RecallOp</code> whose job is to <strong>push that variable's
+    value</strong>. If no, it returns <code>null</code>—which, because
+    <code>RecallWord</code> is last, ends compilation.
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// RecallWord.java:13
+VariableMap gvm = ServiceHolder.editorModelCoupler.getGlobalVarMap();
+String recallWordName = matcher.group(1);
+if (gvm.get(recallWordName) != null) {
+  cwr = new CompiledWordResponse(new RecallOp(), recallWordName, matcher.group(2));
+} else {
+  cwr = null;                          // unknown token → stop
+}
+    </pre>
+    <figcaption>This is how <code>previousSearchTarget searchInPreviousDirection</code>
+ works: <code>RecallWord</code> pushes the stored search target onto the stack,
+ then <code>SearchInPreviousDirectionOp</code> pops it.</figcaption>
+  </figure>
+
+  <div class="callout">
+    <strong>Note the ordering rule.</strong> <code>CommandCompileService</code>
+    tries the words <em>in array order</em> and stops at the first match
+    (<a href="../src/main/java/com/ple/visur/CommandCompileService.java">CommandCompileService.java:22–28</a>).
+    <code>NativeOpWord</code> and <code>RecallWord</code> use the same
+    <code>([^\\s]+)</code> pattern, so order decides who wins: a native operator
+    name is claimed first; only if it is not a known operator does
+    <code>RecallWord</code> get a chance. Arrays are load-bearing here.
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="compile">4. Compiling: The Loop That Builds a VisurCommand</h2>
+
+  <p>
+    <a href="../src/main/java/com/ple/visur/CommandCompileService.java">CommandCompileService.compile()</a>
+    is a lazy tokenizer: no lexer, no grammar, no AST. It simply loops while text
+    remains, asks each word to claim the front of the string, appends what comes
+    back, and repeats.
+  </p>
+
+  <figure>
+    <pre class="diagram">
+public VisurCommand compile(String sentence) {
+  VisurCommand command = new VisurCommand(sentence);
+  String currentSentence = sentence;
+  Word[] words = { literalNumberWord, literalStringWord,
+                   assignmentWord, nativeOperatorWord, recallWord };
+
+  compileLoop:
+  while (currentSentence != "") {
+    for (Word word : words) {
+      CompiledWordResponse cwr = word.compile(currentSentence);
+      if (cwr != null) {
+        command.ops.add(cwr.op);
+        command.opInfo.add(cwr.opInfo);
+        currentSentence = cwr.remainingSentence.stripLeading();
+        break;
+      }
+      if (word instanceof RecallWord) break compileLoop;   // nothing matched
+    }
+  }
+  return command;
+}
+    </pre>
+    <figcaption>The whole compiler, abridged only in whitespace. Each word returns
+ a <a href="../src/main/java/com/ple/visur/CompiledWordResponse.java">CompiledWordResponse</a>—an operator, its
+ operand, and the <code>remainingSentence</code>. The loop feeds that remainder
+ back in as the next input.</figcaption>
+  </figure>
+
+  <p>
+    <code>CompiledWordResponse</code> is the handoff object between the two halves
+    of the compile phase. It carries exactly three fields (<a href="../src/main/java/com/ple/visur/CompiledWordResponse.java">CompiledWordResponse.java:2–4</a>):
+    <code>Operator op</code>, <code>Object opInfo</code>, and
+    <code>String remainingSentence</code>. It is the currency of every
+    <code>Word</code>.
+  </p>
+
+  <h3 id="visurcommand">4.1 VisurCommand: a compiled program</h3>
+
+  <p>
+    The output is a <a href="../src/main/java/com/ple/visur/VisurCommand.java">VisurCommand</a>—two
+    <strong>parallel lists</strong>, one of operators and one of their operands,
+    indexed together:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+public class VisurCommand {
+  String sentenceAsString;              // the original text, kept for debugging
+  ArrayList&lt;Operator&gt; ops = new ArrayList&lt;&gt;();
+  ArrayList&lt;Object&gt; opInfo = new ArrayList&lt;&gt;();
+}
+    </pre>
+    <figcaption><code>ops.get(i)</code> is always paired with
+ <code>opInfo.get(i)</code>. This is why <code>CommandExecutionService</code>
+ can walk the command with a single integer index—no call graph, no stack
+ frames, just a flat list of instructions.</figcaption>
+  </figure>
+
+  <p>
+    Compiled after <code>"0 1 relativeMove"</code>, the command is literally:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+ops    = [ LiteralNumberOp , LiteralNumberOp , RelativeMoveOp ]
+opInfo = [        0        ,        1        ,      null      ]
+    </pre>
+    <figcaption>A three-instruction program. The two literals push operands; the
+ move consumes them. This is the exact object stored in the <code>navigate</code>
+ keymap for the <code>j</code> key (<a href="0002-editor-lifecycle-one-complete-request.html#init">Lesson 2, Figure 5</a>).</figcaption>
+  </figure>
+
+  <hr class="divider">
+
+  <h2 id="execute">5. Executing: Walking the Instruction List</h2>
+
+  <p>
+    <a href="../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService.execute()</a>
+    is the mirror image—a single indexed loop:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+public void execute(VisurCommand command) {
+  for (int i = 0; i &lt; command.ops.size(); i++) {
+    Operator currentOp = command.ops.get(i);
+    Object currentOpInfo = command.opInfo.get(i);
+    switch (currentOp.getClass().getSimpleName()) {
+      case "LiteralNumberOp": LiteralNumberOp.make().execute(currentOpInfo); break;
+      case "LiteralStringOp": LiteralStringOp.make().execute(currentOpInfo); break;
+      case "AssignmentOp":    AssignmentOp.make().execute(currentOpInfo);    break;
+      case "RecallOp":        RecallOp.make().execute(currentOpInfo);        break;
+      default:                currentOp.execute(currentOpInfo);
+    }
+  }
+}
+    </pre>
+    <figcaption>Four operator names are special-cased and re-instantiated through
+ their <code>make()</code> factory; everything else runs on the instance the
+ compiler produced. Functionally the four behave identically to
+ <code>currentOp.execute(...)</code>—it is a stylistic wrinkle worth recognizing
+ when you read the file.</figcaption>
+  </figure>
+
+  <p>
+    There is no interpreter state, no instruction pointer to save, no program
+    counter. The loop's index <em>is</em> the program counter. Because operands
+    live on the <code>ExecutionDataStack</code> in the editor model, even nested
+    gestures—a submode that pushes values later consumed by another
+    operator—work without the executor knowing anything about them.
+  </p>
+
+  <h3 id="eds-arithmetic">5.1 Seeing the stack move: <code>+</code></h3>
+
+  <p>
+    The arithmetic operator is the clearest proof that operators communicate
+    through the stack alone. <a href="../src/main/java/com/ple/visur/AddOperator.java">AddOperator</a>
+    pops twice and pushes the sum:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// AddOperator.java:9
+int a = (int)es.pop();
+int b = (int)es.pop();
+es.push(a + b);
+    </pre>
+    <figcaption>Combine it with literals and you get real arithmetic in a keymap:
+ <code>0 2 3 + relativeMove</code> compiles to five operators and moves the cursor
+ down five lines. Note the order—<code>RelativeMoveOp</code> pops <code>dy</code>
+ first, so the vertical distance is pushed last. The <code>+</code> keyword is only
+ special insofar as <code>NativeOpWord</code> has a <code>case "+"</code>.</figcaption>
+  </figure>
+
+  <hr class="divider">
+
+  <h2 id="walkthrough">6. Hand-Compile Two Real Commands</h2>
+
+  <p>
+    Here are two commands that are actually bound in
+    <a href="../src/main/java/com/ple/visur/InitializerService.java">InitializerService</a>.
+    Read each one left to right and watch the stack.
+  </p>
+
+  <h3 id="walkthrough-push">A push/pop pair: the <code>[</code> key</h3>
+
+  <p>
+    The <code>[</code> key starts a quantum by pushing the submode name
+    <code>"quantumStart"</code> and letting <code>PushSubmodeOp</code> consume it
+    (<a href="../src/main/java/com/ple/visur/InitializerService.java#L255">InitializerService.java:255</a>):
+  </p>
+
+  <figure>
+    <pre class="diagram">
+"quantumStart" pushSubmode
+    </pre>
+    <figcaption>Two tokens&mdash;the smallest complete command in the editor: one
+ literal pushes a value, one native operator pops it.</figcaption>
+  </figure>
+
+  <table>
+    <thead>
+      <tr><th>You type</th><th>Word that claims it</th><th>Operator runs</th><th>Stack after</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>"quantumStart"</code></td>
+        <td>LiteralStringWord</td>
+        <td>LiteralStringOp</td>
+        <td><code>[quantumStart]</code></td>
+      </tr>
+      <tr>
+        <td><code>pushSubmode</code></td>
+        <td>NativeOpWord</td>
+        <td>PushSubmodeOp</td>
+        <td><code>[]</code> &mdash; quantumStart is now on the submode stack</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>
+    <a href="../src/main/java/com/ple/visur/PushSubmodeOp.java">PushSubmodeOp</a>
+    does exactly what the model predicts: <code>String editorSubmodeAsString =
+    (String)eds.pop();</code>, then it looks the string up in the
+    <code>EditorSubmode</code> enum.
+  </p>
+
+  <h3 id="walkthrough-assign">An assignment: the prefix of the <code>i</code> key</h3>
+
+  <p>
+    The insert key's binding opens with the same three tokens everywhere it
+    appears (<a href="../src/main/java/com/ple/visur/InitializerService.java#L264">InitializerService.java:264</a>):
+  </p>
+
+  <figure>
+    <pre class="diagram">
+"span" "tempSpan" ->
+    </pre>
+    <figcaption>The <code>-&gt;</code> token is an <code>AssignmentWord</code>, and
+ it always appears <em>after</em> the two names it consumes&mdash;because
+ <code>AssignmentOp</code> pops the destination first and the source second.</figcaption>
+  </figure>
+
+  <table>
+    <thead>
+      <tr><th>You type</th><th>Word that claims it</th><th>Operator runs</th><th>Stack after</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>"span"</code></td>
+        <td>LiteralStringWord</td>
+        <td>LiteralStringOp</td>
+        <td><code>[span]</code></td>
+      </tr>
+      <tr>
+        <td><code>"tempSpan"</code></td>
+        <td>LiteralStringWord</td>
+        <td>LiteralStringOp</td>
+        <td><code>[span, tempSpan]</code></td>
+      </tr>
+      <tr>
+        <td><code>-&gt;</code></td>
+        <td>AssignmentWord</td>
+        <td>AssignmentOp</td>
+        <td><code>[]</code> &mdash; and <code>tempSpan := span</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p>
+    The full <code>i</code> binding is that prefix plus the rest of the gesture:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+"span" "tempSpan" ->
+"cursorQuantum" "tempCursorQuantum" ->
+0 setSpan
+"character" quantumStart
+"insert" changeMode
+"character" changeCursorQuantum
+    </pre>
+    <figcaption>Broken across lines to read; in the source it is one
+ whitespace-separated string. It saves the current span and quantum, clears the
+ span, starts a quantum, switches to insert mode, and sets the cursor quantum
+ type. The matching <code>Escape</code> binding in the insert keymap reverses it:
+ <code>"tempSpan" "span" -&gt; ...</code> restores the saved values and removes
+ the temporary variables.</figcaption>
+  </figure>
+
+  <p>
+    Three lessons fall out of these traces. First, values travel on the stack: the
+    names <code>span</code> and <code>tempSpan</code> are just strings pushed by
+    literals, and configuration values like <code>"insert"</code> and
+    <code>"character"</code> ride the same stack as numbers. Second, the
+    <code>-&gt;</code> marker is only syntax&mdash;the real arguments are the two
+    names pushed before it. Third, a well-formed command should leave the stack
+    balanced; where that is hard to guarantee, <code>clearEDS</code>
+    (<code>ClearEDSOp</code>) is bound at the start of a gesture to reset the
+    stack to a known state.
+  </p>
+
+  <hr class="divider">
+
+  <h2 id="command-state">7. CommandStateService: The Command Line</h2>
+
+  <p>
+    Everything so far assumes the sentence was typed all at once, because that is
+    how the running editor works: every command comes from a precompiled keymap.
+    There is also a second, live code path. When <code>isInCommandState</code> is
+    true, <code>KeyWasPressedVerticle</code> routes keystrokes to
+    <a href="../src/main/java/com/ple/visur/CommandStateService.java">CommandStateService</a>
+    instead of the keymap (the branch you saw in
+    <a href="0002-editor-lifecycle-one-complete-request.html#step-handle">Lesson 2, Step 1</a>).
+  </p>
+
+  <p>
+    <code>CommandStateService</code> is a small line editor in its own right. It
+    keeps a buffer (<code>commandStateContent</code>) and a cursor
+    (<code>commandCursor</code>) in the shared model and mutates them per
+    keystroke:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+executeCommandState(KeyPressed key):
+  "Escape"      → exitCommandState()          // cancel, clear buffer
+  "Enter"       → compile buffer, execute it, exit
+  "ArrowLeft"   → move command cursor left
+  "ArrowRight"  → move command cursor right
+  "Backspace"   → delete char before cursor
+  length == 1   → insert char at cursor
+    </pre>
+    <figcaption>The critical branch is <code>Enter</code>: it calls
+ <code>CommandCompileService.compile(...)</code> then
+ <code>CommandExecutionService.execute(...)</code>—the exact two-phase pipeline
+ from Figure 1, now driven by a human instead of a keymap.</figcaption>
+  </figure>
+
+  <p>
+    So a keymap is a command typed in advance, and the command state is the same
+    command typed live&mdash;both funnel into the identical compile-then-execute
+    pair.
+  </p>
+
+  <div class="callout warning">
+    <strong>A half-wired feature.</strong> Nothing in the current source ever sets
+    <code>isInCommandState</code> to <code>true</code>: the initializer sets it
+    <code>false</code>
+    (<a href="../src/main/java/com/ple/visur/InitializerService.java#L106">InitializerService.java:106</a>),
+    and the only other writer clears it on exit. <code>CommandStateService</code>
+    is a fully implemented prompt with no UI entry point yet&mdash;so the behavior
+    below is what the code does, not a binding you can reach by pressing a key
+    today.
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="operators">8. The Operator Set at a Glance</h2>
+
+  <p>
+    Twenty-eight classes implement <code>Operator</code> (one of them,
+    <code>ModeSwitchService</code>, is a service that happens to satisfy the
+    interface). Grouped by what they touch, the instruction set is:
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Family</th><th>Operators</th><th>What they do</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Literals</td><td><code>LiteralNumberOp</code>, <code>LiteralStringOp</code></td><td>push a value onto the stack</td></tr>
+      <tr><td>Movement</td><td><code>RelativeMoveOp</code>, <code>AbsoluteMoveOp</code></td><td>move the cursor by (dx, dy) or to an absolute position</td></tr>
+      <tr><td>Insertion</td><td><code>InsertCharOp</code>, <code>InsertNewlineOp</code>, <code>ReplaceCharOp</code></td><td>write text into the document</td></tr>
+      <tr><td>Deletion</td><td><code>DeletePreviousCharOp</code>, <code>DeleteCursorQuantumOp</code></td><td>remove the previous char or the current quantum</td></tr>
+      <tr><td>Variables</td><td><code>AssignmentOp</code>, <code>RecallOp</code>, <code>AddOperator</code>, <code>RemoveGlobalVarOp</code></td><td>read, write, add, and drop global variables</td></tr>
+      <tr><td>Mode &amp; state</td><td><code>ChangeModeOp</code>, <code>ChangeScopeOp</code>, <code>SetSpanOp</code>, <code>PushSubmodeOp</code>, <code>RemoveSubmodeOp</code></td><td>switch the context that governs later input</td></tr>
+      <tr><td>Quantum</td><td><code>QuantumStartOp</code>, <code>QuantumEndOp</code>, <code>ChangeCursorQuantumOp</code></td><td>open, close, and retype an edit region</td></tr>
+      <tr><td>Search</td><td><code>SearchForwardOp</code>, <code>SearchBackwardOp</code>, <code>SearchInPreviousDirectionOp</code>, <code>SearchNotInPreviousDirectionOp</code>, <code>RemoveLastCharInSearchTargetOp</code></td><td>find and refine a search target</td></tr>
+      <tr><td>Utility</td><td><code>ClearEDSOp</code></td><td>empty the operand stack</td></tr>
+    </tbody>
+  </table>
+
+  <p>
+    Lesson 4 takes each family apart in turn; for now, learn the shape: every
+    action the editor can perform is one class implementing one method.
+  </p>
+
+  <hr class="divider">
+
+  <h2 id="quiz">9. Retrieval Practice</h2>
+
+  <p>
+    Close the source files. Answer from memory, then check. The effort of
+    recalling—not re-reading—is what makes this stick.
+  </p>
+
+  <div class="quiz">
+    <script type="application/json">
+    [
+      {
+        "q": "What does a Word's compile method return?",
+        "options": [
+          "A compiled word response holding operator",
+          "A rendered view object holding text",
+          "A mutable command state holding cursor",
+          "A serialized json object holding fields"
+        ],
+        "answer": 0,
+        "explain": "CompiledWordResponse carries the operator, its opInfo operand, and the remaining sentence to be tokenized next."
+      },
+      {
+        "q": "Where do operators get their operands from?",
+        "options": [
+          "A shared execution data stack object",
+          "The java method arguments passed callers",
+          "A per operator private instance field",
+          "The browser key event json body"
+        ],
+        "answer": 0,
+        "explain": "Literals push onto the ExecutionDataStack and operators pop; arguments are never passed through Java calls."
+      },
+      {
+        "q": "Which word class turns a keyword into Java?",
+        "options": [
+          "NativeOpWord maps each keyword to operator",
+          "LiteralStringWord pushes each quoted text value",
+          "AssignmentWord copies each variable into another",
+          "RecallWord pushes each stored global variable"
+        ],
+        "answer": 0,
+        "explain": "NativeOpWord's switch maps strings like relativeMove and + to concrete Operator instances."
+      },
+      {
+        "q": "What triggers compilation in the command prompt?",
+        "options": [
+          "The user presses the Enter key",
+          "The user presses the Escape key",
+          "The user presses the Backspace key",
+          "The user presses an ArrowLeft key"
+        ],
+        "answer": 0,
+        "explain": "CommandStateService compiles and executes the buffer only on Enter; Escape discards it and Backspace edits it."
+      },
+      {
+        "q": "In what order should compile probe its words?",
+        "options": [
+          "Number, string, assignment, native, recall",
+          "Recall, native, assignment, string, number",
+          "Native, recall, number, string, assignment",
+          "String, number, recall, assignment, native"
+        ],
+        "answer": 0,
+        "explain": "CommandCompileService builds the array in that order and stops at the first match, so ordering decides token ownership."
+      },
+      {
+        "q": "What pops first when AssignmentOp executes?",
+        "options": [
+          "The destination variable name value",
+          "The source variable name value",
+          "The original sentence string value",
+          "The remaining sentence string value"
+        ],
+        "answer": 0,
+        "explain": "The destination is pushed last, so it is popped first as nameToPut; the source is popped second as the value to copy."
+      }
+    ]
+    </script>
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="primary-source">10. Primary Source</h2>
+
+  <p>
+    The highest-trust account of this lesson is the code. Read these three files
+    top to bottom, in this order:
+  </p>
+
+  <ol>
+    <li><a href="../src/main/java/com/ple/visur/CommandCompileService.java">CommandCompileService.java</a>—the entire compiler is one loop.</li>
+    <li><a href="../src/main/java/com/ple/visur/NativeOpWord.java">NativeOpWord.java</a>—the complete instruction-name-to-class table.</li>
+    <li><a href="../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService.java</a>—the entire executor is one loop.</li>
+  </ol>
+
+  <p>
+    For the underlying language concept, read the Wikipedia article on
+    <a href="https://en.wikipedia.org/wiki/Stack-oriented_programming">stack-oriented programming</a>
+    and the Forth page it links to. Visur's language is not Forth, but the mental
+    model—postfix order, one shared data stack, words as functions—is exactly the
+    same, and it makes the code read as familiar rather than exotic.
+  </p>
+
+  <p>
+    For wisdom—the judgment of <em>how a command language should be designed</em>—the
+    Forth community is the deepest well. The
+    <a href="https://forth-standard.org/">Forth 2012 standard</a> and its mailing
+    list discussion show what designers learned from decades of stack-language
+    use, including the failure modes of implicit operand stacks. If you would
+    rather keep the feedback loop local, say so and we will workshop command
+    strings together instead.
+  </p>
+
+  <hr class="divider">
+
+  <h2 id="takeaways">11. Key Takeaways</h2>
+
+  <ul>
+    <li><strong>Visur's command language is stack-based:</strong> literals push,
+      operators pop, order defines meaning.</li>
+    <li><strong>Compile and execute are separate phases</strong> joined by
+      <code>VisurCommand</code>—a parallel list of operators and operands.</li>
+    <li><strong>Five words tokenize a command:</strong>
+      <code>LiteralNumberWord</code>, <code>LiteralStringWord</code>,
+      <code>AssignmentWord</code>, <code>NativeOpWord</code>, and
+      <code>RecallWord</code>; the first match in array order wins.</li>
+    <li><strong><code>NativeOpWord</code>'s switch is the instruction set;</strong>
+      a new editing action is a new case plus one <code>Operator</code> class.</li>
+    <li><strong>Operands travel on the <code>ExecutionDataStack</code>,</strong>
+      not in Java arguments—this is what lets the executor stay generic.</li>
+    <li><strong>A keymap is a precompiled command;</strong> the <code>;</code>
+      prompt compiles the same way at runtime.</li>
+  </ul>
+
+  <hr class="divider">
+
+  <h2 id="next-steps">12. What Comes Next</h2>
+
+  <p>
+    In <a href="itinerary.md"><strong>Lesson 4</strong></a> we open
+    the operator catalog: each family—movement, insertion, deletion, variables,
+    search, quantum—read one <code>Operator</code> at a time, tracing exactly which
+    piece of the editor model each one mutates.
+  </p>
+
+  <div class="callout success">
+    <strong>Hands-on (10 min):</strong> Build and run Visur as in
+    <a href="0001-big-picture-what-is-visur.html#build-and-run">Lesson 1</a>, then
+    exercise the language through real bindings:
+    <ol>
+      <li>In Normal mode press <code>[</code>. That two-token command
+        (<code>"quantumStart" pushSubmode</code>) ran the pipeline from Figure 1.</li>
+      <li>Press <code>i</code>, type a few characters, then press
+        <code>Escape</code>. The <code>Escape</code> binding is the assignment
+        gesture from &sect;6 restoring the saved values.</li>
+      <li>To prove the stack directly, add one scratch binding to
+        <code>initializeNavigateKeymap</code> in
+        <a href="../src/main/java/com/ple/visur/InitializerService.java#L236">InitializerService.java</a>:
+        <code>keymap.put(KeyPressed.from("g"), scs.compile("0 2 3 + relativeMove"));</code>.
+        Rebuild, press <code>g</code>, and watch the cursor drop five lines. That
+        is <code>2 3 +</code> computing on the stack, then feeding
+        <code>relativeMove</code>&mdash;the whole point of the language.</li>
+    </ol>
+  </div>
+
+  <div class="callout">
+    <strong>I am your teacher—ask me anything.</strong> If any step above is
+    unclear, ask a follow-up in the chat. Good next questions: "what happens if
+    the stack has leftovers?", "how do I add a new native operator end to end?",
+    or "compile this keymap string with me token by token."
+  </div>
+
+  <div class="annotation">
+    <p>
+      <strong>Source files for this lesson:</strong>
+      <a href="../src/main/java/com/ple/visur/Word.java">Word.java</a>,
+      <a href="../src/main/java/com/ple/visur/LiteralNumberWord.java">LiteralNumberWord.java</a>,
+      <a href="../src/main/java/com/ple/visur/LiteralStringWord.java">LiteralStringWord.java</a>,
+      <a href="../src/main/java/com/ple/visur/AssignmentWord.java">AssignmentWord.java</a>,
+      <a href="../src/main/java/com/ple/visur/NativeOpWord.java">NativeOpWord.java</a>,
+      <a href="../src/main/java/com/ple/visur/RecallWord.java">RecallWord.java</a>,
+      <a href="../src/main/java/com/ple/visur/CompiledWordResponse.java">CompiledWordResponse.java</a>,
+      <a href="../src/main/java/com/ple/visur/CommandCompileService.java">CommandCompileService.java</a>,
+      <a href="../src/main/java/com/ple/visur/VisurCommand.java">VisurCommand.java</a>,
+      <a href="../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService.java</a>,
+      <a href="../src/main/java/com/ple/visur/CommandStateService.java">CommandStateService.java</a>,
+      <a href="../src/main/java/com/ple/visur/Operator.java">Operator.java</a>,
+      <a href="../src/main/java/com/ple/visur/ExecutionDataStack.java">ExecutionDataStack.java</a>,
+      <a href="../src/main/java/com/ple/visur/LiteralNumberOp.java">LiteralNumberOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/LiteralStringOp.java">LiteralStringOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/AssignmentOp.java">AssignmentOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/RecallOp.java">RecallOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/AddOperator.java">AddOperator.java</a>,
+      <a href="../src/main/java/com/ple/visur/ClearEDSOp.java">ClearEDSOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/SetSpanOp.java">SetSpanOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/RelativeMoveOp.java">RelativeMoveOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/InitializerService.java">InitializerService.java</a>.
+    </p>
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0002-editor-lifecycle-one-complete-request.html">← Lesson 2: The Editor Lifecycle — One Complete Request</a>
+    <a href="itinerary.md">Next → Lesson 4: Operators — The 30+ Editing Actions (planned)</a>
+  </div>
+
+  <script src="../assets/quiz.js"></script>
+
+</body>
+</html>

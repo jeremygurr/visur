@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lesson 10 — Named Slots: The Global Variable Map</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="lesson-header">
+    <div class="lesson-number">Lesson 10 of 10</div>
+    <h1>Named Slots: The Global Variable Map</h1>
+    <div class="lesson-meta">
+      Reads ~16 min · Hands-on: run a compiled command sentence token by token,
+      with instant feedback
+    </div>
+  </div>
+
+  <p class="lead">
+    Lesson 9 ended with a snapshot built from <code>emc.getSpan()</code>,
+    <code>emc.getCursorQuantum()</code>, and friends. Those getters do not read
+    editor-model fields — they read a single <code>HashMap&lt;String,
+    VisurVar&gt;</code> called the <em>global variable map</em>. This lesson
+    opens it. The surprise: the map is not just storage. It is a set of
+    <strong>named stack slots</strong> that command sentences use to save and
+    restore editor state, and one of its entries — <code>nl</code> — is the very
+    brick the coordinate system reads in Lessons 7 and 8.
+  </p>
+
+  <h2 id="mission">Mission Anchor</h2>
+
+  <p>
+    The mission asks you to <strong>predict mode and cursor behavior for any
+    key</strong> and to <strong>place any operator</strong> in its taxonomy.
+    Both are impossible without this map: the <code>i</code> binding is a
+    14-token program that parks the current <code>span</code> and
+    <code>cursorQuantum</code> in the map, and <code>Escape</code> is the mirror
+    program that restores them and cleans up. This is the last piece of shared
+    state in the system.
+  </p>
+
+  <div class="callout">
+    <strong>Goal this lesson:</strong> Name every entry in the global variable
+    map and the class that wraps it; explain why there are exactly
+    <em>two</em> <code>VisurVar</code> implementations rather than three; read a
+    command sentence as a stack program; and say exactly how the map reaches the
+    browser (it doesn't — its values are copied into snapshot fields).
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="map">1. One Map, Ten Names</h2>
+
+  <p>
+    <code>VariableMap</code> is thirty lines and does nothing clever:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// VariableMap.java:7-30 — the whole class
+public class VariableMap implements Shareable {
+  HashMap&lt;String, VisurVar&gt; val;
+  public void    put(String key, VisurVar var) { val.put(key, var); }
+  public VisurVar get(String key)               { return val.get(key); }
+  public void    remove(String key)             { val.remove(key); }
+}
+    </pre>
+    <figcaption>
+      A <code>Shareable</code> name → value map. All the semantics live in the
+      callers, not here.
+    </figcaption>
+  </figure>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/VariableMap.java#L7-30">VariableMap.java:7–30</a>
+  </p>
+
+  <p>
+    There is exactly one map, held on the editor model under the
+    <code>globalVariableMap</code> key
+    (<a href="../src/main/java/com/ple/visur/EditorModelKey.java#L11">EditorModelKey.java:11</a>)
+    and created empty in
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L33-35">InitializerService.initializeEditorModel</a>.
+    Counting every string literal ever passed to <code>getGlobalVar</code> or
+    <code>putGlobalVar</code>, ten names are ever used. Eight are permanent;
+    two are transient:
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Name</th><th>Wrapper</th><th>Value</th><th>Who writes it</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>nl</code></td><td><code>BrickVisurVar</code></td><td><code>ArrayList&lt;Integer&gt;</code> of next-line starts</td><td><code>EditorContentService.updateNextLineIndices</code>, on every content write</td></tr>
+      <tr><td><code>ca</code></td><td><code>BrickVisurVar</code></td><td><code>Integer</code> absolute index</td><td><code>emc.putCA</code></td></tr>
+      <tr><td><code>cx</code></td><td><code>BrickVisurVar</code></td><td><code>Integer</code> column</td><td><code>emc.putCX</code></td></tr>
+      <tr><td><code>cy</code></td><td><code>BrickVisurVar</code></td><td><code>Integer</code> line</td><td><code>emc.putCY</code></td></tr>
+      <tr><td><code>cursorQuantum</code></td><td><code>ObjectVisurVar</code></td><td>a <code>Quantum</code> object</td><td><code>emc.putCursorQuantum</code></td></tr>
+      <tr><td><code>scopeQuantum</code></td><td><code>ObjectVisurVar</code></td><td>a <code>Quantum</code> object</td><td><code>emc.putScopeQuantum</code></td></tr>
+      <tr><td><code>span</code></td><td><code>ObjectVisurVar</code></td><td><code>Integer</code> (0 or 1)</td><td><code>emc.putSpan</code></td></tr>
+      <tr><td><code>previousSearchTarget</code></td><td><code>ObjectVisurVar</code></td><td><code>String</code></td><td><code>emc.putPreviousSearchTarget</code></td></tr>
+      <tr><td><code>tempSpan</code> · <code>tempCursorQuantum</code></td><td><code>ObjectVisurVar</code></td><td>saved copies</td><td>the <code>i</code> command; removed by <code>Escape</code></td></tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L146-155">InitializerService.java:146–155</a> (the four bricks) ·
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L174-175">lines 174–175</a> (the two quantums) ·
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L252-256">EditorModelCoupler.java:252–256</a> (<code>previousSearchTarget</code>) ·
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L334-336">lines 334–336</a> (<code>span</code>) ·
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L218-220">lines 218–220</a> (<code>nl</code>).
+  </p>
+
+  <div class="callout">
+    <strong>Two names are not variables.</strong>
+    <code>previousSearchDirectionWasForward</code> and
+    <code>cursorQuantumStart</code>/<code>End</code> also hold search and
+    quantum state, but they live on the <em>editor model</em> directly, not in
+    the variable map
+    (<a href="../src/main/java/com/ple/visur/EditorModelKey.java">EditorModelKey.java</a>;
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L200-216">EditorModelCoupler.java:200–216</a>).
+    "Global variable" is a storage location, not a synonym for "global state".
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="two-kinds">2. Two Implementations, Not Three</h2>
+
+  <p>
+    <code>VisurVar</code> is an interface — a value with <code>getVal</code> and
+    <code>putVal</code> — and it has exactly two implementors in the tree:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// VisurVar.java:5-12 — the contract
+public interface VisurVar {
+  Object getVal();
+  Result putVal(Object obj);
+  static VisurVar make() { return null; }   // ← dead stub
+}
+
+// ObjectVisurVar.java:5-24   — holds *any* Java object verbatim
+public class ObjectVisurVar implements VisurVar { Object val; … }
+
+// BrickVisurVar.java:8-41    — holds a PrimitiveDataClassBrick
+public class BrickVisurVar implements VisurVar { PrimitiveDataClassBrick brick; … }
+    </pre>
+    <figcaption>
+      The interface carries a <code>make()</code> that returns
+      <code>null</code> — a dead stub, never called. Ignore it.
+    </figcaption>
+  </figure>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/VisurVar.java#L5-12">VisurVar.java:5–12</a> ·
+    <a href="../src/main/java/com/ple/visur/ObjectVisurVar.java#L5-24">ObjectVisurVar.java:5–24</a> ·
+    <a href="../src/main/java/com/ple/visur/BrickVisurVar.java#L8-41">BrickVisurVar.java:8–41</a>.
+  </p>
+
+  <p>
+    The distinction matters because a <code>BrickVisurVar</code> is
+    <em>live</em>. Its <code>getVal()</code> does not read a stored field; it
+    asks the brick to compute itself first if it is not yet filled in:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// BrickVisurVar.java:20-25
+public Object getVal() {
+  if (!brick.isComplete()) {
+    brick.getOrCalc(new HashSet&lt;&gt;());   // ← Lesson 7's calculation graph
+  }
+  return brick.getVal();                   // ← the raw leaf value
+}
+
+// ObjectVisurVar.java:16-18
+public Object getVal() { return val; }     // ← nothing to calculate
+    </pre>
+    <figcaption>
+      A brick-backed variable can be a <em>window onto the data-class graph</em>.
+      An object-backed variable is just a box.
+    </figcaption>
+  </figure>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/BrickVisurVar.java#L20-25">BrickVisurVar.java:20–25</a> ·
+    <a href="../src/main/java/com/ple/visur/ObjectVisurVar.java#L16-18">ObjectVisurVar.java:16–18</a> ·
+    <a href="../reference/data-class-map.html">Reference: Data Class Map</a>.
+  </p>
+
+  <div class="callout warning">
+    <strong>Itinerary correction.</strong> Lesson 10's itinerary claims
+    "three variable categories: primitives (numbers), objects, bricks". The
+    source has <strong>two</strong> implementations. Integers are not a
+    category — an <code>span</code> of <code>1</code> is an
+    <code>ObjectVisurVar</code> wrapping an <code>Integer</code>, exactly like a
+    <code>Quantum</code> is an <code>ObjectVisurVar</code> wrapping a
+    <code>Quantum</code>. The real split is
+    <em>brick-backed (calculated) vs. object-backed (literal)</em>.
+  </div>
+
+  <p>
+    There is one asymmetry worth flagging. <code>VisurVar.putVal</code> returns
+    a <code>Result</code>; <code>BrickVisurVar.putVal</code> returns
+    <code>Result.make()</code>, but
+    <code>ObjectVisurVar.putVal</code> returns <code>null</code>
+    (<a href="../src/main/java/com/ple/visur/ObjectVisurVar.java#L20-24">ObjectVisurVar.java:20–24</a>).
+    Nothing reads the return value, so it is harmless — but it is inconsistent.
+  </p>
+
+  <hr class="divider">
+
+  <h2 id="api">3. The Two-Layer API: <code>VariableMap</code> → <code>EditorModelCoupler</code></h2>
+
+  <p>
+    Nothing else touches the map directly except the three variable operators.
+    Every <code>*Op</code> and service goes through
+    <code>EditorModelCoupler</code>, which resolves the map out of the editor
+    model and delegates to <code>EditorContentService</code>:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// EditorModelCoupler.java:40-46 — delegation
+public VisurVar getGlobalVar(String n) { return ecs.getGlobalVar(n, editorModel); }
+public VariableMap getGlobalVarMap()   { return ecs.getGlobalVarMap(editorModel); }
+
+// EditorContentService.java:24-30, 76-80
+getGlobalVar(name, model) → ((VariableMap) model.get(globalVariableMap)).get(name)
+putGlobalVar(name, var, model) → map.put(name, var); model.put(globalVariableMap, map)
+    </pre>
+    <figcaption>
+      Two thin layers, one reason: services can be tested against a model map,
+      and operations can be written against the coupler.
+    </figcaption>
+  </figure>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L40-46">EditorModelCoupler.java:40–46</a> ·
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L188-190">lines 188–190</a> ·
+    <a href="../src/main/java/CursorPositionDC/EditorContentService.java#L24-30">EditorContentService.java:24–30</a> ·
+    <a href="../src/main/java/CursorPositionDC/EditorContentService.java#L76-83">lines 76–83</a>.
+  </p>
+
+  <p>
+    The typed accessors are the interesting part. <code>getCA</code>,
+    <code>getCX</code>, and <code>getCY</code> cast the variable to
+    <code>BrickVisurVar</code>; <code>getSpan</code>,
+    <code>getCursorQuantum</code>, and <code>getScopeQuantum</code> cast to
+    <code>ObjectVisurVar</code>. A wrong cast would be a
+    <code>ClassCastException</code> at runtime, so <em>the wrapper class is part
+    of the contract for each name</em>:
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Accessor</th><th>Expects</th><th>Then</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>getCA()</code> / <code>getCX()</code> / <code>getCY()</code></td><td><code>BrickVisurVar</code></td><td><code>(int) bvv.getVal()</code> — triggers <code>getOrCalc()</code></td></tr>
+      <tr><td><code>getSpan()</code></td><td><code>ObjectVisurVar</code></td><td><code>(int) ovv.getVal()</code></td></tr>
+      <tr><td><code>getCursorQuantum()</code> / <code>getScopeQuantum()</code></td><td><code>ObjectVisurVar</code></td><td><code>(Quantum) ovv.getVal()</code></td></tr>
+      <tr><td><code>getNextLineIndices()</code></td><td><code>BrickVisurVar</code></td><td><code>(ArrayList&lt;Integer&gt;) bvv.getVal()</code></td></tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L56-73">EditorModelCoupler.java:56–73</a> ·
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L156-178">lines 156–178</a> ·
+    <a href="../src/main/java/CursorPositionDC/EditorContentService.java#L39-41">EditorContentService.java:39–41</a>.
+  </p>
+
+  <p>
+    Note the write path for the brick variables:
+    <code>putCA</code> does <code>bvv.putVal(ca)</code> and then
+    <code>putGlobalVar("ca", bvv)</code> — re-putting the <em>same</em> object
+    into the map. <code>putVal</code> mutates the brick in place; the
+    <code>putGlobalVar</code> is a redundant write of the same reference. The
+    object-backed writers, by contrast, build a new wrapper each time
+    (<code>ObjectVisurVar.make(...)</code>).
+  </p>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L200-216">EditorModelCoupler.java:200–216</a> ·
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L295-299">lines 295–299</a> ·
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L329-336">lines 329–336</a>.
+  </p>
+
+  <hr class="divider">
+
+  <h2 id="nl">4. <code>nl</code>: The Variable the Coordinates Read</h2>
+
+  <p>
+    Recall from
+    <a href="0008-cursor-position-coordinates-and-display.html">Lesson 8</a>
+    that <code>ca</code> ↔ <code>cx</code>/<code>cy</code> conversion happens in
+    <code>CoordinatesDC.calcInternal</code>, computed from a shared read-only
+    <code>nl</code> brick. That brick <em>is</em> the global variable
+    <code>nl</code>:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// InitializerService.java:125-138 — one brick, four wrappers in the graph
+PrimitiveDataClassBrick nlDCB = wholeNumberListDC.makeBrick("nl", new ArrayList<>(), true);
+//                                              name   empty outers        read-only
+cursorPositionDCB = cursorPositionDC.makeBrick(nlDCB);
+caAndNLDCB.putInner("nl", nlDCB);
+cxcyAndNLDCB.putInner("nl", nlDCB);     // ← the same nl brick, both directions
+
+// EditorContentService.java:86-101 — recomputed on every content write
+for i in 0..content.length():
+    if content[i] == '\n': indices.add(i + 1)
+nlBVV.putVal(indices);
+putGlobalVar("nl", nlBVV);
+    </pre>
+    <figcaption>
+      <code>nl</code> is created <em>incomplete</em> and read-only
+      (<code>dfb == null</code>, so <code>BrickVisurVar.getVal()</code> would
+      trigger computation), then filled by <code>updateNextLineIndices</code>.
+      Read-only is what stops a coordinate write from wiping it.
+    </figcaption>
+  </figure>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L122-142">InitializerService.java:122–142</a> ·
+    <a href="../src/main/java/CursorPositionDC/EditorContentService.java#L86-101">EditorContentService.java:86–101</a> ·
+    <a href="../src/main/java/DataClass/PrimitiveDataClassBrick.java#L80-88">PrimitiveDataClassBrick.put:80–88</a> ·
+    <a href="../reference/cursor-coordinates-map.html">Reference: Cursor Coordinates Map</a>.
+  </p>
+
+  <p>
+    So the sequence at startup is:
+    <code>initializeCursorPositionDCBsAndBVVs()</code> creates the incomplete
+    <code>nl</code> and its wrappers, then
+    <code>emc.initializeEditorContent(...)</code> stores the text, then
+    <code>emc.updateNextLineIndices()</code> computes <code>nl</code>'s value.
+    Note that <code>initializeEditorContent</code> does <em>not</em> update
+    <code>nl</code> — only <code>putEditorContent</code> does. The initializer
+    calls the two steps separately.
+  </p>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L95-98">InitializerService.java:95–98</a> ·
+    <a href="../src/main/java/CursorPositionDC/EditorContentService.java#L63-69">EditorContentService.java:63–69</a>.
+  </p>
+
+  <hr class="divider">
+
+  <h2 id="language">5. Variables in the Command Language: A Stack Program</h2>
+
+  <p>
+    Lesson 3 showed that <code>CommandCompileService</code> turns a sentence
+    into a <code>VisurCommand</code> — a parallel list of <code>Operator</code>s
+    and <code>opInfo</code>. Lesson 10 adds the missing half:
+    <code>CommandExecutionService</code> runs those operators <em>in order</em>
+    against a stack, the <code>ExecutionDataStack</code>. Three word types exist
+    specifically for variables:
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Word</th><th>Written as</th><th>Compiles to</th><th>Stack effect</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>LiteralStringWord</code></td>
+        <td><code>"span"</code></td>
+        <td><code>LiteralStringOp</code></td>
+        <td>push <code>span</code> (quotes stripped)</td>
+      </tr>
+      <tr>
+        <td><code>AssignmentWord</code></td>
+        <td><code>-&gt;</code></td>
+        <td><code>AssignmentOp</code></td>
+        <td>pop target, pop source → <code>vars[target] := vars[source]</code></td>
+      </tr>
+      <tr>
+        <td><code>RecallWord</code></td>
+        <td>a bare name that <em>is</em> a global var</td>
+        <td><code>RecallOp</code></td>
+        <td>push <code>vars[name]</code></td>
+      </tr>
+      <tr>
+        <td><code>NativeOpWord</code></td>
+        <td><code>removeGlobalVar</code></td>
+        <td><code>RemoveGlobalVarOp</code></td>
+        <td>pop name → delete from the map</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/LiteralStringWord.java#L8-20">LiteralStringWord.java:8–20</a> ·
+    <a href="../src/main/java/com/ple/visur/LiteralStringOp.java#L10-18">LiteralStringOp.java:10–18</a> ·
+    <a href="../src/main/java/com/ple/visur/AssignmentWord.java#L8-19">AssignmentWord.java:8–19</a> ·
+    <a href="../src/main/java/com/ple/visur/AssignmentOp.java#L12-27">AssignmentOp.java:12–27</a> ·
+    <a href="../src/main/java/com/ple/visur/RecallWord.java#L8-26">RecallWord.java:8–26</a> ·
+    <a href="../src/main/java/com/ple/visur/RecallOp.java#L8-13">RecallOp.java:8–13</a> ·
+    <a href="../src/main/java/com/ple/visur/RemoveGlobalVarOp.java#L4-11">RemoveGlobalVarOp.java:4–11</a>.
+  </p>
+
+  <p>
+    The word order matters. <code>CommandCompileService</code> tries
+    <code>LiteralNumberWord</code>, <code>LiteralStringWord</code>,
+    <code>AssignmentWord</code>, <code>NativeOpWord</code>, then
+    <code>RecallWord</code> — and <code>RecallWord</code> is the catch-all that
+    matches <em>any</em> non-space token, succeeding only if it names an existing
+    variable:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// CommandCompileService.java:17-34 — the word order
+Word[] words = { literalNumberWord, literalStringWord,
+                 assignmentWord, nativeOperatorWord, recallWord };
+…
+if (word instanceof RecallWord) {
+  break compileLoop;    // no match anywhere → STOP compiling silently
+}
+    </pre>
+    <figcaption>
+      <code>RecallWord</code> is both the recall mechanism and the
+      "unknown token" terminator. A typo does not throw — it truncates the
+      sentence at that point.
+    </figcaption>
+  </figure>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/CommandCompileService.java#L10-40">CommandCompileService.java:10–40</a> ·
+    <a href="../src/main/java/com/ple/visur/RecallWord.java#L15-21">RecallWord.java:15–21</a>.
+  </p>
+
+  <div class="callout warning">
+    <strong>The regex reads backwards — the operand is on the left.</strong>
+    <code>AssignmentWord</code>'s pattern is <code>(->*[^\s]+)(.*)</code>, but
+    because <code>[^\s]+</code> backtracks when the next character is a space,
+    the matched token is just <code>-&gt;</code>. The <code>opInfo</code> it
+    computes (<code>substring(2)</code>) is empty, and <code>AssignmentOp</code>
+    ignores it anyway. All the meaning is in the two names already on the stack:
+    <strong><code>"source" "target" -&gt;</code></strong> copies
+    <em>source</em> into <em>target</em>
+    (<a href="../src/main/java/com/ple/visur/AssignmentOp.java#L16-17">AssignmentOp.java:16–17</a>).
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="save-restore">6. Save and Restore: Globals as Registers</h2>
+
+  <p>
+    The itinerary's title says "Variables, <em>Registers</em>, and Global
+    State". There is no separate register file — the registers <em>are</em>
+    global variables. The <code>i</code> binding is the clearest proof:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// InitializerService.java:264 — the i key, verbatim
+"span" "tempSpan" -> "cursorQuantum" "tempCursorQuantum" -> 0 setSpan
+"character" quantumStart "insert" changeMode "character" changeCursorQuantum
+    </pre>
+    <figcaption>
+      Fourteen tokens. The first six are a two-register save; the rest switch
+      mode and quantum. Read it as a program, not as prose.
+    </figcaption>
+  </figure>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L263-265">InitializerService.java:263–265</a>.
+  </p>
+
+  <p>
+    <code>Escape</code> in insert and replace mode is the mirror image — restore,
+    then <em>remove the registers</em>:
+  </p>
+
+  <figure>
+    <pre class="diagram">
+// InitializerService.java:334 and :364 — the Escape binding, shared verbatim
+"tempSpan" "span" -> "tempCursorQuantum" changeCursorQuantum
+"tempSpan" removeGlobalVar "tempCursorQuantum" removeGlobalVar
+"navigate" changeMode
+    </pre>
+    <figcaption>
+      Same eleven tokens in both keymaps. The temporary names exist only for the
+      duration of one insert session.
+    </figcaption>
+  </figure>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L333-336">InitializerService.java:333–336</a> ·
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L363-365">lines 363–365</a>.
+  </p>
+
+  <div class="callout">
+    <strong>Why use the global map at all?</strong> The stack does not survive
+    between keystrokes; each keystroke compiles and executes a fresh
+    <code>VisurCommand</code>. To carry a value from the <code>i</code> press to
+    a later <code>Escape</code>, it must live somewhere durable. The global
+    variable map is that somewhere — and the temporary names are a
+    precisely-scoped convention on top of it.
+  </div>
+
+  <h3>An observation on leftovers</h3>
+
+  <p>
+    Trace the <code>i</code> sentence carefully and you will find that the
+    <code>"character"</code> pushed immediately before <code>quantumStart</code>
+    is never consumed: <code>QuantumStartOp</code> reads the
+    <code>cursorQuantum</code> variable and does not touch the stack
+    (<a href="../src/main/java/com/ple/visur/QuantumStartOp.java#L8-13">QuantumStartOp.java:8–13</a>).
+    One <code>"character"</code> therefore remains on the execution-data stack
+    after each <code>i</code>. Commands that use the stack defensively (for
+    example <code>f</code>, which begins with <code>clearEDS</code>) are
+    unaffected, but the sentence does leak. This is verified from the source;
+    whether it was intended is a question for the author.
+  </p>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L264">InitializerService.java:264</a> ·
+    <a href="../src/main/java/com/ple/visur/QuantumStartOp.java#L8-13">QuantumStartOp.java:8–13</a> ·
+    <a href="../src/main/java/com/ple/visur/ClearEDSOp.java#L7-13">ClearEDSOp.java:7–13</a>.
+  </p>
+
+  <hr class="divider">
+
+  <h2 id="browser">7. What the Browser Sees: Nothing Directly</h2>
+
+  <p>
+    The itinerary says "how the frontend reads and displays global state". It
+    does not. A search of <code>visur.js</code> for
+    <code>variable</code>/<code>VariableMap</code>/<code>global</code> returns
+    nothing, and the <code>View</code> class carries only
+    <code>ca</code> and <code>editorContent</code>. Variables reach the browser
+    only as <em>copied fields</em> of the snapshot:
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Snapshot field</th><th>Line in <code>toJson()</code></th><th>Comes from variable</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><code>ca</code></td><td>27</td><td><code>ca</code> (via <code>View</code>)</td></tr>
+      <tr><td><code>span</code></td><td>29</td><td><code>span</code></td></tr>
+      <tr><td><code>cursorQuantum</code></td><td>36</td><td><code>cursorQuantum.getName()</code></td></tr>
+      <tr><td><code>scopeQuantum</code></td><td>37</td><td><code>scopeQuantum.getName()</code></td></tr>
+      <tr><td><code>searchTarget</code> <span class="annotation">(conditional)</span></td><td>49</td><td>peek of the stack, seeded by <code>previousSearchTarget</code></td></tr>
+    </tbody>
+  </table>
+
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L24-52">ModelWasChangedVerticle.toJson():24–52</a> ·
+    <a href="../src/main/java/com/ple/visur/View.java#L3-6">View.java:3–6</a> ·
+    <a href="../src/main/resources/static/visur.js">visur.js</a> (no variable references).
+  </p>
+
+  <p>
+    The map is a <em>server-side implementation detail</em>. The client never
+    sees a name, only the resolved value it needs to draw. This is why adding a
+    variable is safe from the client's point of view — but it also means a
+    variable that nothing copies into <code>toJson()</code> is invisible to the
+    user.
+  </p>
+
+  <hr class="divider">
+
+  <h2 id="corrections">8. Itinerary and Wiki Corrections</h2>
+
+  <table>
+    <thead>
+      <tr><th>The itinerary says</th><th>What the code does</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>"Three variable categories: primitives (numbers), objects, bricks"</td>
+        <td>Two implementations:
+          <code>ObjectVisurVar</code> and <code>BrickVisurVar</code>
+          (<a href="../src/main/java/com/ple/visur/ObjectVisurVar.java#L5">ObjectVisurVar.java:5</a>,
+          <a href="../src/main/java/com/ple/visur/BrickVisurVar.java#L8">BrickVisurVar.java:8</a>).
+          Integers are <code>ObjectVisurVar</code> values.</td>
+      </tr>
+      <tr>
+        <td>"VisurVar — base interface for variables"</td>
+        <td>It <em>is</em> an interface, but it also declares a static
+          <code>make()</code> returning <code>null</code>
+          (<a href="../src/main/java/com/ple/visur/VisurVar.java#L9-11">VisurVar.java:9–11</a>)
+          — dead code. It is not abstract in any meaningful sense.</td>
+      </tr>
+      <tr>
+        <td>"The nl (next line indices) global variable — computed from editor content"</td>
+        <td>Correct — and more: it is the same read-only brick shared by both
+          coordinate decompositions, which is what makes Lesson 8 work
+          (<a href="../src/main/java/com/ple/visur/InitializerService.java#L125-138">InitializerService.java:125–138</a>).</td>
+      </tr>
+      <tr>
+        <td>"How the frontend reads and displays global state"</td>
+        <td>It does not. Five snapshot fields are <em>copied</em> from
+          variables in <code>toJson()</code>; the map itself never crosses the
+          wire.</td>
+      </tr>
+      <tr>
+        <td>"register" (in the title)</td>
+        <td>No register concept exists. Registers are global variables named by
+          convention (<code>tempSpan</code>, <code>tempCursorQuantum</code>).</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <hr class="divider">
+
+  <h2 id="lab">9. Retrieval Practice: Run the Sentences</h2>
+
+  <p>
+    Each tab is a real keymap sentence. Step through it token by token and watch
+    the execution-data stack and the global variable map. Some tokens will ask
+    you to predict the effect first.
+  </p>
+
+  <div class="var-lab">
+    <script type="application/json">
+    {
+      "vars": {
+        "span": 1,
+        "cursorQuantum": "character",
+        "previousSearchTarget": "the",
+        "scopeQuantum": "line"
+      },
+      "sentences": [
+        {
+          "label": "i — save, then enter insert",
+          "tokens": [
+            { "t": "\"span\"", "kind": "literal" },
+            { "t": "\"tempSpan\"", "kind": "literal" },
+            { "t": "->", "kind": "assign",
+              "predict": {
+                "q": "two names are on the stack: \"span\" then \"tempSpan\". Which is copied into which?",
+                "options": [
+                  "The value of span is copied into tempSpan",
+                  "The value of tempSpan is copied into span",
+                  "Neither is copied until setSpan runs later",
+                  "Both are removed and replaced with an empty box"
+                ],
+                "answer": 0,
+                "explain": "AssignmentOp pops target first (tempSpan, the top) then source (span). The left name is the source, the right is the target: \"source\" \"target\" ->."
+              }
+            },
+            { "t": "\"cursorQuantum\"", "kind": "literal" },
+            { "t": "\"tempCursorQuantum\"", "kind": "literal" },
+            { "t": "->", "kind": "assign" },
+            { "t": "0", "kind": "number" },
+            { "t": "setSpan", "kind": "consume", "pop": 1, "push": 0,
+              "setVar": { "name": "span", "value": 0 },
+              "note": "sets SPAN to 0 and recomputes the cursor quantum bounds" },
+            { "t": "\"character\"", "kind": "literal" },
+            { "t": "quantumStart", "kind": "noop",
+              "note": "runs quantumStart() on the cursorQuantum variable — it does NOT read the stack" },
+            { "t": "\"insert\"", "kind": "literal" },
+            { "t": "changeMode", "kind": "consume", "pop": 1, "push": 0,
+              "note": "sets EDITOR MODE = insert and pushes the insert submode" },
+            { "t": "\"character\"", "kind": "literal" },
+            { "t": "changeCursorQuantum", "kind": "consume", "pop": 1, "push": 0,
+              "setVar": { "name": "cursorQuantum", "value": "character" },
+              "note": "sets cursorQuantum to the named quantum" }
+          ],
+          "summary": "tempSpan holds the saved span (1) and tempCursorQuantum holds the saved quantum name, so Escape can put them back. Notice the leftover: the \"character\" pushed before quantumStart is still on the stack at the end, because QuantumStartOp ignores the stack."
+        },
+        {
+          "label": "Escape — restore and clean up",
+          "vars": {
+            "span": 0,
+            "cursorQuantum": "character",
+            "tempSpan": 1,
+            "tempCursorQuantum": "character",
+            "previousSearchTarget": "the",
+            "scopeQuantum": "line"
+          },
+          "tokens": [
+            { "t": "\"tempSpan\"", "kind": "literal" },
+            { "t": "\"span\"", "kind": "literal" },
+            { "t": "->", "kind": "assign",
+              "predict": {
+                "q": "tempSpan holds 1 and span currently holds 0. After this token, what is span?",
+                "options": [
+                  "span becomes 1 again, restored from tempSpan",
+                  "span stays 0 because tempSpan is only temporary",
+                  "span becomes a copy of the cursor quantum name",
+                  "span is removed from the map entirely here"
+                ],
+                "answer": 0,
+                "explain": "The sentence is \"tempSpan\" \"span\" ->, i.e. source tempSpan, target span. The saved value is written back before the temporary is removed."
+              }
+            },
+            { "t": "\"tempCursorQuantum\"", "kind": "literal" },
+            { "t": "changeCursorQuantum", "kind": "consume", "pop": 1, "push": 0,
+              "note": "restores cursorQuantum from the saved name" },
+            { "t": "\"tempSpan\"", "kind": "literal" },
+            { "t": "removeGlobalVar", "kind": "removeVar",
+              "predict": {
+                "q": "What does removeGlobalVar consume, and from where?",
+                "options": [
+                  "It pops a name off the stack and deletes that variable",
+                  "It removes the top value from the execution-data stack",
+                  "It clears the whole global variable map at once",
+                  "It replaces a variable with an empty string value"
+                ],
+                "answer": 0,
+                "explain": "RemoveGlobalVarOp pops a name and calls VariableMap.remove(name). The value argument comes from the stack, the map is what is edited."
+              }
+            },
+            { "t": "\"tempCursorQuantum\"", "kind": "literal" },
+            { "t": "removeGlobalVar", "kind": "removeVar" },
+            { "t": "\"navigate\"", "kind": "literal" },
+            { "t": "changeMode", "kind": "consume", "pop": 1, "push": 0,
+              "note": "sets EDITOR MODE = navigate and pushes the navigate submode, collapsing the submode stack" }
+          ],
+          "summary": "Restore first, then delete. After this sentence the temporary registers are gone and the stack is empty again — a clean mirror of the i sentence."
+        },
+        {
+          "label": "n — recall the last search",
+          "tokens": [
+            { "t": "previousSearchTarget", "kind": "recall",
+              "predict": {
+                "q": "previousSearchTarget is a bare name in the sentence, not a quoted string. What does the compiler do?",
+                "options": [
+                  "RecallWord finds it in the map and pushes its value",
+                  "NativeOpWord looks for an operator with that exact name",
+                  "LiteralStringWord pushes it with the quotes already gone",
+                  "AssignmentWord copies it onto the top of the stack"
+                ],
+                "answer": 0,
+                "explain": "RecallWord is the catch-all last word. If the bare token names an existing global variable it compiles to a RecallOp; otherwise it silently ends the sentence."
+              }
+            },
+            { "t": "searchInPreviousDirection", "kind": "consume", "pop": 1, "push": 0,
+              "note": "pops the target string, then runs SearchForwardOp or SearchBackwardOp per the stored direction" }
+          ],
+          "summary": "The value cycles: it lives in the map between keystrokes, is recalled onto the stack to be used, and is written back to the map by the search operator so n and N can reuse it."
+        },
+        {
+          "label": "+ — the stack is arithmetic",
+          "tokens": [
+            { "t": "2", "kind": "number" },
+            { "t": "3", "kind": "number" },
+            { "t": "+", "kind": "add",
+              "predict": {
+                "q": "The stack is [2, 3] with 3 on top. What does AddOperator leave?",
+                "options": [
+                  "One value, 5, replacing both operands",
+                  "Two values, 2 and 3, unchanged on the stack",
+                  "One value, 3, because the top wins the add",
+                  "An empty stack, because + consumes its result"
+                ],
+                "answer": 0,
+                "explain": "AddOperator pops a=3, pops b=2, pushes a+b=5. Net effect: two operands removed, one result pushed."
+              }
+            }
+          ],
+          "summary": "Literals push, operators consume, and the same ExecutionDataStack serves every command. Variables are just the parts of this stack that outlive a single keystroke."
+        }
+      ]
+    }
+    </script>
+  </div>
+
+  <h2 id="quiz">10. Retrieval Practice: The Map Itself</h2>
+
+  <p>Answer from memory. Options are shuffled on each render.</p>
+
+  <div class="quiz">
+    <script type="application/json">
+    [
+      {
+        "q": "How many implementations does the VisurVar interface have?",
+        "options": [
+          "Two: ObjectVisurVar and BrickVisurVar",
+          "Three: primitive, object, and brick variants",
+          "Four: one per value family in the editor",
+          "One: a single class with a type tag field"
+        ],
+        "answer": 0,
+        "explain": "Only ObjectVisurVar and BrickVisurVar implement it. The itinerary's third 'primitive' category does not exist; integers live inside ObjectVisurVar."
+      },
+      {
+        "q": "Where is the global variable map stored on the server?",
+        "options": [
+          "On the editor model under globalVariableMap",
+          "In a static field on the VariableMap class",
+          "On each verticle as a private instance field",
+          "In the ExecutionDataStack shared by commands"
+        ],
+        "answer": 0,
+        "explain": "EditorContentService.getGlobalVarMap reads editorModel.get(globalVariableMap). The stack is separate and does not survive between keystrokes."
+      },
+      {
+        "q": "What does AssignmentOp read from the execution-data stack?",
+        "options": [
+          "The target name, then the source name below it",
+          "The source name, then the target name below it",
+          "The target value, then the source value below it",
+          "The operator name, then the variable name below it"
+        ],
+        "answer": 0,
+        "explain": "It pops nameToPut first (the top) and nameOfValueToRetrieve second. So \"source\" \"target\" -> copies source into target."
+      },
+      {
+        "q": "Which variable is a read-only brick shared by both coordinate directions?",
+        "options": [
+          "nl, the next-line indices list",
+          "ca, the absolute cursor position",
+          "span, the highlight width flag",
+          "cy, the current line number"
+        ],
+        "answer": 0,
+        "explain": "nl is created read-only and put as an inner of both caAndNL and cxcyAndNL, so a coordinate write cannot wipe it and both conversions read the same list."
+      },
+      {
+        "q": "How does a global variable reach the browser?",
+        "options": [
+          "Its value is copied into a snapshot field by toJson",
+          "The whole VariableMap is serialized onto the viewWasChanged address",
+          "The browser calls getGlobalVar over the event bus for each name",
+          "It is written into editorContent as an inline annotation"
+        ],
+        "answer": 0,
+        "explain": "Neither View nor the wire carries the map. ModelWasChangedVerticle.toJson copies span, cursorQuantum, scopeQuantum, and ca into the payload; everything else stays server-side."
+      },
+      {
+        "q": "When does RecallWord compile to a real operator?",
+        "options": [
+          "Only when the bare token names an existing variable",
+          "Whenever the token is not a number or a quoted string",
+          "Only when the token starts with the letters temp",
+          "Whenever the sentence also contains an assignment arrow"
+        ],
+        "answer": 0,
+        "explain": "RecallWord matches any non-space token but returns null unless the name is already in the map. On null it also breaks the compile loop, silently truncating the sentence."
+      }
+    ]
+    </script>
+  </div>
+
+  <hr class="divider">
+
+  <h2 id="primary-source">11. Primary Source</h2>
+
+  <p>
+    The variable system is small enough to read in one sitting, in this order:
+  </p>
+
+  <ol>
+    <li><a href="../src/main/java/com/ple/visur/VariableMap.java">VariableMap.java</a> —
+      30 lines; the whole storage model.</li>
+    <li><a href="../src/main/java/com/ple/visur/VisurVar.java">VisurVar.java</a> ·
+      <a href="../src/main/java/com/ple/visur/ObjectVisurVar.java">ObjectVisurVar.java</a> ·
+      <a href="../src/main/java/com/ple/visur/BrickVisurVar.java">BrickVisurVar.java</a> —
+      the two wrappers and the live-calculation wrinkle in
+      <code>BrickVisurVar.getVal()</code>.</li>
+    <li><a href="../src/main/java/com/ple/visur/AssignmentOp.java">AssignmentOp.java</a> ·
+      <a href="../src/main/java/com/ple/visur/RecallOp.java">RecallOp.java</a> ·
+      <a href="../src/main/java/com/ple/visur/RemoveGlobalVarOp.java">RemoveGlobalVarOp.java</a> —
+      the three operators that read or write variables.</li>
+    <li><a href="../src/main/java/CursorPositionDC/EditorContentService.java#L86-101">EditorContentService.updateNextLineIndices</a> —
+      how <code>nl</code> is computed, and
+      <a href="../src/main/java/com/ple/visur/InitializerService.java#L122-155">InitializerService.java:122–155</a>
+      for how it enters the graph.</li>
+    <li><a href="../src/main/java/com/ple/visur/InitializerService.java#L263-265">InitializerService.java:263–265</a>
+      and <a href="../src/main/java/com/ple/visur/InitializerService.java#L333-336">:333–336</a> —
+      the <code>i</code> and <code>Escape</code> sentences. Read them as
+      programs.</li>
+  </ol>
+
+  <p>
+    For the stack-machine framing, the canonical short read is the Wikipedia
+    article on a
+    <a href="https://en.wikipedia.org/wiki/Stack_machine">stack machine</a>:
+    Visur's command language is a tiny postfix evaluator where the named slots
+    happen to persist between keystrokes. For the data-class half of
+    <code>nl</code>, re-read
+    <a href="../reference/data-class-map.html">the Data Class Map reference</a>
+    and <a href="0007-the-data-class-hierarchy.html">Lesson 7</a>.
+  </p>
+
+  <hr class="divider">
+
+  <h2 id="takeaways">12. Key Takeaways</h2>
+
+  <ul>
+    <li><strong>One map, ten names.</strong> A single
+      <code>HashMap&lt;String, VisurVar&gt;</code> on the editor model; eight
+      permanent entries plus two transient registers.</li>
+    <li><strong>Two wrappers, not three.</strong> <code>ObjectVisurVar</code> is
+      a box; <code>BrickVisurVar</code> is a live window onto the data-class
+      calculation graph.</li>
+    <li><strong>The wrapper class is part of each name's contract.</strong>
+      <code>ca</code>/<code>cx</code>/<code>cy</code>/<code>nl</code> are
+      bricks; <code>span</code>/<code>cursorQuantum</code>/<code>scopeQuantum</code>
+      are objects.</li>
+    <li><strong>Commands are stack programs.</strong> Literals and numbers
+      push; <code>-&gt;</code> copies one variable into another (source left,
+      target right); a bare variable name recalls its value; operators pop and
+      push.</li>
+    <li><strong>Variables are registers because the stack does not persist.</strong>
+      <code>i</code> parks <code>span</code> and <code>cursorQuantum</code> in
+      <code>tempSpan</code>/<code>tempCursorQuantum</code>; <code>Escape</code>
+      restores and deletes them.</li>
+    <li><strong><code>nl</code> is the bridge to the coordinate system.</strong>
+      One read-only brick, computed on every content write, shared by both
+      decompositions.</li>
+    <li><strong>The browser never sees the map.</strong> Five snapshot fields
+      are copied from variables; the names stay on the server.</li>
+  </ul>
+
+  <hr class="divider">
+
+  <h2 id="next-steps">13. You Have Reached the End of the Course</h2>
+
+  <p>
+    That was Lesson 10 of 10. You now have a complete path from
+    <a href="0001-big-picture-what-is-visur.html">startup</a> through
+    <a href="0002-editor-lifecycle-one-complete-request.html">the request loop</a>,
+    <a href="0003-command-language-words-operators-pipelines.html">the command language</a>,
+    <a href="0004-operators-the-30-editing-actions.html">operators</a>,
+    <a href="0005-editor-modes-and-submodes.html">modes</a>,
+    <a href="0006-the-quantum-system.html">quantums</a>,
+    <a href="0007-the-data-class-hierarchy.html">the data classes</a>,
+    <a href="0008-cursor-position-coordinates-and-display.html">cursor coordinates</a>,
+    <a href="0009-view-model-and-frontend-communication.html">the wire</a>, and
+    the variable map.
+  </p>
+
+  <p>
+    A natural next project, straight from the mission: <strong>add a variable
+    and watch it travel</strong>. Pick a value the editor already computes,
+    expose it as a global variable via <code>emc.putGlobalVar</code>, copy it
+    into <code>ModelWasChangedVerticle.toJson()</code>, and render it in the
+    footer. If you can do that without guessing where each step goes, the
+    mission's "add a word, operator, or quantum by following existing patterns"
+    goal is within reach.
+  </p>
+
+  <div class="callout">
+    <strong>I am your teacher — ask me anything.</strong> Good follow-ups: "write
+    the exact token stream for the <code>s</code> (span) command and explain
+    each pop", "what happens to <code>tempSpan</code> if I quit Visur mid-insert",
+    "why does <code>changeMode</code> peek the mode name but
+    <code>pushSubmode</code> pops it?", or "add a <code>lastCommand</code>
+    variable that records the previous sentence and show it in the footer".
+  </div>
+
+  <div class="annotation">
+    <p>
+      <strong>Source files for this lesson:</strong>
+      <a href="../src/main/java/com/ple/visur/VariableMap.java">VariableMap.java</a>,
+      <a href="../src/main/java/com/ple/visur/VisurVar.java">VisurVar.java</a>,
+      <a href="../src/main/java/com/ple/visur/ObjectVisurVar.java">ObjectVisurVar.java</a>,
+      <a href="../src/main/java/com/ple/visur/BrickVisurVar.java">BrickVisurVar.java</a>,
+      <a href="../src/main/java/com/ple/visur/AssignmentOp.java">AssignmentOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/RecallOp.java">RecallOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/RemoveGlobalVarOp.java">RemoveGlobalVarOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/AssignmentWord.java">AssignmentWord.java</a>,
+      <a href="../src/main/java/com/ple/visur/RecallWord.java">RecallWord.java</a>,
+      <a href="../src/main/java/com/ple/visur/LiteralStringWord.java">LiteralStringWord.java</a>,
+      <a href="../src/main/java/com/ple/visur/LiteralStringOp.java">LiteralStringOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/CommandCompileService.java">CommandCompileService.java</a>,
+      <a href="../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService.java</a>,
+      <a href="../src/main/java/com/ple/visur/ExecutionDataStack.java">ExecutionDataStack.java</a>,
+      <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler.java</a>,
+      <a href="../src/main/java/com/ple/visur/EditorModelKey.java">EditorModelKey.java</a>,
+      <a href="../src/main/java/com/ple/visur/InitializerService.java">InitializerService.java</a>,
+      <a href="../src/main/java/CursorPositionDC/EditorContentService.java">EditorContentService.java</a>,
+      <a href="../src/main/java/DataClass/PrimitiveDataClassBrick.java">PrimitiveDataClassBrick.java</a>,
+      <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>,
+      <a href="../src/main/java/com/ple/visur/View.java">View.java</a>,
+      <a href="../src/main/resources/static/visur.js">visur.js</a>.
+    </p>
+  </div>
+
+  <div class="lesson-nav">
+    <a href="0009-view-model-and-frontend-communication.html">← Lesson 9: View Model &amp; Wire</a>
+    <a href="../reference/variable-map.html">Reference: Global Variable Map →</a>
+  </div>
+
+  <script src="../assets/var-lab.js"></script>
+  <script src="../assets/quiz.js"></script>
+
+</body>
+</html>

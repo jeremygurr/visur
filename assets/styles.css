@@ -1,0 +1,873 @@
+/* ── Tufte-inspired minimalist stylesheet for Visur lessons ── */
+
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html {
+  font-family: "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+  font-size: 18px;
+  line-height: 1.7;
+  color: #1a1a1a;
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  max-width: 48em;
+  margin: 2.5em auto 4em;
+  padding: 0 1em;
+  color: #1a1a1a;
+  background: #fafafa;
+}
+
+/* ── Typography ── */
+h1 {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-weight: 400;
+  font-size: 2em;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.4em;
+  color: #111;
+}
+
+h2 {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-weight: 400;
+  font-size: 1.4em;
+  letter-spacing: -0.01em;
+  margin-top: 2.2em;
+  margin-bottom: 0.6em;
+  color: #222;
+  border-bottom: 1px solid #d0d0d0;
+  padding-bottom: 0.3em;
+}
+
+h3 {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-weight: 400;
+  font-size: 1.15em;
+  margin-top: 1.6em;
+  margin-bottom: 0.4em;
+  color: #333;
+}
+
+p {
+  margin-bottom: 1.2em;
+  text-align: justify;
+  hyphens: auto;
+}
+
+/* ── Lead (marginal-style notes) ── */
+.lead {
+  font-size: 0.92em;
+  color: #555;
+  font-style: italic;
+  border-left: 2px solid #bbb;
+  padding-left: 1em;
+  margin: 1.5em 0;
+}
+
+/* ── Figure / diagram containers ── */
+figure {
+  margin: 2em 0;
+  padding: 0;
+}
+
+figure diagram {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 1.5em;
+  margin-bottom: 0.5em;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.82em;
+  line-height: 1.6;
+  overflow-x: auto;
+  color: #333;
+  white-space: pre;
+}
+
+figcaption {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.85em;
+  color: #666;
+  text-align: left;
+}
+
+/* ── Code ── */
+code {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.85em;
+  background: #f0ede8;
+  padding: 0.15em 0.35em;
+  border-radius: 2px;
+  color: #b83939;
+}
+
+/* ── Lists ── */
+ul, ol {
+  margin: 1em 0 1.5em 1.5em;
+}
+
+li {
+  margin-bottom: 0.6em;
+}
+
+/* ── Tables ── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1.5em 0 2em;
+  font-size: 0.85em;
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+}
+
+thead th {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-weight: 600;
+  font-size: 0.95em;
+  text-align: left;
+  letter-spacing: 0.02em;
+  color: #333;
+  border-bottom: 2px solid #1a1a1a;
+  padding: 0.5em 0.6em;
+  vertical-align: bottom;
+}
+
+tbody td {
+  border-bottom: 1px solid #e2ded6;
+  padding: 0.5em 0.6em;
+  vertical-align: top;
+  line-height: 1.5;
+}
+
+tbody tr:nth-child(even) {
+  background: #f5f2ec;
+}
+
+td, th {
+  overflow-wrap: anywhere;
+}
+
+/* ── Callout boxes ── */
+.callout {
+  background: #f7f4ee;
+  border-left: 3px solid #c9a96e;
+  padding: 1em 1.2em;
+  margin: 1.5em 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.callout.warning {
+  background: #fdf2f2;
+  border-left-color: #c94e4e;
+}
+
+.callout.success {
+  background: #f2fdf4;
+  border-left-color: #5aa06e;
+}
+
+/* ── Source references ── */
+.source-ref {
+  font-size: 0.8em;
+  color: #777;
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+}
+
+.source-ref a {
+  color: #5a8cb5;
+  text-decoration: none;
+}
+
+.source-ref a:hover {
+  text-decoration: underline;
+}
+
+/* ── Links ── */
+a {
+  color: #5a8cb5;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ── Inline annotation (Tufte footnote style) ── */
+.annotation {
+  font-size: 0.8em;
+  color: #666;
+}
+
+/* ── Lesson header bar ── */
+.lesson-header {
+  padding-bottom: 1em;
+  margin-bottom: 1.5em;
+  border-bottom: 2px solid #1a1a1a;
+}
+
+.lesson-number {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: #999;
+  margin-bottom: 0.2em;
+}
+
+.lesson-meta {
+  font-size: 0.85em;
+  color: #888;
+  margin-top: 0.5em;
+}
+
+/* ── Navigation bar ── */
+.lesson-nav {
+  margin-top: 3em;
+  padding-top: 1.5em;
+  border-top: 1px solid #d0d0d0;
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.9em;
+  display: flex;
+  justify-content: space-between;
+  gap: 1em;
+}
+
+/* ── Quiz component (see assets/quiz.js) ── */
+.quiz {
+  margin: 2em 0;
+}
+
+.quiz-question {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 1.2em 1.4em;
+  margin-bottom: 1.2em;
+}
+
+.quiz-prompt {
+  font-weight: 600;
+  margin-bottom: 0.7em;
+  text-align: left;
+}
+
+.quiz-index {
+  color: #999;
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.85em;
+  margin-right: 0.3em;
+}
+
+.quiz-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+
+.quiz-option {
+  text-align: left;
+  font: inherit;
+  font-size: 0.95em;
+  color: #1a1a1a;
+  background: #f7f4ee;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  padding: 0.6em 0.9em;
+  cursor: pointer;
+  display: flex;
+  gap: 0.7em;
+  align-items: baseline;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.quiz-option:hover:not(:disabled) {
+  background: #efe9dd;
+  border-color: #c9a96e;
+}
+
+.quiz-option:disabled {
+  cursor: default;
+}
+
+.quiz-letter {
+  font-family: "SF Mono", "Fira Code", Menlo, Courier, monospace;
+  font-size: 0.8em;
+  color: #999;
+}
+
+.quiz-option.correct {
+  background: #e7f5ea;
+  border-color: #5aa06e;
+}
+
+.quiz-option.correct .quiz-letter {
+  color: #3f7d52;
+}
+
+.quiz-option.incorrect {
+  background: #fbeaea;
+  border-color: #c94e4e;
+}
+
+.quiz-feedback {
+  margin-top: 0.9em;
+  font-size: 0.9em;
+  padding: 0.6em 0.8em;
+  border-radius: 0 4px 4px 0;
+}
+
+.quiz-feedback.ok {
+  background: #f2fdf4;
+  border-left: 3px solid #5aa06e;
+}
+
+.quiz-feedback.no {
+  background: #fdf2f2;
+  border-left: 3px solid #c94e4e;
+}
+
+.quiz-score {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.9em;
+  color: #555;
+  text-align: right;
+  margin-top: 1em;
+}
+
+/* ── Coordinate lab component (see assets/coord-lab.js) ── */
+.coord-lab {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 1.2em 1.4em;
+  margin: 2em 0;
+}
+
+.coord-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.7em 1em;
+  margin-bottom: 0.7em;
+}
+
+.coord-field {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+}
+
+.coord-field-label {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #888;
+}
+
+.coord-field input {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.9em;
+  padding: 0.3em 0.5em;
+  border: 1px solid #d8d2c6;
+  border-radius: 3px;
+  background: #f7f4ee;
+  color: #1a1a1a;
+  width: 7.5em;
+}
+
+.coord-field input:disabled {
+  background: #efece5;
+  color: #555;
+}
+
+.coord-invalid .coord-row:first-child input {
+  border-color: #c94e4e;
+  background: #fdf2f2;
+}
+
+.coord-arrow {
+  color: #999;
+  font-size: 1.1em;
+}
+
+.coord-btn {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.82em;
+  padding: 0.35em 0.8em;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  background: #f7f4ee;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.coord-btn:hover {
+  background: #efe9dd;
+  border-color: #c9a96e;
+}
+
+.coord-status {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.82em;
+  color: #555;
+  margin-top: 0.4em;
+}
+
+.coord-status.no {
+  color: #b83939;
+}
+
+.coord-status.ok {
+  color: #3f7d52;
+}
+
+.coord-feedback {
+  margin-top: 0.7em;
+  font-size: 0.9em;
+  padding: 0.6em 0.8em;
+  border-radius: 0 4px 4px 0;
+}
+
+.coord-feedback:empty {
+  display: none;
+}
+
+.coord-feedback.ok {
+  background: #f2fdf4;
+  border-left: 3px solid #5aa06e;
+}
+
+.coord-feedback.no {
+  background: #fdf2f2;
+  border-left: 3px solid #c94e4e;
+}
+
+/* ── Protocol trace component (see assets/protocol-trace.js) ── */
+.protocol-trace {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 1.2em 1.4em;
+  margin: 2em 0;
+}
+
+.trace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  border-bottom: 1px solid #e2ded6;
+  padding-bottom: 0.9em;
+  margin-bottom: 1.1em;
+}
+
+.trace-tab {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.82em;
+  padding: 0.35em 0.8em;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  background: #f7f4ee;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.trace-tab[aria-pressed="true"] {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+  color: #fafafa;
+}
+
+.trace-step {
+  border-left: 2px solid #e2ded6;
+  padding: 0 0 0 1em;
+  margin-bottom: 1.1em;
+}
+
+.trace-step.current {
+  border-left-color: #c9a96e;
+}
+
+.trace-step-head {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.82em;
+  color: #333;
+  margin-bottom: 0.5em;
+  overflow-wrap: anywhere;
+}
+
+.trace-actor {
+  color: #1a1a1a;
+}
+
+.trace-addr-slot {
+  color: #999;
+}
+
+.trace-step.done .trace-addr-slot {
+  color: #3f7d52;
+  font-weight: 600;
+}
+
+.trace-addr-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45em;
+  margin-bottom: 0.6em;
+}
+
+.trace-addr-btn {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.8em;
+  padding: 0.35em 0.7em;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  background: #f7f4ee;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.trace-addr-btn:hover:not(:disabled) {
+  background: #efe9dd;
+  border-color: #c9a96e;
+}
+
+.trace-addr-btn:disabled {
+  cursor: default;
+}
+
+.trace-addr-btn.correct {
+  background: #e7f5ea;
+  border-color: #5aa06e;
+  color: #2f6640;
+  font-weight: 600;
+}
+
+.trace-addr-btn.incorrect {
+  background: #fbeaea;
+  border-color: #c94e4e;
+  color: #a03a3a;
+}
+
+.trace-payload {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.76em;
+  background: #f5f2ec;
+  border-radius: 3px;
+  padding: 0.5em 0.7em;
+  margin-bottom: 0.6em;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: #333;
+}
+
+.trace-note {
+  font-size: 0.88em;
+  padding: 0.5em 0.8em;
+  border-radius: 0 4px 4px 0;
+  margin-bottom: 0.6em;
+}
+
+.trace-note.ok {
+  background: #f2fdf4;
+  border-left: 3px solid #5aa06e;
+}
+
+.trace-note.no {
+  background: #fdf2f2;
+  border-left: 3px solid #c94e4e;
+}
+
+.trace-next {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.85em;
+  padding: 0.4em 1em;
+  border: 1px solid #1a1a1a;
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: #fafafa;
+  cursor: pointer;
+}
+
+.trace-next:hover {
+  background: #333;
+}
+
+.trace-score {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.85em;
+  color: #555;
+  margin-top: 1em;
+  padding-top: 0.8em;
+  border-top: 1px solid #e2ded6;
+}
+
+.trace-coda {
+  background: #f7f4ee;
+  border-left: 3px solid #c9a96e;
+  padding: 0.9em 1.1em;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.92em;
+}
+
+/* ── Variable lab component (see assets/var-lab.js) ── */
+.var-lab {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 1.2em 1.4em;
+  margin: 2em 0;
+}
+
+.var-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5em;
+  border-bottom: 1px solid #e2ded6;
+  padding-bottom: 0.9em;
+  margin-bottom: 1.1em;
+}
+
+.var-tab {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.8em;
+  padding: 0.35em 0.8em;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  background: #f7f4ee;
+  color: #1a1a1a;
+  cursor: pointer;
+}
+
+.var-tab[aria-pressed="true"] {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+  color: #fafafa;
+}
+
+.var-tokens {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  margin-bottom: 1.1em;
+}
+
+.var-token {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.78em;
+  padding: 0.25em 0.55em;
+  border: 1px solid #e2ded6;
+  border-radius: 3px;
+  background: #fafafa;
+  color: #777;
+  white-space: pre;
+}
+
+.var-token.done {
+  background: #f2fdf4;
+  border-color: #bcdcc4;
+  color: #3f7d52;
+}
+
+.var-token.current {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+  color: #fafafa;
+  font-weight: 600;
+}
+
+.var-stage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.2em;
+  align-items: flex-start;
+}
+
+.var-panel {
+  flex: 1 1 12em;
+  background: #f7f4ee;
+  border: 1px solid #e2ded6;
+  border-radius: 4px;
+  padding: 0.7em 0.9em;
+  min-height: 5em;
+}
+
+.var-panel-title {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #888;
+  margin-bottom: 0.5em;
+}
+
+.var-stack-item {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.82em;
+  padding: 0.3em 0.6em;
+  border: 1px solid #d8d2c6;
+  border-radius: 3px;
+  background: #fff;
+  margin-bottom: 0.3em;
+  color: #333;
+}
+
+.var-stack-item.top {
+  border-color: #c9a96e;
+  border-left-width: 3px;
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.var-stack-empty {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.8em;
+  color: #aaa;
+  font-style: italic;
+}
+
+.var-vars {
+  width: 100%;
+  margin: 0;
+  border-collapse: collapse;
+  font-size: 0.8em;
+}
+
+.var-vars td {
+  border-bottom: 1px solid #e6e1d8;
+  padding: 0.28em 0.2em;
+}
+
+.var-var-name {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  color: #1a1a1a;
+}
+
+.var-var-val {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  color: #b83939;
+  text-align: right;
+}
+
+.var-effect {
+  font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Courier, monospace;
+  font-size: 0.78em;
+  background: #fdf9f0;
+  border-left: 3px solid #c9a96e;
+  border-radius: 0 4px 4px 0;
+  padding: 0.55em 0.8em;
+  margin-top: 1em;
+  color: #555;
+  overflow-wrap: anywhere;
+}
+
+.var-summary {
+  background: #f7f4ee;
+  border-left: 3px solid #c9a96e;
+  padding: 0.9em 1.1em;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.92em;
+  margin-top: 1em;
+}
+
+.var-next {
+  font-family: "Futura", "Gill Sans", "Helvetica Neue", sans-serif;
+  font-size: 0.85em;
+  padding: 0.4em 1em;
+  border: 1px solid #1a1a1a;
+  border-radius: 4px;
+  background: #1a1a1a;
+  color: #fafafa;
+  cursor: pointer;
+  margin-top: 1em;
+}
+
+.var-next:hover {
+  background: #333;
+}
+
+.var-predict {
+  margin-top: 1.1em;
+  border-top: 1px solid #e2ded6;
+  padding-top: 0.9em;
+}
+
+.var-predict-q {
+  font-weight: 600;
+  text-align: left;
+  margin-bottom: 0.6em;
+}
+
+.var-predict-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45em;
+}
+
+.var-predict-btn {
+  text-align: left;
+  font: inherit;
+  font-size: 0.9em;
+  color: #1a1a1a;
+  background: #f7f4ee;
+  border: 1px solid #d8d2c6;
+  border-radius: 4px;
+  padding: 0.55em 0.85em;
+  cursor: pointer;
+}
+
+.var-predict-btn:hover:not(:disabled) {
+  background: #efe9dd;
+  border-color: #c9a96e;
+}
+
+.var-predict-btn.correct {
+  background: #e7f5ea;
+  border-color: #5aa06e;
+  font-weight: 600;
+}
+
+.var-predict-btn.incorrect {
+  background: #fbeaea;
+  border-color: #c94e4e;
+}
+
+.var-predict-ok {
+  margin-top: 0.7em;
+  font-size: 0.9em;
+  background: #f2fdf4;
+  border-left: 3px solid #5aa06e;
+  padding: 0.6em 0.8em;
+  border-radius: 0 4px 4px 0;
+}
+
+/* ── Print styles ── */
+@media print {
+  body {
+    max-width: none;
+    font-size: 11pt;
+  }
+
+  .lesson-nav {
+    display: none;
+  }
+
+  .quiz-option {
+    border-color: #999;
+  }
+}
+
+/* ── Highlight emphasis ── */
+em.strong {
+  font-weight: 600;
+  font-style: italic;
+}
+
+/* ── Divider ── */
+hr.divider {
+  border: none;
+  border-top: 1px solid #ddd;
+  margin: 2.5em 0;
+}

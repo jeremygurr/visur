@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reference — Operator Catalog</title>
+  <link rel="stylesheet" href="../assets/styles.css">
+</head>
+<body>
+
+  <div class="lesson-header">
+    <div class="lesson-number">Reference · Unit of Learning</div>
+    <h1>Operator Catalog</h1>
+    <div class="lesson-meta">
+      Every editing action in Visur · 27 operators · companion to
+      <a href="../lessons/0004-operators-the-30-editing-actions.html">Lesson 4</a>
+    </div>
+  </div>
+
+  <p class="lead">
+    An operator is a class implementing
+    <code>Operator.execute(Object opInfo)</code>. Operands come in on the
+    <code>ExecutionDataStack</code>; side effects go out to the
+    <code>EditorModelCoupler</code>. Read any operator with three questions:
+  </p>
+
+  <ol>
+    <li><strong>Stack in</strong> — pops? how many, in what order? peek? nothing?</li>
+    <li><strong>opInfo</strong> — does it use the compiler's operand, or ignore it?</li>
+    <li><strong>Model out</strong> — which <code>emc.put…()</code> methods does it call?</li>
+  </ol>
+
+  <h2 id="catalog">The Catalog</h2>
+
+  <p class="source-ref">
+    "Origin" is how the operator is reached: a <code>NativeOpWord</code> keyword,
+    or a word (see
+    <a href="../lessons/0003-command-language-words-operators-pipelines.html">Lesson 3</a>).
+  </p>
+
+  <table>
+    <thead>
+      <tr><th>Family</th><th>Origin</th><th>Operator</th><th>Stack in</th><th>Model out</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Literal</td><td>LiteralNumberWord</td>
+        <td><code>LiteralNumberOp</code></td><td>none</td><td>pushes number</td>
+      </tr>
+      <tr>
+        <td>Literal</td><td>LiteralStringWord</td>
+        <td><code>LiteralStringOp</code></td><td>none</td><td>pushes unquoted string</td>
+      </tr>
+      <tr>
+        <td>Utility</td><td><code>clearEDS</code></td>
+        <td><code>ClearEDSOp</code></td><td>pops all</td><td>—</td>
+      </tr>
+      <tr>
+        <td>Movement</td><td><code>relativeMove</code></td>
+        <td><code>RelativeMoveOp</code></td><td>pop <code>dy</code>, pop <code>dx</code></td>
+        <td><code>ca</code>; quantum start/end (+scroll)</td>
+      </tr>
+      <tr>
+        <td>Movement</td><td><code>absoluteMove</code></td>
+        <td><code>AbsoluteMoveOp</code></td><td>—</td><td>— <em>(empty stub)</em></td>
+      </tr>
+      <tr>
+        <td>Insertion</td><td><code>insertChar</code></td>
+        <td><code>InsertCharOp</code></td><td>pop char</td><td>content</td>
+      </tr>
+      <tr>
+        <td>Insertion</td><td><code>insertNewline</code></td>
+        <td><code>InsertNewlineOp</code></td><td>none</td><td>content; <code>ca</code>+1; bounds</td>
+      </tr>
+      <tr>
+        <td>Insertion</td><td><code>replaceChar</code></td>
+        <td><code>ReplaceCharOp</code></td><td>pop char</td><td>content (skips <code>\n</code>)</td>
+      </tr>
+      <tr>
+        <td>Deletion</td><td><code>deletePreviousChar</code></td>
+        <td><code>DeletePreviousCharOp</code></td><td>none</td><td>content (keeps <code>ca</code>)</td>
+      </tr>
+      <tr>
+        <td>Deletion</td><td><code>deleteCursorQuantum</code></td>
+        <td><code>DeleteCursorQuantumOp</code></td><td>none</td><td>content; <code>ca</code>; bounds <em>(span&gt;0 only)</em></td>
+      </tr>
+      <tr>
+        <td>Variable</td><td>AssignmentWord <code>-&gt;</code></td>
+        <td><code>AssignmentOp</code></td><td>pop dest, pop source</td><td>global var map (copy)</td>
+      </tr>
+      <tr>
+        <td>Variable</td><td>RecallWord</td>
+        <td><code>RecallOp</code></td><td>none (<code>opInfo</code>=name)</td><td>pushes value</td>
+      </tr>
+      <tr>
+        <td>Variable</td><td><code>+</code></td>
+        <td><code>AddOperator</code></td><td>pop <code>a</code>, pop <code>b</code></td><td>pushes <code>a+b</code></td>
+      </tr>
+      <tr>
+        <td>Variable</td><td><code>removeGlobalVar</code></td>
+        <td><code>RemoveGlobalVarOp</code></td><td>pop name</td><td>global var map</td>
+      </tr>
+      <tr>
+        <td>Mode/state</td><td><code>changeMode</code></td>
+        <td><code>ChangeModeOp</code></td><td><strong>peek</strong> name, delegate to PushSubmode</td><td>editor mode; submode stack</td>
+      </tr>
+      <tr>
+        <td>Mode/state</td><td><code>pushSubmode</code></td>
+        <td><code>PushSubmodeOp</code></td><td>pop name</td><td>submode stack (<code>navigate</code> resets)</td>
+      </tr>
+      <tr>
+        <td>Mode/state</td><td><code>removeSubmode</code></td>
+        <td><code>RemoveSubmodeOp</code></td><td>none</td><td>submode stack (min depth 1)</td>
+      </tr>
+      <tr>
+        <td>Mode/state</td><td><code>changeScope</code></td>
+        <td><code>ChangeScopeOp</code></td><td>pop scope name</td><td><code>scopeQuantum</code></td>
+      </tr>
+      <tr>
+        <td>Mode/state</td><td><code>setSpan</code></td>
+        <td><code>SetSpanOp</code></td><td>pop toggle (→0/1)</td><td><code>span</code>; quantum start/end</td>
+      </tr>
+      <tr>
+        <td>Quantum</td><td><code>quantumStart</code></td>
+        <td><code>QuantumStartOp</code></td><td>none, but delegate pops a name</td><td><code>ca</code>; quantum start/end</td>
+      </tr>
+      <tr>
+        <td>Quantum</td><td><code>quantumEnd</code></td>
+        <td><code>QuantumEndOp</code></td><td>none, but delegate pops a name</td><td><code>ca</code>; quantum start/end</td>
+      </tr>
+      <tr>
+        <td>Quantum</td><td><code>changeCursorQuantum</code></td>
+        <td><code>ChangeCursorQuantumOp</code></td><td>peek then pop name (global-var fallback)</td><td><code>cursorQuantum</code>; <code>span</code>; bounds</td>
+      </tr>
+      <tr>
+        <td>Search</td><td><code>searchForward</code></td>
+        <td><code>SearchForwardOp</code></td><td>pop target</td><td><code>ca</code>; vcx; bounds; prev target/dir</td>
+      </tr>
+      <tr>
+        <td>Search</td><td><code>searchBackward</code></td>
+        <td><code>SearchBackwardOp</code></td><td>pop target</td><td><code>ca</code>; vcx; bounds</td>
+      </tr>
+      <tr>
+        <td>Search</td><td><code>searchInPreviousDirection</code></td>
+        <td><code>SearchInPreviousDirectionOp</code></td><td>none (delegates)</td><td>via chosen op</td>
+      </tr>
+      <tr>
+        <td>Search</td><td><code>searchNotInPreviousDirection</code></td>
+        <td><code>SearchNotInPreviousDirectionOp</code></td><td>none (delegates)</td><td>via chosen op</td>
+      </tr>
+      <tr>
+        <td>Search</td><td><code>removeLastCharInSearchTarget</code></td>
+        <td><code>RemoveLastCharInSearchTargetOp</code></td><td>pop target</td><td>pushes shorter target</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 id="gotchas">Gotchas</h2>
+
+  <ul>
+    <li><strong>Pop order — <code>RelativeMoveOp</code>:</strong> pops
+      <code>dy</code> then <code>dx</code>, so commands push <code>(dx, dy)</code>.
+      <code>h</code> is <code>-1 0 relativeMove</code>.</li>
+    <li><strong>Pop order — <code>AssignmentOp</code>:</strong> pops the
+      destination first, so <code>"src" "dst" -&gt;</code> copies
+      <em>src into dst</em>.</li>
+    <li><strong><code>AbsoluteMoveOp</code> is an empty stub</strong> despite being
+      a registered keyword.</li>
+    <li><strong><code>AddOperator</code> is integer addition</strong> on the
+      stack—not variable addition.</li>
+    <li><strong><code>OperatorService</code> / <code>ModeSwitchService</code> is
+      dead:</strong> its only implementation does nothing and is never called.</li>
+    <li><strong>"replace" is a submode, not an <code>EditorMode</code>.</strong>
+      <code>getModeByString("replace")</code> returns <code>null</code>.</li>
+    <li><strong><code>QuantumStartOp</code> / <code>QuantumEndOp</code> hide a
+      pop</strong> inside <code>Quantum.getScopeAndCursorQuantums()</code>.</li>
+    <li><strong><code>ChangeModeOp</code> peeks, then delegates;</strong>
+      <code>PushSubmodeOp</code> pops the same string as a submode name.</li>
+    <li><strong><code>ChangeCursorQuantumOp</code> can NPE</strong> if the top
+      stack value is neither a known quantum name nor an existing global var.</li>
+    <li><strong>Document-changing operators do not move the cursor;</strong> the
+      mode handlers append <code>1 0 relativeMove</code>.</li>
+  </ul>
+
+  <h2 id="related">Related</h2>
+
+  <ul>
+    <li><a href="../lessons/0004-operators-the-30-editing-actions.html">Lesson 4 — Operators: The 30+ Editing Actions</a> (the teaching version)</li>
+    <li><a href="../lessons/0003-command-language-words-operators-pipelines.html">Lesson 3 — The Command Language</a> (how commands compile and execute)</li>
+    <li><a href="../src/main/java/com/ple/visur/Operator.java">Operator.java</a> — the interface</li>
+    <li><a href="../src/main/java/com/ple/visur/NativeOpWord.java">NativeOpWord.java</a> — keyword-to-operator table</li>
+    <li><a href="../src/main/java/com/ple/visur/InitializerService.java">InitializerService.java</a> — real bindings using these operators</li>
+  </ul>
+
+  <div class="annotation">
+    <p>
+      <strong>Ask your teacher</strong> to walk any row of this table operator by
+      operator, or to add a missing reference unit (quantum types, mode handlers,
+      variables).
+    </p>
+  </div>
+
+  <div class="lesson-nav">
+    <a href="../lessons/0003-command-language-words-operators-pipelines.html">← Lesson 3: The Command Language</a>
+    <a href="../lessons/0004-operators-the-30-editing-actions.html">Lesson 4: Operators →</a>
+  </div>
+
+</body>
+</html>
