@@ -37,15 +37,20 @@
   <h2 id="what-is-visur">1. What Is Visur?</h2>
 
   <p>
-    Visur is a <strong>Vim-inspired rich text editor</strong> built as a
-    <strong>Vert.x event-sourced application</strong>. In plain English: it is a
+    Visur is a <strong>Vim-inspired text editor</strong> built as a
+    <strong>Vert.x event-driven application</strong>. In plain English: it is a
     server-side Java program that listens for keyboard input from a web browser,
-    edits an in-memory text document, and pushes the rendered result back to the
-    browser via WebSockets—a bidirectional, low-latency protocol that keeps an open
-    connection between browser and server. The rendering happens in the browser using the HTML5
-    Canvas API—there is no DOM-based editing, no contenteditable, no HTML input
-    fields. Every keystroke, cursor position, and character is computed on the
-    server and painted on a canvas by the browser.
+    edits an in-memory text document, and pushes the result back to the browser over
+    a SockJS/WebSocket connection—a bidirectional, low-latency protocol that keeps
+    an open connection between browser and server. The drawing happens in the
+    browser using the HTML5 Canvas API—there is no DOM-based editing, no
+    contenteditable, no HTML input fields. The document state—content, cursor,
+    mode, and which slice of the document is visible—is computed on the server; the
+    browser only paints glyphs at coordinates its own canvas code derives from that
+    state (see <a href="../src/main/resources/static/visur.js#L136-173">visur.js</a>).
+    Editor state lives only in memory, in a Vert.x <code>LocalMap</code>: nothing is
+    persisted, so “event-sourced” in the project notes means “state mutated by
+    events”, not an event log you could replay.
   </p>
 
   <h3 id="websockets-explained">What Are WebSockets?</h3>
@@ -61,16 +66,51 @@
     party can speak whenever they want. For an editor like Visur, this is essential
     because every keystroke must reach the server instantly, and every screen update
     must appear on the canvas without noticeable delay. WebSockets provide that low-latency,
-    bidirectional pipe, making remote editing feel responsive.
+    bidirectional pipe, making remote editing feel responsive. Visur reaches the same
+    pipe through Vert.x's SockJS bridge, which prefers a WebSocket transport and falls
+    back to HTTP streaming/long-polling when a WebSocket cannot be established
+    (<a href="../src/main/java/com/ple/visur/MainVerticle.java#L50">MainVerticle.java</a>,
+    <a href="../src/main/resources/static/visur.js#L46">visur.js</a>).
   </p>
 
   <p>
-    It draws inspiration from <strong>Vim</strong>: the same mode-based editing
-    (normal, insert, replace), the same key-driven command language
-    (<code>5j</code> = move down five lines, <code>w</code> = forward word), and
-    the same idea that the editor state—cursor position, selection, current mode—is
-    the single source of truth.
+    It draws inspiration from <strong>Vim</strong>: mode-based editing, a key-driven
+    command language, and the same idea that the editor state—cursor position,
+    selection, current mode—is the single source of truth.
   </p>
+
+  <p>
+    Three details of that inheritance are easy to get wrong, because Visur splits
+    what Vim calls a “mode” into a <em>mode</em> and a <em>submode</em>:
+  </p>
+
+  <ul>
+    <li><strong>Modes</strong> come from
+      <a href="../src/main/java/com/ple/visur/EditorMode.java#L3-6">EditorMode.java</a>:
+      <code>navigate</code> (Vim's Normal mode), <code>insert</code>, and
+      <code>reading</code> (declared, not implemented). <strong>Replace</strong> is
+      <em>not</em> a mode—it is one of the values of
+      <a href="../src/main/java/com/ple/visur/EditorSubmode.java#L3-12">EditorSubmode.java</a>
+      (<code>replace</code>, <code>span</code>, <code>quantumStart</code>,
+      <code>quantumEnd</code>, <code>searchForward</code>, <code>searchBackward</code>,
+      <code>changeScope</code>).</li>
+    <li><strong>No count prefixes.</strong> <code>5j</code> does <em>not</em> mean
+      “down five lines”. In navigate mode <code>j</code> is bound to the fixed
+      command <code>0 1 relativeMove</code>
+      (<a href="../src/main/java/com/ple/visur/InitializerService.java#L228-241">InitializerService.java</a>),
+      and nothing buffers digits between keystrokes—the <code>keyBuffer</code> field
+      of <a href="../src/main/java/com/ple/visur/EditorModelKey.java#L13">EditorModelKey</a>
+      is declared but never read or written. Digits are only consumed as a span
+      width, inside span submode
+      (<a href="../src/main/java/com/ple/visur/SpanSubmodeHandler.java#L13-23">SpanSubmodeHandler.java</a>).</li>
+    <li><strong><code>w</code> is a quantum selector, not “forward word”.</strong>
+      <code>w</code> switches the cursor's unit of movement and selection to the word
+      quantum, via
+      <a href="../src/main/java/com/ple/visur/ChangeCursorQuantumHandler.java#L9-21">ChangeCursorQuantumHandler.java</a>.
+      The keys are <code>q</code>→character, <code>w</code>→word, <code>e</code>→line,
+      <code>r</code>→document
+      (<a href="../src/main/java/com/ple/visur/InitializerService.java#L167-172">InitializerService.java</a>).</li>
+  </ul>
 
   <p>
     The key difference from Vim: <em>everything happens over a network</em>. Vim
@@ -95,26 +135,36 @@
 
   <figure>
     <pre class="diagram">
-Browser (JS)              Server (Java)
-───────                  ────────────────
-keyDown event            KeyWasPressedVerticle
-  │  send(keyWasPressed)     │
-  ├──────────────────────►   │  ──► Keymap → KeymapHandler
-  │                          │     ──► CommandExecService
-  │                          │     ──► mutates EditorModelCoupler
-  │                          │
-  │                          │  sends modelWasChanged ───────────────┐
-  │  eb.on('viewWasChan  ◄── │                                      │
-  ned')                    CanvasWasChangedVerticle                  │
-  └── drawCanvas()             │  (handles viewport resize)          │
-                                │  sends modelWasChanged ───────────┘
+Browser (visur.js)                    Server (Java)
+──────────────────                    ─────────────
+keydown
+  └─ send keyWasPressed ────────────► KeyWasPressedVerticle
+                                        │ KeymapMap → Keymap (current submode)
+                                        │ Keymap.get → command, else KeymapHandler
+                                        │ CommandExecutionService.execute(...)
+                                        │ mutates EditorModelCoupler
+                                        │
+                                        │ send modelWasChanged
+                                        ▼
+                                      ModelWasChangedVerticle
+                                        │ reads EditorModelCoupler
+                                        │ send viewWasChanged
+viewWasChanged ◄────────────────────────┘
+  └─ drawCanvas() repaints text + cursor
+
+canvas measured once, on page load
+  └─ send canvasWasChanged ─────────► CanvasWasChangedVerticle
+                                        │ putCanvasWidth / putCanvasHeight
+                                        │ send modelWasChanged ──► (as above)
     </pre>
     <figcaption>Figure 1: The three verticles and the four event bus addresses
- they use. The KeyWasPressedVerticle handles all editing logic; the
- ModelWasChangedVerticle builds a View and sends it to the browser; the
- CanvasWasChangedVerticle handles viewport sizing. Both latter verticles
- cascade a <code>modelWasChanged</code> event so the browser always gets the
- latest View.</figcaption>
+ they use. <code>KeyWasPressedVerticle</code> does all editing;
+ <code>ModelWasChangedVerticle</code> turns the shared model into a View and sends
+ it to the browser; <code>CanvasWasChangedVerticle</code> stores the viewport size
+ and then re-triggers <code>ModelWasChangedVerticle</code>. Note the asymmetry:
+ only the canvas verticle re-sends <code>modelWasChanged</code>; the model verticle
+ answers with <code>viewWasChanged</code>, never with another
+ <code>modelWasChanged</code>.</figcaption>
   </figure>
 
   <h3 id="verticle-1">Verticle 1: <code>KeyWasPressedVerticle</code> — The Editor's Brain</h3>
@@ -123,7 +173,7 @@ keyDown event            KeyWasPressedVerticle
     This verticle receives keyboard events from the browser on the event bus
     address <code>"keyWasPressed"</code>. Its job is to interpret the keystroke
     and mutate the editor model. The source is
-    <a href="../../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>.
+    <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>.
   </p>
 
   <p>
@@ -134,23 +184,33 @@ keyDown event            KeyWasPressedVerticle
   <figure>
     <pre class="diagram">
 handle(Message event) {
-  1. Parse the JSON body → extract key string (e.g. "j", "i", "5")
+  1. Parse the JSON body → extract key string (e.g. "j", "i", "ArrowLeft")
   2. Create KeyPressed.from(key)
 
   3. if (isInCommandState)
        → CommandStateService.executeCommandState(keyPressed)
      else
-       → Look up KeymapMap → Keymap (by submode)
-       → Keymap.get(keyPressed) → returns VisurCommand? null
-       → if command exists: CommandExecService.execute(command)
+       → KeymapMap.get(editorSubmode) → the Keymap for the current submode
+       → Keymap.get(keyPressed):
+            a) a static binding made in InitializerService ("j" → 0 1 relativeMove), or
+            b) a KeymapHandler result (e.g. q/w/e/r → changeCursorQuantum)
+       → if a command came back: CommandExecutionService.execute(command)
 
-  4. bus.send("modelWasChanged", null)  // notify all other verticles
+  4. bus.send("modelWasChanged", null)   // always sent, even if no command matched
 }
     </pre>
     <figcaption>Figure 2: The command flow inside
- KeyWasPressedVerticle.handle(). The conditional branches between command
- state (the bottom command-line) and normal editing. Either way,
- <code>modelWasChanged</code> is sent at the end, triggering the ModelWasChangedVerticle.</figcaption>
+ <code>KeyWasPressedVerticle.handle()</code>
+ (<a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java#L14-33">source</a>).
+ The conditional branches between command state (the bottom command line) and
+ normal editing. Either way, <code>modelWasChanged</code> is sent at the end,
+ triggering the ModelWasChangedVerticle. Note that the command-state branch is
+ currently dead code from the keyboard's point of view: nothing ever sets
+ <code>isInCommandState</code> to <code>true</code>—initialization sets it to
+ <code>false</code>
+ (<a href="../src/main/java/com/ple/visur/InitializerService.java#L106">InitializerService.java</a>),
+ and only the exit path ever writes it
+ (<a href="../src/main/java/com/ple/visur/CommandStateService.java#L56-61">CommandStateService.java</a>).</figcaption>
   </figure>
 
   <p>
@@ -168,13 +228,19 @@ handle(Message event) {
 
   <ol>
     <li>Reads the current editor state from the
-      <a href="../../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler</a>
+      <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler</a>
       (the shared state hub).</li>
-    <li>Builds a <a href="../../src/main/java/com/ple/visur/View.java">View</a>
-      object containing the full editor state: content, cursor position, mode,
-      submode, quantum, span, canvas start/end, search target, command state.</li>
-    <li>Serializes it to JSON and sends it on the event bus address
-      <code>"viewWasChanged"</code>.</li>
+    <li>Builds a <a href="../src/main/java/com/ple/visur/View.java">View</a>
+      object—which holds only two fields, <code>ca</code> and
+      <code>editorContent</code>—then fills in the rest of the JSON directly from
+      the coupler in
+      <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L24-52">toJson()</a>:
+      span, canvasStart, canvasEnd, cursorQuantumStart/End, editorMode,
+      editorSubmode, cursorQuantum, scopeQuantum, isAtQuantumStart,
+      isInCommandState, commandStateContent, commandCursor, plus
+      <code>searchTarget</code> (only while in a search submode).</li>
+    <li>Sends that JSON on the event bus address <code>"viewWasChanged"</code>
+      (<a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L18-22">handleChange()</a>).</li>
   </ol>
 
   <p>
@@ -186,24 +252,42 @@ handle(Message event) {
   <h3 id="verticle-3">Verticle 3: <code>CanvasWasChangedVerticle</code> — The Viewport Manager</h3>
 
   <p>
-    This verticle listens on <code>"canvasWasChanged"</code>. It receives the
-    browser's canvas width and height whenever the window is resized or first
-    connected. It:
+    This verticle listens on <code>"canvasWasChanged"</code>. The browser sends the
+    canvas width and height <em>once</em>, right after it connects (there is no
+    resize listener—more on that below). It:
   </p>
 
   <ol>
     <li>Stores the canvas dimensions in the
-      <code>EditorModelCoupler</code>.</li>
-    <li>Uses those dimensions (along with the newline index list) to compute
-      <code>canvasStart</code> and <code>canvasEnd</code>—the visible region of
-      the document.</li>
-    <li>Posts <code>modelWasChanged</code> so the ModelWasChangedVerticle sends
-      a fresh <code>View</code> that includes the updated canvas boundaries.</li>
+      <code>EditorModelCoupler</code>
+      (<a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L15-21">source</a>).</li>
+    <li>Prints a debug listing of the document's lines. Careful: that loop indexes
+      the newline list with <code>cy</code> (the cursor's line) instead of the loop
+      counter, so it logs the cursor's line N times rather than logging every line
+      (<a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L22-33">source</a>).</li>
+    <li>Posts <code>modelWasChanged</code> so the ModelWasChangedVerticle sends a
+      fresh View that carries the new dimensions
+      (<a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L34">source</a>).</li>
   </ol>
 
   <p>
-    Without this verticle, the editor would not handle window resizing—text would
-    be clipped at the old viewport boundaries.
+    What it does <em>not</em> do is compute the visible region: it never touches
+    <code>canvasStart</code>. <code>canvasStart</code> is maintained by the coupler's
+    scrolling helpers
+    (<a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L230-232">putCanvasStart</a>,
+    <code>incrementCanvasStart</code>/<code>decrementCanvasStart</code>), while
+    <code>canvasEnd</code> is derived on demand from canvas width/height, the
+    newline list and the first visible line <code>fy</code>
+    (<a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L91-109">getCanvasEnd()</a>).
+  </p>
+
+  <p>
+    One real limitation: because <code>canvasWasChanged</code> is sent only inside
+    <code>eb.onopen</code>
+    (<a href="../src/main/resources/static/visur.js#L120">visur.js</a>), resizing
+    the browser window does not update the server's notion of the viewport. The
+    canvas element itself grows or shrinks, but the server keeps describing the old
+    rectangle until the page is reloaded.
   </p>
 
   <hr class="divider">
@@ -212,7 +296,7 @@ handle(Message event) {
 
   <p>
     Everything begins in
-    <a href="../../src/main/java/com/ple/visur/MainVerticle.java">MainVerticle.java</a>,
+    <a href="../src/main/java/com/ple/visur/MainVerticle.java">MainVerticle.java</a>,
     the application entry point. The <code>start()</code> method executes in
     exactly this order:
   </p>
@@ -224,6 +308,8 @@ MainVerticle.start()
   ├── 1. ServiceHolder.init(sharedData)
   │       └── Creates ALL services: EditorModelCoupler,
   │            CommandCompileService, CommandExecutionService, etc.
+  │       └── Its InitializerService constructor seeds the initial state:
+  │            editor mode/submode, the document text, quantums, keymaps
   │
   ├── 2. vertx.deployVerticle(new KeyWasPressedVerticle())
   │       └── Listens on event bus address "keyWasPressed"
@@ -234,27 +320,34 @@ MainVerticle.start()
   ├── 4. vertx.deployVerticle(new ModelWasChangedVerticle())
   │       └── Listens on event bus address "modelWasChanged"
   │
-  ├── 5. Configure Router + SockJSBridge (permissions)
-  │       └── Allows browser to send: keyWasPressed, canvasWasChanged
+  ├── 5. Build Router + SockJSBridgeOptions (permission rules)
+  │       └── Allows browser to send:    keyWasPressed, canvasWasChanged,
+  │                                      modelWasChanged
   │       └── Allows browser to receive: modelWasChanged, viewWasChanged
   │
   ├── 6. Route /static/* → serve static files (HTML, CSS, JS)
   │
-  ├── 7. Route "/"  → 302 redirect to /static/visur.html
+  ├── 7. Mount the bridge: router.mountSubRouter("/eventbus",
+  │                                    SockJSHandler...bridge(opts))
   │
-  └── 8. vertx.createHttpServer().listen(8888)
+  ├── 8. Route "/"  → 302 redirect to /static/visur.html
+  │
+  └── 9. vertx.createHttpServer().requestHandler(router).listen(8888)
           └── Wait for browser connections on port 8888
     </pre>
-    <figcaption>Figure 3: The exact startup sequence in MainVerticle. Note that
- <code>ServiceHolder.init()</code> runs <em>before</em> any verticle is
- deployed—this ensures all services (and the EditorModelCoupler) exist before
- any verticle tries to access them. The port is hardcoded to <code>8888</code>.</figcaption>
+    <figcaption>Figure 3: The exact startup sequence in MainVerticle
+ (<a href="../src/main/java/com/ple/visur/MainVerticle.java#L26-67">source</a>).
+ Note that <code>ServiceHolder.init()</code> runs <em>before</em> any verticle is
+ deployed—this ensures all services (and the initialized EditorModelCoupler) exist
+ before any verticle tries to access them. The port is hardcoded to
+ <code>8888</code>, and the bridge lives at <code>/eventbus</code>, which is the URL
+ <code>visur.js</code> connects to.</figcaption>
   </figure>
 
   <h3 id="services">Services Created at Startup</h3>
 
   <p>
-    The <a href="../../src/main/java/com/ple/visur/ServiceHolder.java">ServiceHolder</a>
+    The <a href="../src/main/java/com/ple/visur/ServiceHolder.java">ServiceHolder</a>
     creates all shared services exactly once at startup. These are
     <strong>static singleton references</strong>—every verticle accesses them
     through <code>ServiceHolder.XXX</code>:
@@ -265,24 +358,36 @@ MainVerticle.start()
       (text, newline indices, global variables, canvas dimensions)</li>
     <li><code>editorModelCoupler</code> — the central state hub (a
       <code>LocalMap</code> keyed by
-      <a href="../../src/main/java/com/ple/visur/EditorModelKey.java">EditorModelKey</a>
+      <a href="../src/main/java/com/ple/visur/EditorModelKey.java">EditorModelKey</a>
       enum values)</li>
-    <li><code>commandCompileService</code> — parses keystrokes into Words
-      (<code>CommandCompileService</code>)</li>
-    <li><code>commandExecutionService</code> — executes compiled commands as
-      Operators (<code>CommandExecutionService</code>)</li>
-    <li><code>commandStateService</code> — manages the bottom command-line state</li>
-    <li><code>modeSwitchService</code> — handles mode and submode transitions</li>
-    <li><code>initializerService</code> — one-time editor initialization</li>
+    <li><code>commandCompileService</code> — parses command <em>sentences</em>
+      (strings like <code>"0 1 relativeMove"</code>) into Word/Operator lists at
+      startup and when submodes produce commands</li>
+    <li><code>commandExecutionService</code> — runs a compiled command: it walks the
+      operator list and dispatches each op, pulling operands off the execution-data
+      stack</li>
+    <li><code>commandStateService</code> — edits the bottom command-line buffer
+      (typed characters, backspace, arrows, Enter/Escape)</li>
+    <li><code>modeSwitchService</code> — created at startup but currently
+      <strong>dead code</strong>: it is never called, and its <code>execute()</code>
+      body is entirely commented out
+      (<a href="../src/main/java/com/ple/visur/ModeSwitchService.java#L20-36">source</a>).
+      Mode changes actually happen in
+      <a href="../src/main/java/com/ple/visur/ChangeModeOp.java#L5-15">ChangeModeOp</a>,
+      which writes <code>editorMode</code> and then pushes a submode.</li>
+    <li><code>initializerService</code> — one-time editor initialization (its
+      constructor does the work, so creating it <em>is</em> the initialization)</li>
   </ul>
 
   <div class="callout">
     <strong>Key design note:</strong> The <code>EditorModelCoupler</code> uses a
     <code>LocalMap&lt;EditorModelKey, Object&gt;</code> from Vert.x's shared data
     API. This means all three verticles share the <em>exact same in-memory state
-    object</em>. There is no replication, no synchronization needed—they are all
-    in the same JVM and share the same LocalMap. This is why the coupling is
-    "tight" and the architecture is simple.
+    object</em>. There is no replication—they are all in the same JVM and share the
+    same LocalMap. That is why the coupling is "tight" and the architecture is
+    simple. It also means there is no transaction boundary around a multi-step
+    update; see the threading caveat in
+    <a href="#shared-state">section 7</a>.
   </div>
 
   <hr class="divider">
@@ -293,7 +398,7 @@ MainVerticle.start()
     All communication between the browser and server, and between verticles,
     happens through Vert.x's event bus using four <strong>addresses</strong>
     defined in the
-    <a href="../../src/main/java/com/ple/visur/BusEvent.java">BusEvent</a>
+    <a href="../src/main/java/com/ple/visur/BusEvent.java">BusEvent</a>
     enum:
   </p>
 
@@ -305,7 +410,7 @@ MainVerticle.start()
       <tr>
         <td><code>"canvasWasChanged"</code></td>
         <td>Browser → Server</td>
-        <td>Browser JS (on connect + resize)</td>
+        <td>Browser JS (once, on connect—not on resize)</td>
         <td><code>CanvasWasChangedVerticle</code></td>
       </tr>
       <tr>
@@ -316,8 +421,9 @@ MainVerticle.start()
       </tr>
       <tr>
         <td><code>"modelWasChanged"</code></td>
-        <td>Server → Server (or Server → Browser)</td>
-        <td><code>KeyWasPressedVerticle</code>,
+        <td>Browser → Server (and permitted Server → Browser)</td>
+        <td>Browser JS (echo sent from <code>eb.onopen</code>, after
+          <code>canvasWasChanged</code>), <code>KeyWasPressedVerticle</code>,
           <code>CanvasWasChangedVerticle</code></td>
         <td><code>ModelWasChangedVerticle</code></td>
       </tr>
@@ -331,7 +437,7 @@ MainVerticle.start()
   </table>
 
   <p>
-    The <a href="../../src/main/java/com/ple/visur/MainVerticle.java">MainVerticle</a>
+    The <a href="../src/main/java/com/ple/visur/MainVerticle.java#L42-47">MainVerticle</a>
     configures the SockJS bridge with explicit permit rules:
   </p>
 
@@ -341,13 +447,18 @@ Inbound  (browser → server):  Outbound  (server → browser):
 ────────────────────────────  ─────────────────────────────
 keyWasPressed                 modelWasChanged
 canvasWasChanged              viewWasChanged
+modelWasChanged
     </pre>
     <figcaption>Figure 4: Explicit permission rules on the SockJS bridge.
- Notice that the browser can only <em>send</em> key events and canvas
- dimensions. It cannot send arbitrary messages. And it can only
- <em>receive</em> model changes and view updates. This is a
- deliberate security design—wildcard or open bridges would let a
- malicious browser page read or write arbitrary server state.</figcaption>
+ Notice that the browser can only <em>send</em> three specific addresses—key
+ events, canvas dimensions, and the <code>modelWasChanged</code> nudge that asks
+ for a redraw. It cannot send arbitrary messages, and it can only <em>receive</em>
+ model changes and view updates. This is a deliberate security design—a wildcard
+ or open bridge would let a malicious page read or write arbitrary server state.
+ The <code>modelWasChanged</code> address appears on both sides because the
+ browser echoes it back after sending <code>canvasWasChanged</code>, which is how
+ the very first frame gets drawn (the two sends are ordered, so
+ <code>getCanvasWidth</code> is never read before <code>putCanvasWidth</code> ran).</figcaption>
   </figure>
 
   <hr class="divider">
@@ -356,21 +467,38 @@ canvasWasChanged              viewWasChanged
 
   <p>
     The project uses <strong>Gradle with Kotlin DSL</strong>
-    (<code>build.gradle.kts</code>). The critical dependencies from
-    <a href="../../build.gradle.kts">build.gradle.kts</a> are:
+    (<a href="../build.gradle.kts">build.gradle.kts</a>) and targets Java 16
+    (<a href="../build.gradle.kts#L73-76">source</a>). The dependencies that
+    matter most for this lesson are
+    (<a href="../build.gradle.kts#L30-46">source</a>):
   </p>
 
   <ul>
-    <li><code>io.vertx:vertx-web:4.4.4</code> — HTTP server, routing</li>
-    <li><code>io.vertx:vertx-rx-java3:4.4.4</code> — reactive Java bindings</li>
-    <li><code>io.vertx:vertx-tcp-eventbus-bridge:4.4.4</code> — WebSocket
-      event bus bridge (used for browser ↔ server communication)</li>
+    <li><code>io.vertx:vertx-web:4.4.4</code> — HTTP server, routing, and the
+      <code>SockJSHandler</code> that installs the event bus bridge the browser
+      talks to.</li>
+    <li><code>io.vertx:vertx-rx-java3:4.4.4</code> — the RxJava 3 bindings; note
+      that every verticle extends <code>io.vertx.rxjava3.core.AbstractVerticle</code>,
+      not the plain core one.</li>
+    <li><code>io.vertx:vertx-tcp-eventbus-bridge:4.4.4</code> — declared on the
+      classpath, but <strong>not what the browser uses</strong>. No TCP bridge is
+      installed anywhere in <code>src/main/java</code>; the browser connects through
+      the SockJS bridge above. The build also pulls in several other Vert.x modules
+      (<code>vertx-web-client</code>, <code>vertx-health-check</code>,
+      <code>vertx-opentelemetry</code>, <code>vertx-shell</code>,
+      <code>vertx-micrometer-metrics</code>, ...) that <code>MainVerticle</code>
+      never touches.</li>
   </ul>
 
   <p>
-    The build produces a <strong>fat JAR</strong> via the Shadow plugin
-    (<code>com.github.johnrengelman.shadow</code>), which bundles all
-    dependencies into a single runnable JAR.
+    The build can also produce a <strong>fat JAR</strong> via the Shadow plugin
+    (<code>com.github.johnrengelman.shadow</code>), which bundles all dependencies
+    into one archive with the classifier <code>fat</code>
+    (<a href="../build.gradle.kts#L78-84">source</a>). The runnable task for the
+    server, though, is Gradle's <code>run</code>: <code>build.gradle.kts</code> wires
+    it to Vert.x's <code>Launcher</code> with the arguments
+    <code>run com.ple.visur.MainVerticle --redeploy=...</code>
+    (<a href="../build.gradle.kts#L93-95">source</a>).
   </p>
 
   <div class="callout success">
@@ -378,17 +506,33 @@ canvasWasChanged              viewWasChanged
     <br><br>
     <code>cd /Users/jaredgurr/repos/visur</code>
     <br><br>
-    <code>./gradlew fatJar</code>
+    <code>./gradlew run</code>
     <br><br>
-    <code>java -jar build/libs/visur-1.0.0-SNAPSHOT-fat.jar</code>
+    (There is no <code>fatJar</code> task; the Shadow task is <code>shadowJar</code>,
+    and <code>java -jar build/libs/visur-1.0.0-SNAPSHOT-fat.jar</code> only prints the
+    Vert.x launcher help, because the manifest declares
+    <code>MainVerticle-Verticle</code> while <code>io.vertx.core.Launcher</code> looks
+    for <code>Main-Verticle</code>. If you do want to run the JAR, name the verticle:
+    <code>java -jar build/libs/visur-1.0.0-SNAPSHOT-fat.jar run com.ple.visur.MainVerticle</code>.)
   </div>
 
   <p>
     After running, open
     <a href="http://localhost:8888/static/visur.html">http://localhost:8888/static/visur.html</a>
-    in your browser. You should see a canvas with the default text "The quick brown
-    fox jumps over the lazy dog" and a yellow cursor. The editor starts in
-    <strong>Normal mode</strong> (you can type <code>i</code> to enter Insert mode).
+    in your browser (or just <code>http://localhost:8888/</code>, which 302-redirects
+    there—see
+    <a href="../src/main/java/com/ple/visur/MainVerticle.java#L52-65">MainVerticle</a>).
+    You should see a canvas showing the opening of the Declaration of Independence—not
+    sample lorem-ipsum text; the initial content is a long string literal in
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L40">InitializerService</a>.
+    The footer shows two indicators: <code>NAVIGATE MODE</code> on the left and
+    <code>CHARACTER QUANTUM</code> on the right, and the cursor is a gold
+    (<code>#FFD700</code>) block, because span starts at 1
+    (<a href="../src/main/java/com/ple/visur/InitializerService.java#L32-36">mode seeds</a>,
+    <a href="../src/main/resources/static/visur.js#L75-95">footer rendering</a>,
+    <a href="../src/main/resources/static/visur.js#L199-209">cursor drawing</a>).
+    The editor starts in <strong>navigate</strong> mode (Vim's Normal): press
+    <code>i</code> for Insert mode, <code>Escape</code> to come back.
   </p>
 
   <hr class="divider">
@@ -462,41 +606,90 @@ canvasWasChanged              viewWasChanged
 
   <p>
     Perhaps the single most important file in the entire codebase is
-    <a href="../../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler.java</a>.
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler.java</a>.
     It is the <strong>single source of truth</strong> for the editor's entire
     state—every verticle reads from it and writes to it.
   </p>
 
   <p>
     Internally, it holds a <code>LocalMap&lt;EditorModelKey, Object&gt;</code>
-    where the keys are an enum (<a href="../../src/main/java/com/ple/visur/EditorModelKey.java">EditorModelKey</a>)
-    defining every piece of state:
+    where the keys are an enum
+    (<a href="../src/main/java/com/ple/visur/EditorModelKey.java">EditorModelKey</a>).
+    A wrinkle worth knowing before you go hunting through that enum: only some
+    entries are actually used, and the cursor coordinates are <em>not</em> enum keys
+    at all. The live entries are:
   </p>
 
   <ul>
     <li><code>editorContent</code> — the full text being edited</li>
-    <li><code>nextLineIndices</code> — computed newline positions (the <code>nl</code> global variable)</li>
-    <li><code>cx</code>, <code>cy</code>, <code>ca</code> — cursor coordinates (local X, local Y, absolute)</li>
-    <li><code>editorMode</code> — Normal, Replace, or Insert</li>
-    <li><code>editorSubmode</code> — Span, Scope, SearchForward, SearchBackward, etc.</li>
-    <li><code>span</code> — current selection width</li>
-    <li><code>canvasStart</code>, <code>canvasEnd</code> — visible region</li>
-    <li><code>cursorQuantum</code>, <code>cursorQuantumStart</code>, <code>cursorQuantumEnd</code> — current quantum (character/line/regex/document)</li>
-    <li><code>scopeQuantum</code> — scope type for search operations</li>
-    <li><code>keymapMap</code> — key bindings organized by submode</li>
-    <li><code>isInCommandState</code> — boolean for command-line mode</li>
-    <li><code>commandStateContent</code>, <code>commandCursor</code> — command-line buffer</li>
-    <li><code>executionDataStack</code> — stack for submode operations (e.g., search targets)</li>
-    <li>Global variables: <code>nl</code>, <code>cx</code>, <code>cy</code>, <code>ca</code>, <code>span</code>, <code>cursorQuantum</code>, <code>scopeQuantum</code>, <code>previousSearchTarget</code></li>
+    <li><code>canvasWidth</code>, <code>canvasHeight</code>, <code>canvasStart</code>,
+      <code>fy</code> (first visible line) — the viewport; <code>canvasEnd</code> is
+      computed from these rather than stored</li>
+    <li><code>editorMode</code> — a value of <code>EditorMode</code></li>
+    <li><code>editorSubmodeStack</code> — a <code>Stack&lt;EditorSubmode&gt;</code>;
+      <code>getEditorSubmode()</code> peeks the top, which is why submodes stack</li>
+    <li><code>modeToKeymap</code> — the <code>KeymapMap</code> used by the
+      KeyWasPressedVerticle (note the enum also declares an unused
+      <code>keymapMap</code> constant; <code>modeToKeymap</code> is the one the
+      getter/setter use)</li>
+    <li><code>quantumStart</code>, <code>quantumEnd</code>, <code>isAtQuantumStart</code>
+      — bounds of the current cursor quantum</li>
+    <li><code>quantumNameToQuantum</code>, <code>keyToQuantumName</code> — the quantum
+      registry and the q/w/e/r key mapping</li>
+    <li><code>isInCommandState</code>, <code>commandStateContent</code>,
+      <code>commandCursor</code> — the command-line buffer</li>
+    <li><code>executionData</code> — an <code>ExecutionDataStack</code> used by
+      submodes (e.g. the search target being typed)</li>
+    <li><code>globalVariableMap</code> — a <code>VariableMap</code> holding the visur
+      variables below</li>
+    <li><code>virtualCX</code> — remembered column, and
+      <code>previousSearchDirectionWasForward</code> — used by <code>n</code>/<code>N</code></li>
+    <li><code>lineWrapping</code> — set once to <code>LineWrapping.wrapped</code> at
+      init and never read again
+      (<a href="../src/main/java/com/ple/visur/InitializerService.java#L99">source</a>)</li>
   </ul>
 
+  <p>
+    The editor's <em>variables</em> live in that nested <code>VariableMap</code>
+    (the “global variables” of Lesson 10), reachable as
+    <code>getGlobalVar(name)</code>: <code>nl</code> (next-line indices),
+    <code>ca</code> (absolute cursor offset), <code>cx</code>/<code>cy</code>
+    (line-relative column / line number), <code>span</code> (0 or 1 quantums),
+    <code>cursorQuantum</code>, <code>scopeQuantum</code>, and
+    <code>previousSearchTarget</code>.
+    <code>nl</code>, <code>ca</code>, <code>cx</code>, <code>cy</code> are created as
+    data-class bricks in
+    <a href="../src/main/java/com/ple/visur/InitializerService.java#L122-155">InitializerService</a>;
+    <code>getCX()</code>, <code>getCY()</code> and <code>getCA()</code> read them back
+    out of that map
+    (<a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L56-70">EditorModelCoupler</a>).
+    So “<code>cx</code>/<code>cy</code>/<code>ca</code> are EditorModelKey values” is
+    the wrong mental model: they are variables, fetched by name.
+  </p>
+
   <div class="callout warning">
-    <strong>Important:</strong> The EditorModelCoupler is a <code>static</code>
-    field on <code>ServiceHolder</code>. This is a design pattern that gives all
-    verticles direct access to the same state object. It is <em>not</em> thread-safe
-    in the traditional Java sense—Vert.x is single-threaded per event loop, so
-    this works because only one thread ever touches the data at a time. If you
-    refactor to use threads, this pattern breaks.
+    <strong>Important:</strong> the <code>EditorModelCoupler</code> is a
+    <code>static</code> field on <code>ServiceHolder</code>, so every verticle reads
+    and writes the same state object. A common—but wrong—way to justify that design
+    is “Vert.x is single-threaded, so only one thread touches it at a time”. Two
+    corrections:
+    <ul>
+      <li>Each <code>deployVerticle</code> call
+        (<a href="../src/main/java/com/ple/visur/MainVerticle.java#L33-37">MainVerticle</a>)
+        gets its own context with its own event-loop thread, and a Vert.x instance
+        runs <em>many</em> event loops (2 per core by default). Only code inside a
+        single verticle is guaranteed to be single-threaded; these three verticles
+        can run on three different threads.</li>
+      <li><code>LocalMap</code> is not a plain <code>HashMap</code>: Vert.x's
+        <code>LocalMapImpl</code> is a <code>ConcurrentHashMap</code> underneath, so
+        individual <code>get</code>/<code>put</code> calls are safe.</li>
+    </ul>
+    The <em>real</em> hazard is that multi-step read-modify-write sequences are not
+    atomic—for example <code>getCanvasEnd()</code>'s loop, or the
+    <code>putCX()</code>/<code>putCA()</code> pairs that must stay consistent. Today
+    that survives because handlers are short and each user keystroke is handled in
+    one burst, but it is a real race surface, not a guaranteed-safe design. Don't
+    add blocking work or threads here without addressing it.
   </div>
 
   <hr class="divider">
@@ -508,18 +701,24 @@ canvasWasChanged              viewWasChanged
   </p>
 
   <ul>
-    <li><strong>What is Visur?</strong> A Vim-inspired rich text editor running as
+    <li><strong>What is Visur?</strong> A Vim-inspired text editor running as
       a server, with the browser as a thin rendering terminal.</li>
     <li><strong>How many verticles are there?</strong> Three:
       KeyWasPressedVerticle (editing logic), ModelWasChangedVerticle (view
-      building), CanvasWasChangedVerticle (viewport management).</li>
-    <li><strong>How does the browser communicate with the server?</strong> Via
-      WebSocket through Vert.x's SockJS bridge, using four event bus addresses.</li>
+      building), CanvasWasChangedVerticle (viewport size + redraw trigger).</li>
+    <li><strong>How does the browser communicate with the server?</strong> Through
+      Vert.x's SockJS bridge (WebSocket transport, HTTP fallbacks) at
+      <code>/eventbus</code>, using four event bus addresses. The bridge permits
+      three inbound addresses (keyWasPressed, canvasWasChanged, modelWasChanged) and
+      two outbound (modelWasChanged, viewWasChanged).</li>
     <li><strong>What is the single source of truth for editor state?</strong> The
       <code>EditorModelCoupler</code>, a shared
-      <code>LocalMap&lt;EditorModelKey, Object&gt;</code>.</li>
-    <li><strong>How do you build and run it?</strong> <code>./gradlew fatJar</code>
-      then <code>java -jar build/libs/visur-*-fat.jar</code>.</li>
+      <code>LocalMap&lt;EditorModelKey, Object&gt;</code> that also contains a
+      <code>VariableMap</code> of named editor variables (<code>nl</code>,
+      <code>ca</code>, <code>cx</code>, <code>cy</code>, <code>span</code>, ...).</li>
+    <li><strong>How do you build and run it?</strong> <code>./gradlew run</code>
+      (or <code>./gradlew shadowJar</code> then
+      <code>java -jar build/libs/visur-1.0.0-SNAPSHOT-fat.jar run com.ple.visur.MainVerticle</code>).</li>
     <li><strong>What is the request loop?</strong> Browser sends keystroke → server
       mutates state → server sends View JSON → browser redraws canvas.</li>
   </ul>
@@ -529,10 +728,10 @@ canvasWasChanged              viewWasChanged
   <h2 id="next-steps">9. What Comes Next</h2>
 
   <p>
-    In <strong>Lesson 2</strong, you will trace the
-    <code>EditorModelCoupler</code> in detail—every field, every getter and
-    setter—and walk through one complete editing operation step by step,
-    reading the actual source code that mutates each piece of state.
+    In <strong>Lesson 2</strong>, you will walk the coupler, the
+    <code>ServiceHolder</code> registry and the <code>InitializerService</code> boot
+    sequence, then trace one complete editing request through the operator layer
+    (<a href="0002-editor-lifecycle-one-complete-request.html">lesson 2</a>).
   </p>
 
   <p>
@@ -540,12 +739,18 @@ canvasWasChanged              viewWasChanged
   </p>
 
   <ol>
-    <li>Build and run Visur as described above.</li>
-    <li>Connect a browser to <code>http://localhost:8888/static/visur.html</code>.</li>
-    <li>Press <code>i</code> to enter Insert mode and type some text.</li>
-    <li>Press <code>Escape</code> to return to Normal mode and try <code>j</code>,
+    <li>Run Visur with <code>./gradlew run</code>.</li>
+    <li>Connect a browser to <code>http://localhost:8888/</code>.</li>
+    <li>Press <code>i</code> to enter Insert mode and type some text.
+      (In Insert mode, every single-character key is inserted by
+      <code>InsertModeHandler</code>; there is no per-character keymap entry.)</li>
+    <li>Press <code>Escape</code> to return to navigate mode and try <code>j</code>,
       <code>k</code>, <code>h</code>, <code>l</code> (Vim movement keys).</li>
-    <li>Try <code>5j</code> (move down five lines) and notice the number prefix.</li>
+    <li>Press <code>s</code> then a digit (e.g. <code>s</code>,<code>0</code>) to set
+      the span: span 0 collapses the gold block into a thin <code>|</code> cursor
+      (<a href="../src/main/java/com/ple/visur/SpanSubmodeHandler.java#L13-23">SpanSubmodeHandler</a>).</li>
+    <li>Press <code>w</code> and watch the right-hand footer change from
+      <code>CHARACTER QUANTUM</code> to <code>WORD QUANTUM</code>.</li>
     <li>Open the browser's developer console and watch the network tab for
       <code>viewWasChanged</code> messages arriving on every keystroke.</li>
   </ol>
@@ -553,18 +758,18 @@ canvasWasChanged              viewWasChanged
   <div class="annotation">
     <p>
       <strong>Source files for this lesson:</strong>
-      <a href="../../src/main/java/com/ple/visur/MainVerticle.java">MainVerticle.java</a>,
-      <a href="../../src/main/java/com/ple/visur/AbstractVisurVerticle.java">AbstractVisurVerticle.java</a>,
-      <a href="../../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>,
-      <a href="../../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>,
-      <a href="../../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java">CanvasWasChangedVerticle.java</a>,
-      <a href="../../src/main/java/com/ple/visur/ServiceHolder.java">ServiceHolder.java</a>,
-      <a href="../../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler.java</a>,
-      <a href="../../src/main/java/com/ple/visur/BusEvent.java">BusEvent.java</a>,
-      <a href="../../src/main/java/com/ple/visur/Keymap.java">Keymap.java</a>,
-      <a href="../../src/main/java/com/ple/visur/KeymapHandler.java">KeymapHandler.java</a>,
-      <a href="../../src/main/java/com/ple/visur/KeymapMap.java">KeymapMap.java</a>,
-      <a href="../../build.gradle.kts">build.gradle.kts</a>.
+      <a href="../src/main/java/com/ple/visur/MainVerticle.java">MainVerticle.java</a>,
+      <a href="../src/main/java/com/ple/visur/AbstractVisurVerticle.java">AbstractVisurVerticle.java</a>,
+      <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>,
+      <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>,
+      <a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java">CanvasWasChangedVerticle.java</a>,
+      <a href="../src/main/java/com/ple/visur/ServiceHolder.java">ServiceHolder.java</a>,
+      <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler.java</a>,
+      <a href="../src/main/java/com/ple/visur/BusEvent.java">BusEvent.java</a>,
+      <a href="../src/main/java/com/ple/visur/Keymap.java">Keymap.java</a>,
+      <a href="../src/main/java/com/ple/visur/KeymapHandler.java">KeymapHandler.java</a>,
+      <a href="../src/main/java/com/ple/visur/KeymapMap.java">KeymapMap.java</a>,
+      <a href="../build.gradle.kts">build.gradle.kts</a>.
     </p>
   </div>
 

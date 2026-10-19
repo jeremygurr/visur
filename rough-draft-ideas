@@ -1,0 +1,94 @@
+Visur will have two prompt modes, AI and shell.
+It will run as a server which clients attach to and hyperbase is the storage mechanism on the backend.
+Eventually, we'll make our own visur terminal client, but that'll be much later at first we'll just continue using built-in terminals.
+
+Visur will be designed to run on MacBook first then we will design the set up for Linux
+Visor is the new agent harness. It will merge all the best features of other AI harnesses like pi herdr firstmate pisubagents. Either we will include those orchestras as providers or we will custom build our own providers with the same ideas.
+
+Commands and skills are kind of the same thing in visur. If you want to run an agent skill, it's just a bash command in the shell prompt. When you want to run that skill from inside the AI prompt you just tell AI the command or skill to run.
+
+One of the first commands we have built-in is visur-change. Running this command with some change you want to make to visor will result in bash simpleton scripts being run to Direct AI into looking for the feature you want added to visor or changed and see if there's a way to update the settings to get what you want. If there is no existing setting to get what you want specifically than AI will be required to provide you a list of workarounds substitutions, and then the final option which is to change visur source code and live recompile it to get what you want. So for example, I want my text to be pink in certain scenarios so advisor looks for any settings related to that tells you what it can change and the side effects of that change and maybe none of those features are good enough for me so I tell it no change the source codes, but this feature is supported without the side effects. Then AI will go to work while you do other things to update your visor terminal to get what you want and again it will live rec compile the client for you or if it had to make a change to visur server code then it will live recompile that in a safe way.
+
+So out of the box as soon as people install visor, we want it to have a standard set up that works immediately out of the box without any additional config or set up. As soon as you install visor, you should be able to start developing apps with extreme precision and control over AI with sandboxing parallelism time and token, budgets and supervisors as well as the ability to have fluent conversations with tts and stt, and finally the ability to reach your Pfizer server for any device on your local network via the web browser or SSH, also it will have the ability to send you phone calls, slack, text, email or Google hangout messages depending on what providers you chose during the initial set up, or you could skip that. This works for not just AI prompts but for shell prompts for example maybe you ran a command that takes multiple hours to run. You will get a notification ding as soon as that command completes. Then if you're in AI prompt mode, the AI will prompt you when it's waiting for you to give feedback. Another out of the box feature that needs to work is local ticketing systems, which can be pushed to a repo if the user gives AI that power. we automatically tell users what kind of scope their tokens need to have for operations on github, and this will be well protected via the sandboxing, and we can even make simpleton scripts which do the work instead of AI, so AI might not be allowed to run the 'git push' or any remote commands at all if you want to prevent it, but the simpleton bash commands can. Simpleton / AI will use the git worktree to make local references where AI can work and not mess with the current local branch, then get approval from the supervisor AI to merge. The supervisor AI is configured to give you regular updates via phone messages. At first, we won't re-invent the wheel, we'll just use a modified version of firstmate to do this task. In the future we'll create our own lightweight provider via simpleton. Simpleton can easily do all the work of supervising AI.
+
+Visur AIs will always prioritize local information, data and sources or tools. So any information that gives you is based on your current system and any recommendations are also based on your current system. It will also reach out to external sources after it has confirmed everything locally just as a backup to its conclusions and ass assertions. All AI claims and assertions that it gives the user will come with the source links for the user to use to validate what the AI said is true.
+
+Visor will already come configured with whatever local models it can run based on your local machines power. The user can optionally configure this to use different models with different settings or use cloud models instead, and they will be asked to provide the API key in those instances, but the nice thing about Pfizer is that it will be able to run the inference models locally without you having to think about anything. He will tell you all the default and let you choose. So for example, since my machine is a Mac with 64 gigs of unified memory and 400 MB per second memory bandwidth, it will conclude that it can run Qwen 35B in omlx and it will configure openviking, our modified versions of Matt, lavish, teach, and wiki skills. It will also configure text to speech and speech to text as well as the fluency plug-in whatever that is to make sure that the conversations with visur / AI are fluent. And again any of those local AI services can be replaced with cloud service services in the confit settings
+
+I want to mention something else visor will not have a plug-in system. That's not how Pfizer is designed if you ever want to change something about visor you need to use your skills and utilize the AI agents to change the source code of visor live and refresh it there will not be any plug-in systems. This way each individual copy of visur is custom built for your needs. You don't have to worry about learning some complicated plugin lanuage or settings config locations. You just have to know the code for visur and if you know the code for visur, you'll be able to make visur your own.
+
+
+
+Features Wishlist for Visur:
+list of the most beloved features of multiplexers (tmux, herdr), IDE's (intellij, vscode, neovim), editors (helix, vim), sheet / presentation software (excel, word, powerpoint), decentralized remote / local communication software (ssh, rsync, tailscale), local or inmemory databases (hyperbase, etcd, redis, files, mariadb), knowledge/note-taking/journaling (knowledge-hub, obsidian), AI harnesses / skills / plugins / distros (firstmate, herdr, pi) via simpleton
+
+
+Basically this is visur:
+  Visur client / web browser -> visur server 
+    -> BASH shell prompt
+    -> AI shell prompt
+    -> Hybrid prompt (User tells AI what they want, and AI provides the commands
+    -> simpleton framework as the AI orchestrator, supervisor, sandboxer, budgeter etc... might use firstmate or pi inside simpleton as well
+      -> AI inference providers: ollama, llama-serve, omlx, mlx etc...
+        -> Models: Managed and chosen by Simpleton based on the task. High, medium and low-intelligence as well as different type (embedding, text, speech, visual etc). For example, AI command auto-complete or command suggestions are very low-power
+      -> Storage: Hyperbase, obsidian, knowledge-hub, openviking
+
+
+Rough Draft workflow for AI programming
+
+Visur will instruct users how to begin using visur for optimal AI / Human hybrid work. Included are the human habits listed below and the workflow that simpleton + AI work through with the user
+
+human habits:
+- Once per week do a 1-3 hour session of ai task making and every day do 15 min
+- Always validate AI claims by going to it's provided local and external sources. Make sure it's not getting things wrong
+- Once per day spend 1-2 hours studying the lessons provided by AI about your study topics and skills you want to improve
+- Once per day spend 30-60 min unblocking tickets for AI on various projects
+AI management workday= 1 hour 45 min to 3 hours 15 min
+
+Preparation, generate skeleton ideas: (use knowledge-hub or a visur excel sheet)
+- Human: Basically create a list of goals / projects and come up with a bunch of tasks as many as you can think of based on your goals.
+- Human: Add all the sources of truth and resources which must be available to the AI for use in accomplishing the tasks in the project.
+- Human / AI: If you need to create wiki pages or ingest openviking data as aids for AI to improve accuracy, speed and optimize context usage, then do that now.
+- Human: Provide a list of /teach topics you want AI to teach you. It will make those into tickets and start making those lessons along the way for you to open up with an agent in parallel whenever you are ready to study the topic. These lesson documents automatically get updated by the AI whenever  something changes in their source material or new research data comes in. So for example, you tell AI you want to understand how the code in your repo works, but there is no code yet. So you tell AI at what stage you want the lessons created, maybe after beta / v1 of the project is finished. It creates 5 lesson tickets with a generic itinerary, and then when it finishes v1 of the project, it will automatically begin working on those lessons. You will be able to start learning from those lessons in parallel while AI gets going on V2. And you don’t have to tell AI to do anything for V2, it will automatically create those ‘documentation’ tickets and update the lessons based on changes happening in V2.
+
+Body
+For anything foundational that absolutely must be right:
+- Human / AI: go through grilling and wayfinder sessions until the idea is fully fleshed out. No longer a skeleton. Otherwise just provide the skeleton ideas and have AI generate a bunch of tickets. Use the updated grilling and wayfinder skills which create my new ticket ideas
+- AI: Always make these types of tickets: Research, implement / documentation and teach. The research tickets are for things you and the AI don't know enough about yet and need to understand better.
+- AI: Every ticket needs a fresh session / context. A single ticket should always be doable in a single session with AI. If not, it needs to be broken into parts. Multiple tickets should be doable in parallel.
+
+Research Tickets:
+- AI: Use experimentation processes and where needed create tickets for human to run experiments in parallel. If you've done all you can and just waiting on human experiments, change ticket to "blocker waiting on human" with the linked human experiment ticket that is blocking and start a new context / subagent to work on another project or task.
+- Human: work on any experiment tasks given to you by the AI and let it
+- AI: Document your experiments and findings in wiki pages or openviking.
+- Human: Document your experiments and findings using visur / knowledge hub.
+- AI: Once all necessary experiments are documented compile an overview doc outlining everything in detail with links to the original source materials
+- Human: review the overview and conclusion doc and determine if more research is necessary or not. If not, then just proceed with the next part. Otherwise tell AI your thoughts and go through more research
+
+Implementation tickets:
+- AI: Look over the code or project using whatever source materials provided and only obtain the context necessary. Start sub-agents and give them necessary instructions with context for implementing the ticket in multiple parts if needed. review their work and approve or disprove based on the results or validation checks you use
+- AI: Set status to ‘blocked for human review’
+- Human: While AI is working on implementation, work the same amount you did before using AI. Only now, your focus is on gaining deeper understanding of the code, so study any docs, /teach lessons, or create more tasks for AI to work on with the current or other projects.
+- Human: Set status to ‘in progress’ and review any PRs or changes raised by AI. Approve or reject. Set status to ‘complete’ if you approve, or ‘needs change’ with your notes explaining everything AI needs to do for you to consider this for approval.
+- AI: Periodically check all tickets status and any that are in ‘needs change’ should be looked at in order of priority. Review the feedback given by the user and work on meeting the requirements given for approval. Once done, move ticket back to ‘blocked for human review’
+- Human: Review changes again and if everything looks good, approve, or else repeat the previous steps.
+
+Documentation Tickets:
+- AI: After completing any implementation ticket, your job is to update any relevant documentation or /teach lessons that relies on the source material that has been changed. Whether it’s ./raw files or ./src or even discoveries of broken / updated links / processes external to the current project such as github.com changing their name to gh.com or something like that you may discover during ticket implementation.
+- AI: set status to ‘blocked for human review’
+- Human: review the changes to docs and approve or reject
+
+Teach Tickets:
+- AI: Use lavish-teach skill to generate an html doc with styles for the user to review at their convenience.
+- AI: Start a separate sub-agent with its only context being the source materials, and have it review the lavish document to ensure no false information is being taught.
+- AI: change status to ‘blocked by human review’.
+- Human: Move ticket into ‘in progress’ and begin studying the lesson either with AI present or without, depending on capacity. Practice any core concepts taught and validate yourself by going to source materials and studying valid resources online or from experts as well. You should be spending 4 hours per day studying lessons so you really understand the project, it’s code and how it’s designed / maintained.
+
+
+How AI actually works in this context:
+- Human: starts herdr / pi agent harness in firstmate or some similar orchestration layer
+- Human: Runs the new skill which starts the lightweight firstmate / project-manager.
+- AI: Based on the list of projects provided by the user and their priority, AI starts each phase (user planning, making tickets, implementation)
+- Human: Does the joint planning sessions with AI
+- Human: once AI starts implementation phase, always ensure either there are enough tasks for AI to work on in case they complete or get blocked on the others.
+
