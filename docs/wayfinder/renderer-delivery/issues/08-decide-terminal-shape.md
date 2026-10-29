@@ -24,6 +24,11 @@ The process boundary is already settled — the client is a separate, non-JVM pr
 
 Weigh all of it against the standing preference that all state is server-side, and against the §A answer: an ANSI-pipe design wants a dumb byte transport, a structured-payload design wants a message transport.
 
+**This ticket now carries a number, not a preference.** [Baseline measurements of the current update path](01-baseline-measurements.md) found a payload-independent **~17.5 ms round-trip floor** on the current SockJS path that is neither server work (0.3 ms) nor parse (0.1 ms) nor paint (1.6 ms), and it sits on the view-delivery leg. Vim is ~1–2 ms. So:
+
+- **First task, before choosing**: isolate that floor — raw WebSocket echo vs the SockJS bridge, browser-side vs server-side. If it is the browser's SockJS delivery path, the canvas client can never reach goal 1's latency and the terminal client becomes the *only* path to it, which is a different map. If it is the SockJS bridge's framing, any transport in the candidate list fixes it.
+- **Then choose against a budget**: keystroke → last cell painted ≤ 16 ms (one 60 Hz frame) at 5 MB, given the payload is viewport-bounded by [Decide the view-update protocol and where its seam sits](03-decide-view-protocol.md). State in the answer which candidate hits it and how you know.
+
 **C. Parity.** What must the terminal renderer do for beta, versus what can wait? Split explicitly into:
 
 - **Must** — the modes and submodes a user needs for real editing ([`EditorMode`](../../../../src/main/java/com/ple/visur/EditorMode.java), [`EditorSubmode`](../../../../src/main/java/com/ple/visur/EditorSubmode.java)), command state (`isInCommandState`, `commandStateContent`, `commandCursor`), search prompt (`searchTarget`), span/cursor-quantum highlight, scrolling, resize

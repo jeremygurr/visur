@@ -400,7 +400,7 @@ high on mechanism, medium on the macOS-specific signal-loop recommendation.
 
 ### 2.8 Is a full viewport repaint per keystroke acceptable?
 
-The ticket asks the same question about the terminal that [Baseline measurements](01-baseline-measurements.md) asks
+The ticket asks the same question about the terminal that [Baseline measurements](../issues/01-baseline-measurements.md) asks
 about canvas. Answer, split into the three things that actually decide it:
 
 **1. Bytes.** All arithmetic, viewport-bounded, nothing to do with document size:
@@ -433,7 +433,7 @@ baseline ticket needs to produce is about **payload**, and the expected answer i
 rectangles for beta while the payload does need a viewport slice.
 
 Residual risk on this finding: it is arithmetic, not measurement. Nothing here replaces
-[Baseline measurements](01-baseline-measurements.md); it predicts its result.
+[Baseline measurements](../issues/01-baseline-measurements.md); it predicts its result.
 
 ---
 
@@ -485,7 +485,7 @@ Residual risk on this finding: it is arithmetic, not measurement. Nothing here r
    `api-ui-events` before implementing.
 3. **Terminal.app `?2026` support** — no evidence either way; assumed absent.
 4. **No measurements.** The byte/time table in §2.8 is arithmetic. Nothing was profiled, and no bytes-per-second
-   figure was verified from a primary benchmark. [Baseline measurements](01-baseline-measurements.md) still owns the
+   figure was verified from a primary benchmark. [Baseline measurements](../issues/01-baseline-measurements.md) still owns the
    numbers.
 5. **macOS system terminfo** — whether the shipped `/usr/share/terminfo` in current macOS carries `Tc`/`RGB` and
    `Sync` entries was not verified. If it does not, an app that consults terminfo (rather than probing) will
