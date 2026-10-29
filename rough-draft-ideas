@@ -1,3 +1,5 @@
+See 'Proper workflow for AI programming' in my notes app
+
 Visur will have two prompt modes, AI and shell.
 It will run as a server which clients attach to and hyperbase is the storage mechanism on the backend.
 Eventually, we'll make our own visur terminal client, but that'll be much later at first we'll just continue using built-in terminals.
@@ -27,11 +29,11 @@ Basically this is visur:
   Visur client / web browser -> visur server 
     -> BASH shell prompt
     -> AI shell prompt
-    -> Hybrid prompt (User tells AI what they want, and AI provides the commands
-    -> simpleton framework as the AI orchestrator, supervisor, sandboxer, budgeter etc... might use firstmate or pi inside simpleton as well
+    -> Hybrid prompt (User tells AI what they want, and AI provides the commands (! in pi feeds the output to AI)
+    -> simpleton framework as the AI orchestrator, supervisor, sandboxer, budgeter, model routing etc... might use firstmate or pi inside simpleton as well
       -> AI inference providers: ollama, llama-serve, omlx, mlx etc...
         -> Models: Managed and chosen by Simpleton based on the task. High, medium and low-intelligence as well as different type (embedding, text, speech, visual etc). For example, AI command auto-complete or command suggestions are very low-power
-      -> Storage: Hyperbase, obsidian, knowledge-hub, openviking
+      -> Storage: Hyperbase, obsidian, knowledge-hub, openviking, wiki pages, teach / lavish
 
 
 Rough Draft workflow for AI programming
@@ -92,3 +94,782 @@ How AI actually works in this context:
 - Human: Does the joint planning sessions with AI
 - Human: once AI starts implementation phase, always ensure either there are enough tasks for AI to work on in case they complete or get blocked on the others.
 
+
+
+
+ Feature Wishlist for Visur
+
+ Multiplexers
+
+ ### tmux
+
+ - Persistent sessions — detach, close laptop, reattach later; work survives
+ - Nested split panes — free-form keyboard-driven pane splits in any direction
+ - Copy mode (vi/emacs bindings) — full vi-style text selection within a pane
+ - Prefix-key system — one keystroke (Ctrl-b) enters command mode, then a second key acts
+ - Plugins — TPM ecosystem (vimrc, continuation, sensible, etc.)
+ - Status bar — customizable, at-a-glance session/pane info
+ - Control mode / scripting — drive tmux from other programs via send-keys
+ - Session grouping — multiple windows, multiple panes per window, all in one session
+ - Resize panes with keyboard — no mouse needed, proportional or fixed
+
+ ### herdr
+
+ - Agent state awareness — displays real-time status (working, idle, blocked, done) per pane
+ - CLI/socket API — agents can programmatically create panes, run commands, read output
+ - Mouse splitting — drag to split panes, not just keyboard
+ - Tab/pane/workspace hierarchy with agent context
+ - Remote attach — --remote flag forwards local config over SSH
+ - Zero-config — doesn't require learning shortcuts to start using
+
+ ### wezterm (additional — multiplexer built into terminal)
+
+ - Multiplexer built into the terminal itself — no separate process, integrates with your shell
+ - Lua scripting — fully scriptable via Lua: keybinds, layouts, aesthetics, behavior
+ - Domain sockets — programmatic control from other programs
+ - Shared clipboards across panes
+ - Cross-platform layouts — define once, works on macOS/Windows/Linux
+
+ ### zellij (additional — Rust-based, plugin system)
+
+ - Plugin system with WASM — sandboxed plugins that can be shared
+ - Layouts as files — declarative, version-controllable layout definitions
+ - Built-in strainer — fullscreen applications within the grid
+ - No prefix key required — configurable, or uses a single key with a mode indicator
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ IDEs
+
+ ### IntelliJ IDEA
+
+ - Project-wide refactoring — rename, extract, inline, change signature with zero fear
+ - Inspections — real-time code analysis with configurable severity, auto-fixable
+ - Data flow analysis — null-safety, unreachable code, performance warnings
+ - Smart completion — context-aware, type-aware, learns your patterns
+ - Debugger — conditional breakpoints, evaluate expressions, hot-swap code
+ - Structure view — outline of file/project with drag-and-drop reordering
+ - Vcs integration — per-line blame, diff with history, staging
+ - Run configurations — save/run/debug any command with parameters, env vars, working dir
+ - Live templates — type syst → System.out.println() with cursor placement
+ - Database tooling — built-in SQL console, schema viewing
+ - Command completion (new) — natural language to command/action
+
+ ### VS Code
+
+ - Extension ecosystem — thousands of extensions, marketplace discovery
+ - Split editors — side-by-side, snap to grid, drag to rearrange
+ - Integrated terminal — tabbed, split, works with multiplexer
+ - Settings Sync — your config follows you across machines
+ - Remote Development — SSH, containers, WSL as first-class "where" the code lives
+ - Keybinding editor — remap visually, no config file needed
+ - Multi-cursor editing — select all instances, edit simultaneously
+ - Minimap — overview of the whole file
+ - Quick Open — fuzzy file search with Cmd+P, Ctrl+P muscle memory
+ - Debug Adapter Protocol — debug any language, any debugger, with a unified UI
+ - Workspaces — multi-root, save specific configs per project
+ - Diff editor — inline side-by-side comparisons everywhere
+ - Editor groups — multiple independent split configurations, drag between them
+
+ ### Neovim
+
+ - Extensibility via Lua — full programming language for configuration
+ - LSP built-in — first-class Language Server Protocol, no plugins needed
+ - Treesitter — real syntax parsing for highlighting, text objects, queries
+ - Imperative + declarative — write logic AND declare state in the same language
+ - Headless mode — nvim --headless for scripting, CI, CI-like tooling
+ - Remote Control — nvim --listen + nvim --remote for IDE-like control
+ - Virtual text/annotations — LSP diagnostics, inlay hints, code actions rendered in the buffer
+ - Extmarks — persistent marks that survive edits (for diagnostics, selections)
+ - Multi-window + tabs — split windows, tab pages, all keyboard-driven
+ - API stability — stable C/Lua API, safe to build tools on top
+ - vimscript compatibility — all old vim scripts still work
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ Editors (lighter weight)
+
+ ### Vim / Neovim (text-editing primitives)
+
+ - Modal editing — normal/insert/visual/command modes map muscle memory to intent
+ - Text objects — iw, ip, i", af — select by semantic structure
+ - Operator-pending — d, c, y + motion = delete/change/yank by structure
+ - Repeat with . — any edit can be repeated, composing into macros
+ - Registers — multiple named buffers for cut/copy, can be chained
+ - Macro recording — record a sequence of keystrokes, replay on other lines
+ - Search & replace with regex — buffer-wide, file-wide, project-wide
+ - Line manipulation — dd, jj, >>, << as core vocabulary
+ - Visual block — rectangular selection for column editing
+ - Goto-anywhere — gg, G, H/M/L, percentage jump, pattern search
+
+ ### Helix (additional — modal, no config needed)
+
+ - Zero config, full capability — works out of the box, no plugins needed
+ - TUI-based — runs in any terminal, no X/Wayland dependency
+ - Treesitter by default — syntax-aware text objects and selections
+ - LSP on first run — auto-detects and starts language servers
+ - Multiple selections — native, first-class, composable with edits
+ - No keybinding conflicts — modes replace prefix-key systems
+ - SQLite-based undo tree — forkable, viewable, navigable
+ - Workspaces (split view) — multiple files visible at once, like a lightweight IDE
+ - Keymap layering — user keymaps override defaults cleanly
+ - Document symbols outline — side panel showing structure
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ Sheet / Presentation Software
+
+ ### Excel / Google Sheets
+
+ - Grid of cells with formula engine — every cell can be a computed value
+ - Named ranges — reference data by name, not A1
+ - Autofill / pattern detection — enter two values, drag to fill
+ - Pivot tables — aggregate/cross-tabulate by dragging fields
+ - Conditional formatting — rules that change cell appearance based on values
+ - Charts that update live — bound to cell ranges
+ - What-if analysis / data tables — sensitivity analysis
+ - Cross-sheet references — Sheet2!A1, external workbook links
+ - Data validation — dropdowns, constraints, input rules
+ - Macro/VBA — automate multi-step operations
+ - Freeze panes — keep headers visible while scrolling
+
+ ### PowerPoint / Keynote
+
+ - Slide canvas — free-form spatial layout, not linear
+ - Master slides / templates — set style once, applies to all
+ - Transitions & animations — timed reveals, motion paths
+ - Speaker notes — separate from displayed content
+ - Presenter view — see next slide + notes + timer while audience sees current
+ - Object layering — z-order, grouping, alignment guides
+ - Data-linked charts — updates when source data changes
+
+ ### Word / Google Docs
+
+ - Track changes — every edit attributed, accept/reject individually
+ - Comments & annotations — threaded, positioned in text
+ - Styles hierarchy — Heading 1 → 2 → 3, TOC auto-generated
+ - Mail merge — template + data source = personalized documents
+ - Templates — reusable document skeletons
+ - Cross-references — link to figures, tables, sections with auto-updating numbers
+ - Footnotes/endnotes — positioned but separate from flow
+ - Collaborative editing — multiple cursors, presence indicators
+
+ ### Notion (additional — unified document/database)
+
+ - Blocks — everything is a block (text, code, toggle, callout, table, embed)
+ - Databases within documents — table/board/calendar/gallery views of structured data
+ - Linked databases — same data, multiple views
+ - Templates — shareable, composable
+ - Embed anything — Figma, videos, iframes, live code
+ - Real-time collaboration — multiplayer cursors, inline comments
+ - AI writing — inline, context-aware
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ Decentralized Remote / Local Communication
+
+ ### SSH
+
+ - Stateless, universal — any Unix machine, any network, one protocol
+ - Tunneling / port forwarding — -L, -R, -D to route traffic through remote
+ - Key-based auth — passwordless, scriptable
+ - Multiplexing — ControlMaster reuses connections for speed
+ - X11 forwarding — run GUI apps remotely
+ - Config file — per-host settings, aliases, tricks
+
+ ### rsync
+
+ - Delta transfer — only sends what changed, not whole files
+ - --progress / --stats — visible transfer status
+ - Filtering — --include/--exclude patterns
+ - Remote-to-remote — rsync --rsync-path copies between two remotes through local
+ - Archive mode — -a preserves permissions, symlinks, timestamps, recursion
+ - Dry-run — --dry-run to preview changes
+ - Bandwidth throttling — --bwlimit
+
+ ### Tailscale
+
+ - Zero-config mesh networking — install on devices, they just find each other
+ - MagicDNS — every device has a stable name, no IP memorization
+ - End-to-end encrypted — WireGuard-based, no middleman sees traffic
+ - Key-based device auth — no passwords, identities are cryptographic
+ - SSH built in — tailscale ssh user@device, no key setup needed
+ - Taildrive — S3-compatible object storage over your tailnet
+ - Funnel — safely expose a local service to the internet with auth
+ - Subnet routing — extend the tailnet to cover existing LANs
+ - ACLs — fine-grained: who can reach which service on which device
+ - Cross-platform — macOS, iOS, Android, Windows, Linux, FreeBSD, routers
+
+ ### mosh (additional — SSH alternative for unreliable networks)
+
+ - Roaming support — survive WiFi→cellular, laptop lid close, airplane mode
+ - Latency compensation — local echo, predictive rendering
+ - Stateless servers — no port forwarding, uses UDP
+ - Composable with Tailscale — mosh over tailnet = bulletproof remote
+
+ ### git (additional — decentralized sync)
+
+ - Push/pull model — any repo is a full copy, not a reference
+ - Merge/rebase/cherry-pick — flexible history composition
+ - Worktrees — multiple checkouts of one repo, share object database
+ - Hooks — pre-commit, pre-push, post-merge automation
+ - Staging area — select exactly what goes in a commit
+ - Blame — who wrote each line, when
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ Local / In-Memory Databases
+
+ ### Redis
+
+ - Sub-millisecond latency — in-memory, single-threaded, blazing fast
+ - Rich data types — strings, hashes, lists, sets, sorted sets, streams, hyperloglog
+ - Pub/Sub & Streams — event publishing, consumer groups, at-least-once delivery
+ - TTL / expiration — keys auto-expire, built-in caching
+ - Lua scripting — atomic multi-key operations
+ - Replication & clustering — read replicas, sharded clusters
+ - Persistence — RDB snapshots, AOF append-only log
+ - Unbelievably simple protocol — text-based, easy to debug with redis-cli
+
+ ### etcd
+
+ - Watch API — subscribe to key prefix changes in real time
+ - Ordered keys — logical clocks, monotonic revision numbers
+ - Leases & TTL — keys expire, enabling leader election, heartbeat
+ - Consistent, distributed — Raft-based, strong consistency guarantees
+ - Simple key-value — but with the power of a consensus database
+ - HTTP/JSON API — easy to query with curl
+ - Used by Kubernetes — battle-tested at massive scale
+
+ ### SQLite (additional — the king of local DBs)
+
+ - Zero configuration — a single file IS the database
+ - In-process — no server, no network, no daemon
+ - Transactions — ACID, reliable
+ - JSON functions — query JSON within SQL
+ - WAL mode — concurrent reads during writes
+ - FTS5 — full-text search built in
+ - Virtual tables — extend with custom queryable sources
+ - Migrations — simple, versioned schema changes
+
+ ### Linux filesystem (additional)
+
+ - Everything is a file — /proc, /sys, devices, processes all addressable
+ - inotify / fanotify — watch files for changes, react in real time
+ - watch / fswatch — poll or notify on file changes
+ - Named pipes (FIFOs) — IPC as file I/O
+ - /dev/shm — shared memory as a filesystem path
+ - OverlayFS — layered filesystems, union mounts
+ - File descriptors as abstraction — any I/O stream looks like a file
+
+ ### MariaDB / PostgreSQL (relational)
+
+ - SQL — declarative, composable, universal query language
+ - Views — saved queries as virtual tables
+ - Materialized views — precomputed, refreshable
+ - Window functions — ROW_NUMBER(), RANGE BETWEEN for analytics
+ - Triggers — react to INSERT/UPDATE/DELETE automatically
+ - JSONB — semi-structured data within relational tables
+ - Logical replication — publish/subscribe changes to subscribers
+ - Explain plans — see exactly how a query executes
+ - Partitioning — sharding by range/list/hash for scale
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ Knowledge / Note-Taking / Journaling
+
+ ### Obsidian
+
+ - Backlinks — see all notes that reference this note, automatically
+ - Graph view — visualize your entire knowledge network as a force-directed graph
+ - Local-first, plain Markdown — your notes are just .md files, no lock-in
+ - Canvas — infinite whiteboard, drag notes/images/cards, freeform spatial layout
+ - Bases (new) — database-like views of your notes (table, card, dashboard)
+ - Plugins — thousands, from dataview queries to kanban to Excalidraw
+ - Daily notes — one file per day, linkable, templated
+ - Templating — fill-in-the-blank note structures with dynamic fields
+ - Search with operators — path:, tag:, link:, file: combinations
+ - Embeds — ![[note#section]] to include parts of other notes inline
+ - Frontmatter / YAML metadata — structured data per note
+ - Publish — one-click publish to a private/public website
+ - Sync — official sync, or just use git/ikvault/syncthing
+
+ ### knowledge-hub (additional — daily journal → structured intelligence)
+
+ - Daily journals as input — write freely, the system extracts structure
+ - Digest generation — AI summarizes daily notes into topic digests
+ - Priority extraction — surfaces what matters from noise
+ - Source grounding — claims linked back to where they appeared
+ - Wiki auto-generation — topical pages built from accumulated journals
+ - Delegation awareness — tracks what was delegated to AI agents, results
+ - Context handoff — preserves working context across days/sessions
+
+ ### Roam / Logseq (additional — outliner-style)
+
+ - Outliner structure — everything is a bullet, nested, referenceable
+ - Block-level references — link to a specific paragraph, not just a note
+ - Transclusion — embed referenced blocks inline, live-updating
+ - Daily pages — one entry point per day, everything else linked
+ - Query language — {{query}} to find blocks by properties, dates, tags
+ - Whiteboard / Canvas — spatial mode alongside outline mode
+ - Local-first, plain text — .org or .md files
+
+ ### Workflowy / Dynalist (additional — pure outliner)
+
+ - Infinite nesting — drag to restructure, no rigid hierarchy
+ - Collaborative — real-time multiplayer outline editing
+ - Collapse/expand — zoom between detail levels
+ - Templates — reusable outline structures
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ AI Harnesses / Agents
+
+ ### pi (coding agent)
+
+ - Skills — markdown instruction files that activate contextually, composable
+ - Extensions — TypeScript modules that add tools, UI elements, keybindings
+ - Subagents — spawn child agents with focused tasks, parallel or sequential
+ - Workflows — scripted multi-step agent orchestration
+ - Session persistence — conversations survive, can be resumed, forked
+ - Tools as first-class — bash, file ops, web search, web fetch, all composable
+ - Codemodes — script-mode (deterministic steps) + LLM-mode, mix freely
+ - Package system — pi install npm:<package> for sharing extensions/skills
+ - MCP support — Model Context Protocol for external tool servers
+ - Multi-model — switch providers/models mid-session
+ - Leader key palette — command palette for all actions
+ - Streaming — see output as it's generated, interruptible
+
+ ### firstmate (additional — multi-agent orchestration)
+
+ - Single interface, multi-agent — talk to one "first mate" that spawns a crew
+ - Visible agents — you can see what each agent is doing, intervene
+ - Git worktree isolation — each agent works in its own worktree, no conflicts
+ - Multi-harness adapters — drives Claude, Codex, Grok, pi, etc. uniformly
+ - Trust dialog — approve/reject agent actions before they execute
+ - Lifecycle controls — pause, resume, kill, reassign tasks mid-flight
+ - Safety hooks — guardrails on what agents can do (no rm -rf, etc.)
+ - Quota management — track and limit token/time/cost per agent
+
+ ### herdr (as AI harness)
+
+ - Agent state visibility — real-time status per agent (working/blocked/done/idle)
+ - Programmatic pane management — agents create their own terminal space
+ - Block detection — notifies you when an agent is stuck waiting for input
+ - Multiple agents in one terminal — tabs/panes per agent, all visible
+ - Remote agent monitoring — SSH into a machine, see all agents, interact
+
+ ### Cursor / Windsurf / Copilot (IDE-integrated AI)
+
+ - Inline completion — ghost text, Tab to accept
+ - Chat with codebase context — ask questions, get answers grounded in your files
+ - Multi-file edits — AI proposes changes across multiple files simultaneously
+ - Command mode — natural language → multi-step operation
+ - Agent mode — AI plans, executes, iterates on a task autonomously
+ - Codebase indexing — embeddings of your entire repo for retrieval
+ - Rules / instructions — project-level AI behavior configuration
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ Terminal Emulators
+
+ ### Ghostty
+
+ - Native performance — GPU-accelerated, written in Zig, macOS-native
+ - Splits built in — no tmux needed for basic splitting
+ - Config file — simple key-value, hot-reloaded
+ - Image protocols — Kitty graphics, sixel support
+ - Shell integration — command markers, jump to previous/next prompt
+ - Cross-platform — macOS, Linux (Windows in progress)
+ - No Electron — native, fast startup, low memory
+ - Quake mode — drop-down terminal from top of screen
+ - Fullscreen / window management — multiple windows, tabs
+
+ ### iTerm2
+
+ - Split panes — keyboard or mouse driven, nested
+ - Hotkey window — global hotkey drops a terminal from screen edge
+ - Profiles — per-terminal settings (colors, font, shell, cwd)
+ - Triggers — regex-based: flash, beep, run command, log on match
+ - Search — regex search in scrollback
+ - Paste from clipboard history — command history with smart paste
+ - Shell integration — marks command boundaries, click to jump
+ - Capture/annotate — annotate a screenshot of terminal output
+ - API — Python/AppleScript control, status bar items
+ - Multiple encodings, ligatures, bold as bright
+
+ ### Warp
+
+ - AI-native terminal — built-in AI for command suggestions, error explanation
+ - Blocks — commands and outputs grouped as visual units, not a flat stream
+ - Rich output rendering — tables, images, JSON pretty-printed natively
+ - Collaborative workspaces — share terminal sessions, see each other's output
+ - Custom prompts — templated, dynamic prompts with computed values
+ - Command palette — fuzzy search of all commands, like Cmd+P for shell
+ - Plugins — extend with custom blocks, AI actions, integrations
+ - Cloud sync — history and config follow you
+
+ ### Alacritty
+
+ - Speed — absolutely minimal, no features it doesn't need
+ - OpenGL rendering — fast, smooth, low CPU
+ - Config as YAML — simple, version-controllable
+ - No tabs/splits — pure terminal, let multiplexer handle layout
+ - Cross-platform — same binary everywhere
+ - Low memory — ~14MB idle vs 185MB+ for iTerm2
+
+ ### kitty (additional — power-user terminal)
+
+ - GPU-accelerated — OpenGL, extremely fast
+ - Remote control — kitty @ CLI to control windows, panes, send text
+ - Image protocol — native image display in terminal
+ - Tabs + splits — built in, keyboard-driven
+ - Layouts — stacked, vertical, horizontal, grid, custom
+ - SSH integration — seamless remote terminal forwarding
+ - Scriptable — Python API for extensions
+ - GPU font rendering — ligatures, ligature-aware metrics
+
+ ### WezTerm (additional — already mentioned, but key features)
+
+ - Terminal + multiplexer — in one binary
+ - Lua scripting — everything is configurable in Lua
+ - Serial/Crypto — built-in crypto for secure channels
+ - Domain socket multiplexer — programmatic control
+ - Cross-platform — macOS, Linux, Windows
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ My Own Feature Ideas (Synthesis)
+
+ These are features I think would be compelling in a combined app, drawing from the patterns above but not directly
+ from any single one:
+
+ ### Spatial-Everything Model
+
+ - Infinite canvas as the base — not just a "canvas view" you switch to, but the fundamental data model. Text,
+   terminals, databases, spreadsheets, agents — all exist as objects on a spatial canvas. You can arrange them freely,
+   group them, resize them. Think Obsidian Canvas × tmux panes × IDE editor groups, unified.
+ - Spatially-aware search — search results show where things live in your workspace, not just a list. Click to fly
+   there.
+ - Spatial undo — moving/resizing objects on canvas is undoable, just like text edits.
+
+ ### Quantum as Universal Edit Scope
+
+ - Everything is a quantum — a quantum is the smallest addressable unit of anything. A character, a line, a function, a
+   file, a terminal session, a database row, a chart, a slide. Operations (delete, copy, move, search) work on any
+   quantum type. This generalizes vim's text objects to the entire app.
+ - Quantum hierarchy — characters ⊂ lines ⊂ paragraphs ⊂ functions ⊂ files ⊂ projects. You can operate at any level. d
+   + function deletes a function. d + file deletes a file. d + terminal kills a terminal.
+ - Quantum queries — select all quanta matching a predicate: "all files modified today", "all terminal outputs
+   containing ERROR", "all notes tagged #urgent".
+
+ ### Unified Command Language
+
+ - One input field for everything — a single command bar (like VS Code's palette + tmux prefix + Excel formula bar)
+   that accepts:
+     - Text edits (change all foo to bar)
+     - Navigation (goto file:src/main.rs:42)
+     - App operations (split terminal right, new agent:review)
+     - Data queries (SELECT * FROM notes WHERE tag=urgent)
+     - AI prompts (refactor this to use async)
+     - Spreadsheet formulas (=SUM(A1:A10))
+ - Command composition — pipe commands: grep "TODO" | agent:fix | review
+ - Command history with context — not just a list, but searchable with "when did I last do X in this
+   file/project/context"
+
+ ### Live Data as First-Class Content
+
+ - Streams as documents — tail -f, log files, agent outputs, database subscriptions — all render as live-updating
+   documents in the canvas. Scroll through history, pin interesting moments.
+ - Reactive bindings — a cell in a spreadsheet can be bound to a terminal output, a database query, an API response.
+   When the source changes, the cell updates.
+ - Time-travel views — any document can show its state at any point in history. Scrub through time like a video.
+
+ ### Agent-Native Workspace
+
+ - Agents as citizens — AI agents aren't a sidebar or a chat panel. They're objects on the canvas with their own
+   terminals, their own files, visible state (working/blocked/done). You can talk to them, watch them work, redirect
+   them — all in the same spatial context as your own work.
+ - Agent output as data — when an agent produces code, a plan, or a report, it's a quantum. You can edit it, reference
+   it, pipe it elsewhere, version it.
+ - Swarm views — see all your agents at once in a dashboard: what each is doing, what's blocked, what needs your input.
+   One keystroke to focus on any of them.
+ - Delegation graph — visualize the hierarchy of delegated tasks: you → firstmate → 3 agents → their sub-tasks. Click
+   any node to inspect.
+
+ ### Persistence & Continuity
+
+ - Everything survives — sessions, terminal state, agent work, canvas layout, scrollback. Close the app, open it
+   tomorrow, exactly where you left off. Like tmux persistence + VS Code settings sync + Obsidian vault.
+ - Session snapshots — save named snapshots of your entire workspace state. Restore, diff, merge snapshots.
+ - Cross-device continuity — start on your desktop, continue on your laptop, check from your phone. The workspace IS
+   the source of truth, the device is just a viewport.
+
+ ### Fabrication (Sheet/Presentation within the Editor)
+
+ - Spreadsheet mode — any document can be "viewed as" a table. Parse structured text into cells, apply formulas,
+   generate charts. Not a separate app — a mode of the same content.
+ - Presentation mode — any document (or collection of quanta) can be presented as slides. Auto-generate slides from a
+   document's heading structure. Present with speaker notes, transitions.
+ - Report generation — compose a report from: live query results + charts + code snippets + prose + images. All on the
+   canvas, all live-bound, export to PDF/HTML.
+
+ ### Communication as a Layer
+
+ - Tailscale built in — the app's networking layer. Any device running the app can join a tailnet. Share a workspace, a
+   terminal, a document — just by being on the same tailnet.
+ - Peer-to-peer document sharing — no server. Two people's workspaces mesh directly. Shared documents sync over the
+   tailnet.
+ - Remote attach — open the app on any device, attach to a session running elsewhere. Your local instance becomes a
+   thin client. (Like herdr's remote, but for the whole app.)
+ - Async collaboration — leave a "handoff note" at a specific place in your work. The next person to open that
+   workspace sees it, acts on it, leaves their own.
+
+ ### Security & Trust
+
+ - Capability-based permissions — agents, plugins, extensions get explicit capabilities (can read files? can execute?
+   can network?). You grant/revoke per-session or per-agent.
+ - Audit log — every action (yours or an agent's) is logged with full context. Queryable, filterable, exportable.
+ - Sandboxed plugins — WASM or similar. A plugin can't do anything it hasn't been explicitly permitted.
+ - Trust levels — per source: your own code (full trust), verified plugins (limited), arbitrary web content (sandboxed,
+   read-only).
+
+ ### Search & Discovery
+
+ - Semantic + structural search — search by meaning ("where do we handle auth?") or by structure (function: * login *)
+   or by text ("password") — all in one query language.
+ - Cross-modal search — search through text, terminal history, database records, agent conversations, file contents,
+   canvas objects — one search box, results grouped by type.
+ - Graph-aware navigation — "show me everything related to this" as a live graph, not a flat list. Follow edges to
+   explore.
+
+ ### Configurability Without Configuration
+
+ - Everything is inspectable and scriptable — there is no "hidden" behavior. Any operation you can do by hand, you can
+   script. Any state you can see, you can query.
+ - Convention over configuration, but overridable — sensible defaults that just work. Override anything with a simple
+   config file. No 2000-line vimrc required.
+ - Self-documenting — the app documents itself. Ask "how do I do X?" and get an answer with an example, not a link to a
+   47-page manual.
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ Additional Products Worth Studying
+
+ ┌──────────────────────┬────────────────────────────┬────────────────────────────────────────────────────────────────┐
+ │ Product              │ Why                        │ Key Feature to Steal                                           │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ DBeaver              │ Universal database client  │ One UI for any database, with ER diagrams, data editing, SQL   │
+ │                      │                            │ console                                                        │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ TablePlus            │ Modern database client     │ Fast, clean, multi-connection, data grid that feels like a     │
+ │                      │                            │ spreadsheet                                                    │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Raycast / Alfred     │ Launchers                  │ Command palette as universal entry point, with extensions,     │
+ │                      │                            │ workflows, snippets                                            │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Emacs                │ The ultimate extensible    │ Everything is a buffer, everything is scriptable, everything   │
+ │                      │ editor                     │ is a mode                                                      │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Zed                  │ Modern collaborative       │ GPU-rendered, CRDT-based real-time collab, AI integrated, fast │
+ │                      │ editor                     │                                                                │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Figma                │ Collaborative canvas       │ Multiplayer spatial editing with presence, comments,           │
+ │                      │                            │ versioning                                                     │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Linear               │ Issue tracker              │ Keyboard-driven, command palette, efficient project management │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Obsidian Bases       │ Structured views of notes  │ Query your notes like a database, multiple views of same data  │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Syncthing            │ File sync                  │ Decentralized, P2P, no cloud, just devices syncing directly    │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Nushell              │ Programming shell          │ Everything is structured data (tables, records),               │
+ │                      │                            │ pipeline-based                                                 │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Bash / Zsh           │ Shell                      │ Pipes, redirection, history, completion, scripting — the       │
+ │                      │                            │ universal glue                                                 │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Mission Control      │ Window management          │ See all windows/spaces at once, drag to rearrange              │
+ │ (macOS)              │                            │                                                                │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Ray / Dask           │ Distributed compute        │ Scale from laptop to cluster with the same API                 │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ htop / btop          │ System monitoring          │ At-a-glance live dashboards of system state                    │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Excalidraw           │ Hand-drawn diagrams        │ Quick sketching, whiteboard, connects to Obsidian              │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Notion               │ All-in-one workspace       │ Docs + databases + wikis + projects in one block-based system  │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Superhuman           │ Email                      │ Speed-obsessed, keyboard-first, AI-assisted communication      │
+ ├──────────────────────┼────────────────────────────┼────────────────────────────────────────────────────────────────┤
+ │ Arc Browser          │ Browser                    │ Spaces as work contexts, vertical tabs, integrated AI          │
+ └──────────────────────┴────────────────────────────┴────────────────────────────────────────────────────────────────┘
+
+ ────────────────────────────────────────────────────────────────────────────────
+
+ This is a lot. The through-line I'd suggest: the app is a spatial, persistent, scriptable workspace where everything —
+ text, data, processes, agents, communications — is a first-class, addressable, manipulable object on an infinite
+ canvas, unified by a single command language and a quantum-based editing model.
+
+
+
+
+
+
+
+--------------------------------------
+  Beta Scope Analysis: Core Features for Visur
+
+ ### What Already Works (the foundation)
+
+ ┌───────────────────┬────────────────────────────────────────────────────────────────────┬────────┐
+ │ Layer             │ What's Built                                                       │ Status │
+ ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────┤
+ │ Server            │ Vert.x HTTP + WebSocket (port 8888), static file serving           │ ✅     │
+ ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────┤
+ │ Event bus         │ Pub/sub between browser and server via SockJS                      │ ✅     │
+ ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────┤
+ │ Editor model      │ 3 modes (normal/insert/replace), 6 submodes (span/scope/search)    │ ✅     │
+ ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────┤
+ │ Quantum system    │ 4 types: Character, Line, Regex, Document                          │ ✅     │
+ ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────┤
+ │ Command system    │ 4 word types, 27 operators, reverse-polish execution               │ ✅     │
+ ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────┤
+ │ Cursor management │ Full cursor positioning (cx, cy, ca), variables, data class system │ ✅     │
+ ├───────────────────┼────────────────────────────────────────────────────────────────────┼────────┤
+ │ Browser frontend  │ Canvas 2D text rendering, vim-like hjkl navigation, insert mode    │ ✅     │
+ └───────────────────┴────────────────────────────────────────────────────────────────────┴────────┘
+
+ ### What's Needed for Beta (from your rough-draft-ideas + README)
+
+ These are the 5 planned features from README.adoc that block a functional beta:
+
+ 1. Filesystem Navigation (Priority 1 — blocks everything)
+ - FileQuantum and DirectoryQuantum — extend the quantum system
+ - NormalView / FilesystemView split in ModelWasChangedVerticle
+ - Read files from disk, write to files — basic CRUD
+ - This is already in your todo file
+
+ 2. Type-Sensitive Editing (Priority 2 — makes it language-agnostic)
+ - Editing structured objects (tables, JSON, images) not just text
+ - Would build on the existing data-class system
+
+ 3. Multi-User Editing (Priority 3 — client-server architecture)
+ - Real-time collaboration like Google Docs
+ - Requires the server tracking multiple cursor positions and merging edits
+
+ 4. Macro Logic (Priority 4 — conditional flows)
+ - If/else/arithmetic inside macros
+ - Build on existing variable system + command compilation
+
+ 5. Interface Independence (Priority 5 — same editor from browser/CLI/GUI)
+ - The editor model is server-side already; just need CLI and GUI clients
+
+ ### Quick Scorecard
+
+ ┌─────────────────────────────┬─────────────────────────────────────────────────┬────────────────────────┐
+ │ Feature                     │ Code needed?                                    │ Impact                 │
+ ├─────────────────────────────┼─────────────────────────────────────────────────┼────────────────────────┤
+ │ Filesystem (read/write      │ ~150 lines: FileQuantum, DirectoryQuantum, view │ HIGH — unlocks         │
+ │ files)                      │ split                                           │ everything             │
+ ├─────────────────────────────┼─────────────────────────────────────────────────┼────────────────────────┤
+ │ Type-sensitive editing      │ Medium — extend quantum system                  │ HIGH                   │
+ ├─────────────────────────────┼─────────────────────────────────────────────────┼────────────────────────┤
+ │ Multi-user collab           │ Medium — server tracks cursors, merges          │ MEDIUM                 │
+ ├─────────────────────────────┼─────────────────────────────────────────────────┼────────────────────────┤
+ │ Macro logic                 │ Low-Medium — extend command system              │ MEDIUM                 │
+ ├─────────────────────────────┼─────────────────────────────────────────────────┼────────────────────────┤
+ │ CLI/GUI clients             │ Low — reuse server, new frontends               │ LOW                    │
+ └─────────────────────────────┴─────────────────────────────────────────────────┴────────────────────────┘
+
+ ### My Recommendation for Beta
+
+ Start with #1: Filesystem navigation. Everything else builds on being able to open, edit, and save files.
+ The existing quantum system gives you the architecture — just add FileQuantum (for navigating inside a
+ file) and DirectoryQuantum (for navigating folders).
+
+ Want me to start scaffolding that? I can work through the implementation following existing patterns in
+ the codebase (extending Quantum.java, adding the operators, and updating ModelWasChangedVerticle).
+
+
+
+
+
+
+-----------------------
+Asked AI how vim works and how visur works. It appears Vim does not redraw the entire screen for every update which is why it's so fast and you can jump to different pages very quickly. But visur does. See answer below:
+
+ Looked at both sides of the pipe. Answer: yes — full viewport repaint on every keystroke, plus the full
+ document over the wire. It's worse than "redraws the screen": nothing anywhere is diffed.
+
+ The path, one keystroke
+
+ 1. Every keypress becomes modelWasChanged — KeyWasPressedVerticle.java:31
+ (src/main/java/com/ple/visur/KeyWasPressedVerticle.java#L31). No distinction between "cursor moved one
+ cell" and "document edited". All keys take the same path.
+
+ 2. Full document serialized — ModelWasChangedVerticle.java:20,28
+ (src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L19-28):
+
+ ```java
+   view.editorContent = emc.getEditorContent();   // whole buffer, every key
+   output.put("editorContent", view.editorContent);  // whole buffer on the wire
+ ```
+
+ That runs over SockJS/WebSocket. For the Declaration of Independence init buffer (~8 KB) that's 8 KB per
+ keystroke. Nothing is a delta.
+
+ 3. Full canvas clear — visur.js:72 (src/main/resources/static/visur.js#L72) →
+ [clearCanvas():212`](src/main/resources/static/visur.js#L211-213):
+
+ ```js
+   ctx.clearRect(0, 0, canvas.width, canvas.height);   // entire viewport, unconditionally
+ ```
+
+ 4. Full viewport repaint — drawCanvas():136 (src/main/resources/static/visur.js#L136-160) then loops absX
+ from canvasStart to canvasEnd, calling fillText once per character cell (:196
+ (src/main/resources/static/visur.js#L196)), plus a fillRect for the cursor. On a 1470×900 window:
+ cellWidth ≈ 13, so ~113 × 45 ≈ 5,000 fillText calls per keystroke. There is no dirty-rect tracking, no
+ backbuffer, no per-cell diff, no double buffering.
+
+ 5. DOM churn on top — visur.js:75-106 (src/main/resources/static/visur.js#L75-106) rewrites innerHTML on
+ two status elements every event, sometimes in a chain of appends.
+
+ The asymmetry that matters
+
+ ┌─────────┬───────────────────┬───────────────────────────────┐
+ │ Cost    │ Complexity        │ Where                         │
+ ├─────────┼───────────────────┼───────────────────────────────┤
+ │ Payload │ O(document)       │ ModelWasChangedVerticle:20,28 │
+ ├─────────┼───────────────────┼───────────────────────────────┤
+ │ Repaint │ O(viewport cells) │ drawCanvas, ~5,000 fillText   │
+ ├─────────┼───────────────────┼───────────────────────────────┤
+ │ DOM     │ O(status length)  │ visur.js:75-106               │
+ └─────────┴───────────────────┴───────────────────────────────┘
+
+ Drawing is bounded by the viewport, so it degrades gracefully as files grow. The payload does not — it's
+ the whole buffer. That's the load-bearing problem, and it's exactly what filesystem work lands on:
+
+ - Open a 2 MB file → 2 MB shipped per keystroke.
+ - Browse a directory with 10,000 entries rendered as listing content → the listing ships whole on every
+   cursor move within the listing.
+
+ Also flagging, since I hit it: CanvasWasChangedVerticle.java:20-32
+ (src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L20-32) has a leftover debug loop commented
+ "simply a line by line log of editorContent". It loops i over nextLineIndices.size() but reads
+ nextLineIndices.get(cy) with cy fixed, so it prints the same line N times to stdout on every canvas
+ resize. Dead weight; not a blocker.
+
+ One caveat: my frame-time estimate (~5,000 × 2–5 µs ≈ 10–25 ms/keystroke) is arithmetic, not measurement —
+ I haven't run the app.
+
+ What this does to the map
+
+ This is new fog that was invisible until now, and it sits under the browse ticket: designing a directory
+ browser on a full-snapshot payload means designing straight into a perf cliff. So it graduates to a
+ decision ticket that blocks the browse work —
+
+ "How does the view payload reach the client?" — full snapshot vs. viewport slice vs. delta/patch, and
+ whether repaint stays full-viewport or moves to dirty regions. I'd lean: ship a viewport slice + explicit
+ change kind (cursor-only vs content), keep full repaint for beta (it's bounded by viewport and cheap to
+ reason about), and revisit dirty regions only if measurement says so.
