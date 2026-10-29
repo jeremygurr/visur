@@ -2,13 +2,12 @@
 
 Type: research
 Status: open
-Blocked by: 04
 
 ## Question
 
 What does a non-JVM client need in order to take over the terminal — paint to it, read keys from it — and how much of Visur's existing key handling turns out to be shaped by the browser rather than by the command language?
 
-Blocked by [Decide the terminal client's implementation language and TUI stack](04-decide-client-language.md), because half the answer is "reach for library X". Once the language lands, answer all three parts in it.
+Unblocked: the language landed — **Rust + crossterm**, minimal tier ([Decide the terminal client's implementation language and TUI stack](04-decide-client-language.md)). Answer all three parts in Rust, against the component design in [Terminal client: components, responsibilities, and the server contract](../design/terminal-client-components.md), which fixes which of these jobs belong to crossterm (decode, raw mode, `SIGWINCH`) and which belong to us (adapter, emission, paint policy).
 
 **A. Output.** Cursor addressing and painting are escape sequences on the TTY. Determine: how to avoid a full-screen flicker on repaint (does the chosen stack expose `DEC 2026` synchronized output, or suppress it?); how to restore the terminal on a panic, an uncaught error, or `SIGINT`; whether stdout buffering needs to be bypassed; and whether the alternate screen (`1049`) should be entered at all — the older ticket draft assumed `System.out`, and that assumption is gone with the JVM.
 

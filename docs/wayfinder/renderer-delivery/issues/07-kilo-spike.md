@@ -8,7 +8,7 @@ Blocked by: 06
 
 Does a minimal ANSI renderer driven by the live event bus feel usable — and where does it stop feeling usable?
 
-Raise the fidelity of the terminal discussion by building something concrete and throwaway, in the spirit of Kilo, **in the language chosen in [Decide the terminal client's implementation language and TUI stack](04-decide-client-language.md)**. This is the first thing written in that language, so the spike doubles as the honest answer to "does this toolchain fight us". Deliberately scoped: if it takes more than a session, it has exceeded its purpose.
+Raise the fidelity of the terminal discussion by building something concrete and throwaway, in the spirit of Kilo, **in Rust with crossterm** ([Decide the terminal client's implementation language and TUI stack](04-decide-client-language.md)). Keep it to the thin path described in [the component design](../design/terminal-client-components.md): crossterm raw mode + input, hand-rolled grid, no ratatui. This is the first thing written in that language, so the spike doubles as the honest answer to "does this toolchain fight us". Deliberately scoped: if it takes more than a session, it has exceeded its purpose.
 
 **Must work:**
 
