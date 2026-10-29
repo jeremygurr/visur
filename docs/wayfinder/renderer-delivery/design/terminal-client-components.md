@@ -55,13 +55,13 @@ Numbers are legend, not order of execution; §7 (lifecycle/loop) is the thing th
 
 | # | Component | Responsibility | Explicitly *not* its job |
 |---|---|---|---|
-| 1 | **Key decoder** | Turn raw stdin bytes into semantic `KeyEvent`s. Crossterm does this: ESC-vs-prefix timeout, modifier combos, bracketed-paste markers, `SIGWINCH`. | Knowing anything about Visur. Producing Visur key tokens. |
-| 2 | **Key adapter** | Map crossterm `KeyEvent` → **Visur key token** (the vocabulary `KeyPressed.from` accepts). Drops `Release` events, collapses `Repeat` to one token per repeat. Owns the paste → `PasteToken` translation. | Parsing escape sequences. Deciding what a key *means* in Visur. |
+| 1 | **Key decoder** | Turn raw stdin bytes into semantic events. Crossterm does this: ESC-vs-prefix timeout, modifier combos, bracketed-paste markers, `SIGWINCH`. Its output type is **`Event`, not `KeyEvent`** — paste arrives as `Event::Paste(String)`, which is deliberately not a key ([ticket 06 research](../research/terminal-input-mapping.md) §7). | Knowing anything about Visur. Producing Visur key tokens. |
+| 2 | **Key adapter** | Map `Event` → **Visur key token** (the vocabulary `KeyPressed.from` accepts: 7 fixed names plus any single character). Drops `Release`; forwards **one token per auto-repeat** (not one per held key). Owns the paste translation. **Drops every non-empty `KeyModifiers`** — otherwise `Ctrl-d`/`Alt-d` arrive as `Char('d')` and fire the navigate binding `d` = `deleteCursorQuantum`. | Parsing escape sequences. Deciding what a key *means* in Visur. |
 | 3 | **View shadow** | Hold the last `ViewUpdate` verbatim: viewport content, cursor, mode, submode, command state, change kind. Provide it to the screen model. | Interpreting it. Caching across resync boundaries. Growing a document. |
 | 4 | **Screen model** | `Vec<Cell>` of `cols × rows`, `Cell { ch, fg, bg, attrs }`. Build the *next* grid from the shadow + terminal size, including line wrapping **if** the server does not wrap (open — see §6). | Any layout the protocol does not describe. Storing more than one screen. |
 | 5 | **Compositor** | Diff previous grid against next grid; produce **damage as row runs** (never rectangles — the survey's finding). Own the two paint paths: `diff` and `full_repaint`. Force a full repaint on: resize, attach, alt-screen enter/exit, capability change. | Emitting bytes. Deciding when to paint (the loop does). |
 | 6 | **Escape emitter** | Damage → bytes: `CUP` per dirty row, maximal same-attribute runs, `SGR` only on change, `EL` for blank tail, cursor placement plus `?25l/?25h`, `?1049` enter/exit, `?2026` brackets, one `write(2)` per frame. Holds the probed capability flags. | Being a TUI framework. Tracking what is on screen (the compositor owns that). |
-| 7 | **Lifecycle + loop** | Raw mode, alt screen, panic/`SIGINT`/`SIGTERM` restore via a `Drop` guard, `SIGWINCH`. Single `poll`-driven event loop over {stdin, transport, signal}: update shadow → compose → damage → emit, coalescing anything that arrives before the frame flushes. | Blocking on the network. Rendering when nothing is dirty. |
+| 7 | **Lifecycle + loop** | Raw mode, alt screen, `SIGWINCH`, and a **restore that is ours, not RAII**: a `panic::set_hook` plus a `Drop` guard that runs `?2026l → ?25h → disable paste → pop keyboard flags → ?1049l → disable_raw_mode()`, since crossterm does not restore on drop. Single `poll`-driven event loop over {stdin, transport, signal}: update shadow → compose → damage → emit, coalescing anything that arrives before the frame flushes. **Owns the quit action** — see below. | Blocking on the network. Rendering when nothing is dirty. |
 | 8 | **Transport out** | Send key tokens and control messages (`resize`, `redraw`, `paste`). | Serialising beyond what the codec says. |
 | 9 | **Transport** | Bytes both ways over a socket. Trait with implementations for TCP-JSON, unix-socket-JSON, or Vert.x event-bus framing. **Chosen in ticket 08.** | Knowing about views or keys. |
 | 10 | **Protocol codec** | `ViewUpdate` ⇄ JSON (or the chosen framing), with a version field and tolerance for unknown fields so the server can grow the payload without breaking old clients. **Shape owned by ticket 03.** | Business logic. |
@@ -144,7 +144,7 @@ Derived from the baseline measurements, which are in [the closed ticket](../issu
 
 | Stage | Budget | Basis |
 |---|---|---|
-| key decode + adapter | ≤ 0.1 ms | one small parse per keystroke |
+| key decode + adapter | ≤ 0.1 ms | one small parse per keystroke — **only on the kitty `DISAMBIGUATE_ESCAPE_CODES` path**; the ESC-timeout fallback cannot meet it, by construction (see below) |
 | transport out + in (loopback) | ≤ 1.0 ms | measured 1 ms for the outbound leg; server work was 0.30 ms at 8 KB |
 | protocol decode (viewport-bounded) | ≤ 0.2 ms | 1.7 ms measured for 517 KB; a viewport is 3–6 KB |
 | compose + diff | ≤ 0.5 ms | row-run diff over ~3.5 k cells |
@@ -152,6 +152,17 @@ Derived from the baseline measurements, which are in [the closed ticket](../issu
 | **total** | **≤ 2.1 ms** | matches vim |
 
 The whole budget is ~1/8 of the current 17.5 ms floor, which is why leaving the browser's SockJS path is what makes goal 2 possible at all.
+
+## Corrections forced by [ticket 06](../issues/06-terminal-io-non-jvm.md)
+
+This document was written before the input research landed; four of its statements were wrong and are corrected in place above. Recording them so the same assumptions do not get re-derived:
+
+1. **The decoder emits `Event`, not `KeyEvent`.** Bracketed paste arrives as `Event::Paste(String)`; there is no key event for it. Component 2's input type is `Event`, and paste needs its own token on the wire ([ticket 08](../issues/08-decide-terminal-shape.md) decides whether that is one synthetic insert or a dedicated message).
+2. **Ctrl-C is a byte, not a `SIGINT`.** `enable_raw_mode()` clears `ISIG`, so `0x03` reaches us as input and the "restore on `SIGINT`" line that used to be here was unreachable from the keyboard. **This is a design hole, not a detail:** nothing else in Visur can quit, so component 7 must bind an explicit quit/detach action and the spec must name it. `SIGTERM` from outside still restores via the hook, and `Drop` still covers normal exit.
+3. **The ≤ 0.1 ms decode budget is conditional.** It holds when kitty's `DISAMBIGUATE_ESCAPE_CODES` is pushed (`Esc` arrives as self-delimiting `CSI 27 u`) and on the arrow/printable path generally. Under the ESC-timeout fallback the *renderer* is still fast but `Esc` waits out crossterm's private timeout (~50 ms in practice, unverified constant) — that is a per-key latency cliff on exactly the key Visur uses most, and it is why the probe matters.
+4. **Restore is an explicit ordered sequence, not RAII,** and output goes to fd 1 directly rather than `std::io::Stdout` (whose `LineWriter` buffers).
+
+Two further findings belong to the server, not the client, and are recorded rather than fixed: `CommandStateService` handles `ArrowLeft`/`ArrowRight` but not Up/Down, and **no keybinding anywhere sets `isInCommandState = true`** — so the `;` command line is unreachable by keypress today, and a correct terminal client will faithfully deliver keys that do nothing.
 
 ## Open, and owned elsewhere
 

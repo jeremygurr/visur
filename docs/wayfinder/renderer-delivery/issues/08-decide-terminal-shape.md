@@ -22,6 +22,13 @@ The process boundary is already settled — the client is a separate, non-JVM pr
 - **Plain JSON over TCP or a Unix domain socket** — same as above with less ceremony; a Unix socket additionally keeps the client off the network and gives you peer credentials for free. macOS-only scope makes this less of a portability problem than it looks.
 - **SockJS** — do not. It exists to be the browser's fallback.
 
+**Inherited from [Terminal input and output from an out-of-JVM client](06-terminal-io-non-jvm.md)**, which decided the input vocabulary but deliberately left these to you:
+
+- **Paste.** `Event::Paste(String)` is not a key event. Decide whether a paste is one synthetic `insertChar`-shaped command stream or a dedicated message — the research favours a dedicated message, because a stream is one round trip per character.
+- **Quit.** Raw mode clears `ISIG`, so Ctrl-C is a byte, and nothing in Visur quits. The client must bind an explicit quit/detach action; name it in the parity list or the client cannot be exited except by closing the terminal.
+- **Command state is unreachable today.** No keybinding anywhere sets `isInCommandState = true` (`CommandStateService` also lacks Up/Down), so the `;` command line cannot be opened by any keypress. Either the client binds it — a server-side change this map should not smuggle in silently — or parity explicitly excludes it.
+- **Capability probe at attach**: `?2026` via `DECRQM` and kitty `DISAMBIGUATE_ESCAPE_CODES` via `CSI >1u`, probe-not-version-check, degrading silently. The probe is what keeps the `Esc` key off the timeout path.
+
 Weigh all of it against the standing preference that all state is server-side, and against the §A answer: an ANSI-pipe design wants a dumb byte transport, a structured-payload design wants a message transport.
 
 **This ticket now carries a number, not a preference.** [Baseline measurements of the current update path](01-baseline-measurements.md) found a payload-independent **~17.5 ms round-trip floor** on the current SockJS path that is neither server work (0.3 ms) nor parse (0.1 ms) nor paint (1.6 ms), and it sits on the view-delivery leg. Vim is ~1–2 ms. So:
