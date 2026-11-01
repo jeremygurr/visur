@@ -1,7 +1,8 @@
 # Kilo-shaped spike: Visur in a terminal
 
 Type: prototype
-Status: open
+Status: in progress
+Assignee: pi (agent session, 2026-10-28)
 Blocked by: 06
 
 ## Question
@@ -30,3 +31,30 @@ Watch for, and record:
 - Whether the client language's toolchain got in the way (build step, dependency weight, debugging ergonomics) — if it did, say so plainly, because it is cheaper to learn that here than after the spec is written
 
 Link the spike (branch, or a `spike/` folder that is thrown away) from this ticket. The answer records what felt right, what felt wrong, and which of the shape ticket's options the spike argues for.
+
+## Progress notes (agent) — awaiting the human verdict
+
+**Spike built and verified headlessly, 2026-10-28.** Source, launcher and README: [spike/](../spike/README.md). Run with `docs/wayfinder/renderer-delivery/spike/visur`.
+
+Verified in a real pty (`spike/drive.py` drives keys and captures the screen): attaches to the live event bus with **no Java change** (minimal SockJS-over-WebSocket client in Rust), paints the Declaration, wrapping at terminal width, cursor as inverse video, mode line with mode/quantum/span. `h j k l`, `i`, printable chars, `Esc` and `Backspace` all round-trip; a 5-character insert showed up as 5 characters at the cursor.
+
+**Measured, 8 KB buffer, 100×30 terminal, full repaint per key, no diffing: median 2.6–4.4 ms, p95 4.6–8.6 ms keystroke → view rendered.** Compare: 17.5 ms for the same keystroke in the browser, ~1–2 ms for vim. So a naive full-repaint Rust client already beats the canvas client by 4–7×, and vim parity is a matter of tens of milliseconds of tuning, not architecture. Two of those milliseconds were the spike's own poll granularity (a 2 ms socket read timeout measured 4.4 ms median; 200 µs measured 2.6 ms), which is an argument for a real `poll`/`epoll` loop rather than a timed read.
+
+**Three findings that cost nothing to learn here and would have cost the spec more:**
+
+1. **SockJS requires a client ping.** The vert.x eventbus JS client sends `{"type":"ping"}` every ~5 s; without it the session is reaped after exactly 10 s with `c[3000,"Go away!"]`. A client on this transport must implement it — one concrete cost of reusing SockJS instead of a plain socket, for [Decide the terminal client's shape, transport, and parity](08-decide-terminal-shape.md).
+2. **Readiness is a handshake, not an open port.** The first `canvasWasChanged` is regularly lost because the verticles are not subscribed when the socket opens. The spike re-sends it every 300 ms until the first view. This is the launcher requirement in [Decide the terminal client's implementation language and TUI stack](04-decide-client-language.md), confirmed empirically.
+3. **The client must reimplement the browser's wrapping** — `x % canvasWidth` ([visur.js:167-171](../../../../src/main/resources/static/visur.js#L167-L171)) — merely to place the cursor, because the server sends an unwrapped character array. [Decide the view-update protocol and where its seam sits](03-decide-view-protocol.md) sub-question C, now observed rather than predicted.
+
+Also observed, server-side: `CanvasWasChangedVerticle.handle` prints every line of the document on every resize ([CanvasWasChangedVerticle.java:25-33](../../../../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L25-L33)) — 55 log lines per attach at 8 KB, and O(document) per resize. Harmless here; a real cost at 5 MB.
+
+### Not resolved by the above
+
+This ticket is HITL: the question is **what felt right and what felt wrong**, and that is the human's call. Still to answer, with the spike running:
+
+- Is the round trip perceptible? Does typing feel laggy compared to vim?
+- Where does `Esc` misbehave (spike has no `DISAMBIGUATE_ESCAPE_CODES`, so it is on crossterm's timeout path)?
+- Does the terminal's scrollback fight the viewport (spike uses `?1049`)?
+- What does it do on exit and on a crash?
+- Does the Rust toolchain get in the way — build step, dependency weight, debugging ergonomics?
+- Which shape does this argue for in [Decide the terminal client's shape, transport, and parity](08-decide-terminal-shape.md)?

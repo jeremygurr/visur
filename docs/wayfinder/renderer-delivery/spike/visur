@@ -1,0 +1,48 @@
+#!/bin/bash
+# Spike launcher: one command. Uses a running server if there is one, starts one if not,
+# and shuts down only a server it started. This is the shape ticket 04 requires;
+# here it exists so the spike is actually usable.
+set -u
+
+ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+BIN="$(dirname "$0")/visur-term/target/release/visur-term"
+PORT="${VISUR_PORT:-8888}"
+LOG="$(dirname "$0")/server.log"
+
+if [ ! -x "$BIN" ]; then
+  echo "client not built — run: cd .scratch/spike/visur-term && cargo build --release" >&2
+  exit 1
+fi
+
+port_open() { lsof -ti:"$PORT" >/dev/null 2>&1; }
+
+own_server=0
+if port_open; then
+  echo "using the server already listening on :$PORT"
+else
+  echo "no server on :$PORT — starting one (./gradlew run, log: $LOG)"
+  ( cd "$ROOT" && ./gradlew run -q > "$LOG" 2>&1 ) &
+  gradle_pid=$!
+  own_server=1
+  for _ in $(seq 1 120); do
+    if curl -sf -o /dev/null "http://127.0.0.1:$PORT/static/visur.html"; then break; fi
+    sleep 0.5
+  done
+  if ! port_open; then
+    echo "server failed to start; tail of $LOG:" >&2
+    tail -20 "$LOG" >&2
+    kill "$gradle_pid" 2>/dev/null
+    exit 1
+  fi
+  echo "server up"
+fi
+
+"$BIN"
+status=$?
+
+if [ "$own_server" = 1 ]; then
+  echo "stopping the server we started"
+  pkill -f "com.ple.visur.MainVerticle" 2>/dev/null
+  kill "$gradle_pid" 2>/dev/null
+fi
+exit $status
