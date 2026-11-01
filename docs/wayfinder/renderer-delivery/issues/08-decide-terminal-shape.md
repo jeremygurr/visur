@@ -1,7 +1,9 @@
 # Decide the terminal client's shape, transport, and parity
 
 Type: grilling
-Status: open
+Status: closed
+Closed: 2026-10-28
+Assignee: pi (agent session, 2026-10-28)
 
 ## Question
 
@@ -46,3 +48,63 @@ Weigh all of it against the standing preference that all state is server-side, a
 Bring [Survey of incremental rendering and terminal capability baselines](02-terminal-render-survey.md)'s capability findings and [Kilo-shaped spike: Visur in a terminal](07-kilo-spike.md)'s verdict. The spike should already be arguing for one shape and one stand-in transport; confirm or overrule it, and record whichever the spike got wrong as evidence that the spike is a spike.
 
 The answer records: chosen shape, chosen transport with its wire format sketched, the must/should/won't parity split, and what the canvas renderer keeps that the terminal cannot have — enough for the spec ticket to write both without reopening.
+
+## Answer
+
+Decided with the user 2026-10-28, on top of [the protocol](03-decide-view-protocol.md) and [the spike](07-kilo-spike.md).
+
+### A. Shape: structured-payload client. ANSI pipe overruled.
+
+The client consumes the view payload as **data** and owns its own layout and painting. The ANSI-pipe option — server emits escape sequences, client forwards bytes — is formally overruled, for three reasons that only became decisive once the payload was settled: the payload is viewport-bounded and self-describing, so it is only meaningful to a client that reads fields; an ANSI pipe would put terminal knowledge inside the server and leave the canvas renderer with nothing to consume; and it would make `N` viewports impossible rather than additive.
+
+### B. Transport: plain JSON over WebSocket, on a new `/ws` route, localhost only
+
+- ~10 lines in [`MainVerticle`](../../../../src/main/java/com/ple/visur/MainVerticle.java) using Vert.x core's `HttpServerRequest.toWebSocket(...)` — verified present in vertx-core 4.4.4, and `vertx-web` 4.4.4 has no `WebSocketHandler`, so this is the route that needs no new dependency.
+- **One WebSocket message = one view update**, same JSON shape as decided in [03](03-decide-view-protocol.md). Keys go the other way as `{"key": token}`. Standard WS ping/pong replaces the hand-rolled SockJS heartbeat.
+- Bound to `127.0.0.1`. No auth, no TLS, no remote attach — remote is out of scope on the map.
+
+**Rejected, and why:**
+
+- **SockJS (works today, zero server change)** — the client must reimplement `o`/`h`/`a[...]` framing *plus* a 5 s ping or the session is reaped at 10 s with `c[3000,"Go away!"]` (spike finding). That is a browser-shaped protocol maintained forever in Rust, for a payload that is now our own JSON. Speed was never the objection: 2.6–4.4 ms either way.
+- **`vertx-tcp-eventbus-bridge`** — free server-side, but the client implements Vert.x binary framing and heartbeats in a language with no client library.
+- **Plain TCP / Unix domain socket** — *not* rejected on merit; kept as a `Transport` implementation behind the same trait if a second listener ever earns its keep. Domain-socket support in Vert.x was not verified, so claiming it would be dishonest.
+
+Because the client speaks a `Transport` trait, this choice is one small file to reverse. That is the real reason it is safe to decide now.
+
+### C. Scrolling: server-mediated, follow-the-cursor, for beta
+
+A renderer receives only its viewport's rows, so **it cannot scroll past them** — it does not have the text. Consequences, and these go in the spec as obligations:
+
+- Moving past the edge is a **cursor move**; the server re-windows and sends `full: true`.
+- A renderer that "scrolls its own buffer" is violating the protocol. The rows it holds are the only truth.
+- **Not in beta**: page-scroll with a stationary cursor (`Ctrl-E`-style), and overscan/local scroll. Both recorded as *should*; both need either a new message or a bigger payload.
+
+### D. Parity split
+
+**Must** — paint rows and cursor (block for `span` 1, bar for `span` 0) from `cursorRow`/`cursorCol`; mode line with mode/submode/quantum/span; command-state line when `isInCommandState`; `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`+digit; search (`f`/`F`/`n`/`N`/`/` and typing the target); `SIGWINCH` → `viewportWasChanged` → full repaint; capability probe for `?2026` via `DECRQM`, degrading silently; alt screen, raw mode, ordered restore on panic *and* normal exit; **quit on `Ctrl-C` and `Ctrl-Q`**.
+
+**Should** — kitty `DISAMBIGUATE_ESCAPE_CODES` push, degrading gracefully when tmux swallows it; `?2026` brackets on every frame; overscan/local scroll; page-scroll without moving the cursor; truecolor once `VisurColor` is wired up.
+
+**Won't** — mouse reporting, panes, tabs, images; opening the `;` command line (no keybinding can, server-side — see [06](06-terminal-io-non-jvm.md)); search-and-replace (does not exist); any file I/O (does not exist); per-client viewports (needs session scoping).
+
+`Ctrl-C`/`Ctrl-Q` = quit/detach is the terminal's own binding, not a Visur command; a `:q` equivalent waits until command state is reachable.
+
+### E. What the canvas renderer keeps that the terminal cannot have
+
+Recorded so the spec doesn't try to unify them:
+
+- **Font control.** The canvas measures `20px Courier` and derives its own cell metrics ([visur.js:24-30](../../../../src/main/resources/static/visur.js#L24-L30)); a terminal's cell size is the terminal's, and the client only asks for `cols`/`rows`.
+- **Sub-cell geometry** — the cursor bar is drawn at `x * cellWidth - 0.5`, and the span block at `+5px` offsets ([visur.js:179-208](../../../../src/main/resources/static/visur.js#L179-L208)). A terminal has one cell, no fractions.
+- **Color-by-construction.** The canvas can fill any pixel any colour; the terminal gets `SGR` and whatever the terminal supports, which is why truecolor and `?2026` probing are terminal-only concerns.
+- **Arbitrary redraw cost.** Canvas paint is measured at 1.6–2.4 ms and viewport-bounded, so the canvas can afford the naive full repaint; the terminal must diff rows to stay inside its `~2 ms` budget at large viewports.
+- Conversely the terminal gets something the canvas cannot have: **zero-cost text layout**. Rows arrive wrapped, so painting a row is a `write`, not 130 `fillText` calls.
+
+### F. Recorded prerequisites (not client work)
+
+- **Bracketed paste needs a server message.** `Event::Paste(String)` arrives as one string; forwarding it as N key events is N round trips. This is a server-side addition, recorded with the others rather than smuggled into the client.
+- **Session-scoped viewport state** — from [03](03-decide-view-protocol.md), unchanged: `N` viewports and multi-user both need it.
+- **Command-line reachability** — from [06](06-terminal-io-non-jvm.md), unchanged: nothing sets `isInCommandState = true`.
+
+### G. Latency note inherited from [06](06-terminal-io-non-jvm.md)
+
+Under `tmux`, `SIGWINCH` is pane-shaped and one hop late, `?2026` is unavailable on tmux ≤ 3.4, and the kitty push is traditionally swallowed — so a tmux user gets the ESC-timeout `Esc` and no synchronized output. Worth one line in the spec so it is a known limitation rather than a bug report.
