@@ -316,7 +316,7 @@ Recorded because they are load-bearing for anything that follows, and none of th
 
 | # | Prerequisite | Blocks |
 |---|---|---|
-| **P1** | **Session-scoped viewport state.** `ServiceHolder.editorModelCoupler` is a **static singleton** and `canvasWidth`/`canvasHeight`/`canvasStart`/`fy` live inside it ([EditorModelKey](../../../src/main/java/com/ple/visur/EditorModelKey.java#L4-L35)), so two clients overwrite each other's viewport and both are rendered for the last caller. | multi-interface (`N` viewports), multi-user |
+| **P1** | **Session-scoped viewport state.** *Confirmed empirically 2026-10-28: with the browser and the terminal open on the same document, the two renderers disagree about what is on screen and which was last.* `ServiceHolder.editorModelCoupler` is a **static singleton** and `canvasWidth`/`canvasHeight`/`canvasStart`/`fy` live inside it ([EditorModelKey](../../../src/main/java/com/ple/visur/EditorModelKey.java#L4-L35)), so two clients overwrite each other's viewport and both are rendered for the last caller. | multi-interface (`N` viewports), multi-user |
 | **P2** | **Content-parameterise the operator/quantum stack** — sixteen `emc.getEditorContent()` call sites. | a second content kind, filesystem views, any `ContentView` seam |
 | **P3** | **A paste message.** `Event::Paste(String)` is one string; forwarding it as N key events is N round trips. | bracketed paste, and every clipboard feature |
 | **P4** | **Make command state reachable.** No keybinding sets `isInCommandState = true`; `CommandStateService` also lacks `ArrowUp`/`ArrowDown`. | the `;` command line, a `:q`-style quit, macros |
