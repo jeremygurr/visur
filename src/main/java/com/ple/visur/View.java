@@ -8,10 +8,10 @@ import java.util.List;
 /**
  * The editor state a renderer needs, projected once and serialised once.
  *
- * <p>This replaces a class that was a mutable two-field holder ({@code ca}, {@code editorContent}) filled in and
- * read back by {@link ModelWasChangedVerticle}. The document itself is no longer part of the payload: {@link
- * Viewport} lays the visible region out into rows, and the rows carry their own origins, so nothing downstream
- * has to know how wrapping works.
+ * <p>This replaces a class that was a mutable two-field holder filled in and read back by {@link
+ * ModelWasChangedVerticle}. The document itself is not part of the payload: {@link Viewport} lays the visible
+ * region out into rows, and the rows carry their own origins, so nothing downstream has to know how wrapping
+ * works — which is what makes the payload independent of document size.
  *
  * <p>Everything here is derived, so a change in one place shows up as a change in both {@code render()} and
  * {@link ViewportTest}. Layout is not decided here: it is decided by {@link Viewport}, which this only feeds.
@@ -33,13 +33,7 @@ public record View(
   boolean isInCommandState,
   String commandStateContent,
   int commandCursor,
-  String searchTarget,
-  // Transitional: the browser still paints from these three, so they stay on the wire until the switch ticket
-  // removes them together with the browser's own wrapping. Nothing new should read them.
-  int ca,
-  String editorContent,
-  int canvasStart,
-  int canvasEnd
+  String searchTarget
 ) {
 
   /** The browser's canvas carries one row of chrome, and never content, in its last row. */
@@ -48,17 +42,25 @@ public record View(
   /**
    * Reads the editor model and lays out what is visible.
    *
-   * <p>{@code full} is false: every message already describes the whole viewport, so a renderer that repaints
-   * from it is correct whether or not it was told to discard what it had. Nothing forces a repaint yet, and the
-   * resize path that would own that decision is a later ticket.
+   * <p>Every message describes the whole viewport, so a renderer that repaints from one is correct whether or not
+   * it was told to discard what it had. {@code full} is therefore only an optimisation hint for a renderer that
+   * diffs: it says "your cached rows are not worth comparing, start over".
    */
   public static View of(EditorModelCoupler emc) {
+    return of(emc, false);
+  }
+
+  /**
+   * @param full true when the renderer's cached rows cannot be trusted — after the viewport itself changed size,
+   *             since every row boundary moved.
+   */
+  public static View of(EditorModelCoupler emc, boolean full) {
     int origin = emc.getCanvasStart();
     int height = Math.max(emc.getCanvasHeight() - LAST_CANVAS_ROW_IS_NOT_CONTENT, 0);
     List<Viewport.Row> rows = Viewport.rows(emc.getEditorContent(), emc.getCanvasWidth(), origin, height);
     Viewport.Position cursor = Viewport.position(rows, cursorIndex(emc));
     return new View(
-      false,
+      full,
       origin,
       rows,
       emc.getSpan(),
@@ -74,11 +76,7 @@ public record View(
       emc.getIsInCommandState(),
       emc.getCommandStateContent(),
       emc.getCommandCursor(),
-      searchTarget(emc),
-      emc.getCA(),
-      emc.getEditorContent(),
-      origin,
-      emc.getCanvasEnd()
+      searchTarget(emc)
     );
   }
 
@@ -122,10 +120,6 @@ public record View(
     payload.put("commandStateContent", commandStateContent);
     payload.put("commandCursor", commandCursor);
     payload.put("searchTarget", searchTarget);
-    payload.put("ca", ca);
-    payload.put("editorContent", editorContent);
-    payload.put("canvasStart", canvasStart);
-    payload.put("canvasEnd", canvasEnd);
     return payload;
   }
 

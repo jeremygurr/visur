@@ -42,8 +42,6 @@ public class MainVerticle extends AbstractVerticle {
     SockJSBridgeOptions opts = new SockJSBridgeOptions()
       .addInboundPermitted(new PermittedOptions().setAddress(BusEvent.keyWasPressed.name()))
       .addInboundPermitted(new PermittedOptions().setAddress(BusEvent.canvasWasChanged.name()))
-      .addInboundPermitted(new PermittedOptions().setAddress(BusEvent.modelWasChanged.name()))
-      .addOutboundPermitted(new PermittedOptions().setAddress(BusEvent.modelWasChanged.name()))
       .addOutboundPermitted(new PermittedOptions().setAddress(BusEvent.viewWasChanged.name()));
 
     router.get("/static/*").handler(this::staticHandler);

@@ -1,5 +1,8 @@
 package com.ple.visur;
 
+import io.vertx.core.json.JsonObject;
+import io.vertx.rxjava3.core.eventbus.Message;
+
 /**
  * Turns "the model changed" into "here is the view".
  *
@@ -14,11 +17,16 @@ public class ModelWasChangedVerticle extends AbstractVisurVerticle {
 
   @Override
   public void start() {
-    vertx.eventBus().consumer(BusEvent.modelWasChanged.name(), event -> handleChange());
+    vertx.eventBus().consumer(BusEvent.modelWasChanged.name(), this::handleChange);
   }
 
-  public void handleChange() {
-    vertx.eventBus().send(BusEvent.viewWasChanged.name(), View.of(emc).render());
+  /** The trigger may ask for a full repaint; a keystroke changes no layout, so it does not. */
+  public void handleChange(Message<Object> event) {
+    vertx.eventBus().send(BusEvent.viewWasChanged.name(), View.of(emc, isFull(event.body())).render());
+  }
+
+  private static boolean isFull(Object trigger) {
+    return trigger instanceof JsonObject json && Boolean.TRUE.equals(json.getBoolean("full"));
   }
 
 }

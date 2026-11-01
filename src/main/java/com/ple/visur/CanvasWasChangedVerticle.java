@@ -31,7 +31,8 @@ public class CanvasWasChangedVerticle extends AbstractVisurVerticle {
         System.out.println("Line " + i + ": " + line);
       }
     }
-    vertx.eventBus().send(BusEvent.modelWasChanged.name(), "true");
+    // Every row boundary moved, so a renderer that diffs must not compare against what it had.
+    vertx.eventBus().send(BusEvent.modelWasChanged.name(), new JsonObject().put("full", true));
   }
 
 }

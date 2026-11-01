@@ -23,6 +23,7 @@ Reaching the destination means: the protocol in [the spec](../renderer-delivery/
 <!-- one line per closed ticket: gist, then link to the ticket holding the detail -->
 
 - [Make large documents loadable](issues/01-benchmark-content.md): `VISUR_CONTENT_BYTES` + `SizedContent`; verified at 6 KB, 1 MB and 5 MB with the browser rendering each.
+- [Switch the wire to viewport rows](issues/03-switch-payload.md): payload flat at ~5 KB from 6 KB to 5 MB (1,038× smaller at 5 MB), key→paint flat at 32 ms, 44 `fillText` per frame instead of 3,558. The browser's `modelWasChanged` echo — which was silently stealing half of all views — is gone.
 - [Extract Viewport and View](issues/02-extract-viewport-view.md): `Viewport` lays out and maps the cursor, `View` projects and serialises, the verticle is a pipe. The payload gained rows but kept the three fields the browser still paints from; §3.1's wrap-alignment invariant turned out not to be needed.
 
 ## Not yet specified
