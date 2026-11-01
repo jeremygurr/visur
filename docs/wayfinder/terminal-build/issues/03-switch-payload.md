@@ -75,5 +75,9 @@ cells — 29, 44 and 53 rows respectively, rows matching the seed document at th
 scrolling through origin 3305, selection gold pixels matching the visible selected cells, search submode reaching
 the mode line as `LINE (f) a_`, and 115k–296k pixels painted.
 
-**The spike is now broken**, as spec §7 predicts: it reads `editorContent`. [Ticket 05](05-client-skeleton.md)
-fixes it.
+**The spike was fixed in this change too**, which spec §7 predicted would be needed but had scheduled for
+[ticket 05](05-client-skeleton.md). It painted `editorContent` and wrapped it itself, so it showed nothing once the
+field was gone. It now consumes `rows` and places the cursor from `cursorRow`/`cursorCol`; its `Layout` — the
+client-side wrap, absolute-index table and `cursor_cell` — is deleted outright, so it is smaller than before.
+Verified in a pty: text, mode line and cursor render, 15 keystrokes at a median 6.2 ms. That also makes it a
+second, out-of-JVM reader of the new protocol, which is worth having before the real client exists.

@@ -4,6 +4,11 @@ Type: task
 Status: open
 Blocked by: 04
 
+> [!note] The spike already speaks the new protocol
+> [Ticket 03](03-switch-payload.md) moved it to `rows`, so it is a working reference for this ticket rather than
+> something to repair first. What it does *not* have is any of this ticket's real work: damage tracking, the
+> ordered terminal restore, `SIGWINCH`, or a launcher.
+
 ## Work
 
 Spec §5.2–5.4, built to the component boundaries in [the design](../../renderer-delivery/design/terminal-client-components.md). Start from [the spike](../../renderer-delivery/spike/visur-term/src/main.rs) — it already solves the hard, uninteresting parts (raw mode, layout, cursor, key adapter) and predates `rows`, so its job is to be read and then mostly deleted.

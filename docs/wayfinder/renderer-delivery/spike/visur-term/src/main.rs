@@ -16,12 +16,19 @@ use tungstenite::{connect, Message};
 // ---------------------------------------------------------------- view payload
 
 #[derive(Debug, Default, Clone)]
+struct Row {
+    start: i64,
+    text: Vec<char>,
+}
+
+#[derive(Debug, Default, Clone)]
 struct View {
-    content: Vec<char>,
+    rows: Vec<Row>,
+    cur_row: i64,
+    cur_col: i64,
     cqs: i64,
     cqe: i64,
     span: i64,
-    at_start: bool,
     mode: String,
     submode: String,
     quantum: String,
@@ -43,12 +50,27 @@ fn b(v: &Value, k: &str) -> bool {
 }
 
 fn parse_view(body: &Value) -> View {
+    // Rows arrive already wrapped, each carrying its own absolute origin. This client never re-wraps: the row
+    // boundaries are the server's word.
+    let rows = body
+        .get("rows")
+        .and_then(|r| r.as_array())
+        .map(|rows| {
+            rows.iter()
+                .map(|row| Row {
+                    start: i(row, "start"),
+                    text: s(row, "text").chars().collect(),
+                })
+                .collect()
+        })
+        .unwrap_or_default();
     View {
-        content: s(body, "editorContent").chars().collect(),
+        rows,
+        cur_row: i(body, "cursorRow"),
+        cur_col: i(body, "cursorCol"),
         cqs: i(body, "cursorQuantumStart"),
         cqe: i(body, "cursorQuantumEnd"),
         span: i(body, "span"),
-        at_start: b(body, "isAtQuantumStart"),
         mode: s(body, "editorMode"),
         submode: s(body, "editorSubmode"),
         quantum: s(body, "cursorQuantum"),
@@ -60,61 +82,27 @@ fn parse_view(body: &Value) -> View {
     }
 }
 
-// ---------------------------------------------------------------------- layout
-
-/// Wrap the buffer at `width` the way the browser does (`x % canvasWidth`), keeping
-/// each character's absolute index and its (row, col) so the cursor can be placed.
-struct Layout {
-    rows: Vec<Vec<(usize, char)>>,
-    pos: Vec<(usize, usize)>,
-}
-
-fn layout(content: &[char], width: usize) -> Layout {
-    let width = width.max(1);
-    let mut rows: Vec<Vec<(usize, char)>> = vec![Vec::new()];
-    let mut pos = Vec::with_capacity(content.len());
-    let mut x = 0usize;
-    for (idx, ch) in content.iter().enumerate() {
-        pos.push((rows.len() - 1, x));
-        if *ch == '\n' {
-            rows.push(Vec::new());
-            x = 0;
-            continue;
-        }
-        rows.last_mut().unwrap().push((idx, *ch));
-        x += 1;
-        if x == width {
-            rows.push(Vec::new());
-            x = 0;
-        }
-    }
-    Layout { rows, pos }
-}
-
-fn cursor_cell(v: &View) -> usize {
-    let cell = if v.span > 0 || v.at_start { v.cqs } else { v.cqe };
-    cell.max(0) as usize
-}
-
 // ---------------------------------------------------------------------- render
 
-fn paint(lay: &Layout, v: &View, start_row: usize, rows: usize, cols: usize, status: &str) -> String {
+fn paint(v: &View, start_row: usize, rows: usize, cols: usize, status: &str) -> String {
     let content_rows = rows.saturating_sub(1).max(1);
-    let cursor = cursor_cell(v);
-    let (cur_row, cur_col) = *lay.pos.get(cursor).unwrap_or(&(0, 0));
     let mut out = String::with_capacity(rows * (cols + 12) + 128);
 
     for r in 0..content_rows {
         out.push_str(&format!("\x1b[{};1H", r + 1));
-        if let Some(row) = lay.rows.get(start_row + r) {
-            for (idx, ch) in row {
-                let on_cursor = *idx >= cursor
-                    && (*idx == cursor || (v.span > 0 && (*idx as i64) < v.cqe.max(v.cqs)));
-                if on_cursor {
+        if let Some(row) = v.rows.get(start_row + r) {
+            // The selection is an absolute character range; this row clips it to its own characters.
+            let row_end = row.start + row.text.len() as i64;
+            let from = v.cqs.max(row.start);
+            let to = if v.span > 0 { v.cqe.min(row_end) } else { from };
+            for (col, ch) in row.text.iter().enumerate() {
+                let abs = row.start + col as i64;
+                let selected = abs >= from && abs < to;
+                if selected {
                     out.push_str("\x1b[7m");
                 }
                 out.push(*ch);
-                if on_cursor {
+                if selected {
                     out.push_str("\x1b[0m");
                 }
             }
@@ -155,6 +143,8 @@ fn paint(lay: &Layout, v: &View, start_row: usize, rows: usize, cols: usize, sta
     out.push_str(&format!("\x1b[{};1H\x1b[7m{}\x1b[0m", rows, line));
 
     // cursor
+    let cur_row = v.cur_row.max(0) as usize;
+    let cur_col = v.cur_col.max(0) as usize;
     let screen_row = cur_row.saturating_sub(start_row).min(content_rows - 1) + 1;
     let screen_col = cur_col.min(cols.saturating_sub(1)) + 1;
     out.push_str(&format!("\x1b[{};{}H", screen_row, screen_col));
@@ -334,9 +324,7 @@ fn main() {
         }
 
         if dirty {
-            let lay = layout(&view.content, cols);
-            let cursor = cursor_cell(&view);
-            let (cur_row, _) = *lay.pos.get(cursor).unwrap_or(&(0, 0));
+            let cur_row = view.cur_row.max(0) as usize;
             if cur_row < start_row {
                 start_row = cur_row;
             } else if cur_row >= start_row + content_rows {
@@ -346,7 +334,7 @@ fn main() {
                 Some(ms) => format!("  last={:.1}ms n={} views={}", ms, latencies.len(), seen),
                 None => format!("  waiting for view (views={})", seen),
             };
-            let screen = paint(&lay, &view, start_row, rows, cols, &status);
+            let screen = paint(&view, start_row, rows, cols, &status);
             out.write_all(screen.as_bytes()).ok();
             out.flush().ok();
             dirty = false;

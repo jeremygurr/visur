@@ -292,11 +292,11 @@ Each step is independently shippable; steps 2 and 3 pair so clients update once.
 | # | Step | Intermediate state |
 |---|---|---|
 | 1 | Extract `Viewport` + `View` against the **current** payload | no wire change; the browser still receives `editorContent`; verify by running it |
-| 2 | Switch the wire: add `rows`/`origin`/`full`/`cursorRow`/`cursorCol`; drop `editorContent`/`ca`/`canvasEnd`; **update `visur.js` in the same change** and delete its wrapping | both renderers see rows; the spike is broken until step 3 |
+| 2 | Switch the wire: add `rows`/`origin`/`full`/`cursorRow`/`cursorCol`; drop `editorContent`/`ca`/`canvasEnd`; **update `visur.js` in the same change** and delete its wrapping | both renderers see rows; the spike needs its layout replaced by `rows` in the same change, since it was wrapping for itself |
 | 3 | Rename the inbound address to `viewportWasChanged`; add the `/ws` route; rename `CanvasWasChangedVerticle` → `ViewportWasChangedVerticle`; delete its debug loop | browser and terminal both on the new transport path |
 | 4 | `emc.getSearchPrompt()`, deleting the `"_"` cursor hack | payload shape unchanged |
 
-**No compatibility window.** There is one deployed client and it lives in this repo; dual-format would mean two server paths and a renderer that sniffs. The spike breaks at step 2 and is fixed in about ten lines.
+**No compatibility window.** There is one deployed client and it lives in this repo; dual-format would mean two server paths and a renderer that sniffs. The spike does break at step 2 — it painted `editorContent` and wrapped it itself — and it was fixed in that same change rather than waiting for step 3: consuming `rows` deleted its whole layout pass, so it came out smaller than it went in.
 
 ---
 
