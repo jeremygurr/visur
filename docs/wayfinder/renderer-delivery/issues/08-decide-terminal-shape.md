@@ -2,7 +2,6 @@
 
 Type: grilling
 Status: open
-Blocked by: 02, 03, 07
 
 ## Question
 
@@ -21,6 +20,8 @@ The process boundary is already settled — the client is a separate, non-JVM pr
 - **New plain JSON over WebSocket** — one more listener in `MainVerticle`, a JSON codec on both ends, no frame protocol to reverse-engineer. Cheapest to make correct, adds server surface.
 - **Plain JSON over TCP or a Unix domain socket** — same as above with less ceremony; a Unix socket additionally keeps the client off the network and gives you peer credentials for free. macOS-only scope makes this less of a portability problem than it looks.
 - **SockJS** — do not. It exists to be the browser's fallback.
+
+**Already decided above you — do not reopen:** the payload is viewport-bounded server-wrapped rows with per-row origins, one format for all renderers, with `N` viewports to come ([Decide the view-update protocol and where its seam sits](03-decide-view-protocol.md)). The spike argued for a structured-payload client, not an ANSI pipe ([Kilo-shaped spike: Visur in a terminal](07-kilo-spike.md)). Your remaining transport question is therefore narrower than it looks: the payload is JSON-shaped and self-describing, so the candidates in §B differ only in framing, connection lifetime and who pays for the wire format.
 
 **Inherited from [Terminal input and output from an out-of-JVM client](06-terminal-io-non-jvm.md)**, which decided the input vocabulary but deliberately left these to you:
 
