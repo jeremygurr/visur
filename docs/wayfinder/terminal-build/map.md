@@ -22,7 +22,8 @@ Reaching the destination means: the protocol in [the spec](../renderer-delivery/
 
 <!-- one line per closed ticket: gist, then link to the ticket holding the detail -->
 
-_None yet._
+- [Make large documents loadable](issues/01-benchmark-content.md): `VISUR_CONTENT_BYTES` + `SizedContent`; verified at 6 KB, 1 MB and 5 MB with the browser rendering each.
+- [Extract Viewport and View](issues/02-extract-viewport-view.md): `Viewport` lays out and maps the cursor, `View` projects and serialises, the verticle is a pipe. The payload gained rows but kept the three fields the browser still paints from; §3.1's wrap-alignment invariant turned out not to be needed.
 
 ## Not yet specified
 

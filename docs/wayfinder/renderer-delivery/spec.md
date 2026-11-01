@@ -116,7 +116,11 @@ Three pieces, one task each. This is the single-responsibility split: layout is 
 
 ### 3.1 Why `Viewport` can slice from an arbitrary origin
 
-[`getCanvasEnd()`](../../../src/main/java/com/ple/visur/EditorModelCoupler.java#L91-L108) computes the visible region in wrapped rows, and [`decrementCanvasStart`](../../../src/main/java/com/ple/visur/EditorModelCoupler.java#L354-L379) keeps `canvasStart` walk-aligned to `canvasWidth` within a line. So re-slicing from `origin` at `canvasWidth` reproduces the browser's global `x % canvasWidth` wrap exactly, without walking from index 0. **`Viewport` must preserve that invariant**: it assumes `origin` is either a line start or `lineStart + k*width`.
+[`getCanvasEnd()`](../../../src/main/java/com/ple/visur/EditorModelCoupler.java#L91-L108) computes the visible region in wrapped rows, and [`decrementCanvasStart`](../../../src/main/java/com/ple/visur/EditorModelCoupler.java#L354-L379) keeps `canvasStart` walk-aligned to `canvasWidth` within a line. So re-slicing from `origin` at `canvasWidth` reproduces the browser's global `x % canvasWidth` wrap exactly, without walking from index 0. **`Viewport` does not depend on that invariant.** The invariant is what keeps rows stable across a scroll, but
+`Viewport` itself is origin-agnostic: the browser's wrap is a pure function of (content, width, where painting
+starts), so slicing from an arbitrary origin reproduces exactly what it drew — including after a resize, when
+`canvasStart` stops being a multiple of the new width. A mid-row origin is therefore a tested case rather than a
+violated precondition ([terminal-build ticket 02](../terminal-build/issues/02-extract-viewport-view.md)).
 
 ### 3.2 Class-by-class changes
 

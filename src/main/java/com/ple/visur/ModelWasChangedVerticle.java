@@ -1,54 +1,24 @@
 package com.ple.visur;
 
-import io.vertx.core.json.*;
-import io.vertx.rxjava3.core.eventbus.Message;
-
+/**
+ * Turns "the model changed" into "here is the view".
+ *
+ * <p>A pipe, deliberately. It used to own a single mutable {@link View} instance, rewritten and re-sent on every
+ * message, which made two models' worth of state (the editor's and this verticle's copy) that could disagree;
+ * and it serialised the payload itself, so the wire format lived in a verticle. Both are now someone else's job:
+ * {@link View#of(EditorModelCoupler)} projects and {@link View#render()} serialises.
+ */
 public class ModelWasChangedVerticle extends AbstractVisurVerticle {
 
-  View view = new View();
   EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
 
   @Override
   public void start() {
-    vertx.eventBus().consumer(BusEvent.modelWasChanged.name(), event -> {
-      handleChange(event);
-    });
+    vertx.eventBus().consumer(BusEvent.modelWasChanged.name(), event -> handleChange());
   }
 
-  public void handleChange(Message<Object> event) {
-    view.ca = emc.getCA();
-    view.editorContent = emc.getEditorContent();
-    vertx.eventBus().send(BusEvent.viewWasChanged.name(), toJson());
-  }
-
-  public JsonObject toJson() {
-    JsonObject output = new JsonObject();
-    EditorSubmode editorSubmode = emc.getEditorSubmode();
-    output.put("ca", view.ca);
-    output.put("editorContent", view.editorContent);
-    output.put("span", emc.getSpan());
-    output.put("canvasStart", emc.getCanvasStart());
-    output.put("canvasEnd", emc.getCanvasEnd());
-    output.put("cursorQuantumStart", emc.getCursorQuantumStart());
-    output.put("cursorQuantumEnd", emc.getCursorQuantumEnd());
-    output.put("editorMode", emc.getEditorMode());
-    output.put("editorSubmode", editorSubmode);
-    output.put("cursorQuantum", emc.getCursorQuantum().getName());
-    output.put("scopeQuantum", emc.getScopeQuantum().getName());
-    output.put("isAtQuantumStart", emc.getIsAtQuantumStart());
-    output.put("isInCommandState", emc.getIsInCommandState());
-    output.put("commandStateContent", emc.getCommandStateContent());
-    output.put("commandCursor", emc.getCommandCursor());
-    if(editorSubmode.name().equals("searchForward") || editorSubmode.name().equals("searchBackward")) {
-      ExecutionDataStack eds = emc.getExecutionDataStack();
-      String searchTarget = "";
-      if(eds.size() > 0) {
-        searchTarget = (String) eds.peek();
-      }
-      searchTarget += "_";
-      output.put("searchTarget", searchTarget);
-    }
-    return output;
+  public void handleChange() {
+    vertx.eventBus().send(BusEvent.viewWasChanged.name(), View.of(emc).render());
   }
 
 }

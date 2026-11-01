@@ -101,7 +101,7 @@ eb.onopen = function() {
       } else {
         document.getElementById("currentEditorModeDisplay").innerHTML += " (F) "
       }
-      document.getElementById("currentEditorModeDisplay").innerHTML += searchTarget
+      document.getElementById("currentEditorModeDisplay").innerHTML += searchTarget + "_"
     } else {
       document.getElementById("currentEditorModeDisplay").innerHTML += "; SPAN = " + span
     }

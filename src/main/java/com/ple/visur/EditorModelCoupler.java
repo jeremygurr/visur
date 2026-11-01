@@ -141,6 +141,18 @@ public class EditorModelCoupler {
     return (int)editorModel.get(commandCursor);
   }
 
+  /**
+   * The text currently being searched for, or "" when nothing is.
+   *
+   * <p>The cursor that marks the end of the prompt used to be appended where the payload was assembled
+   * ({@code searchTarget += "_"}), which put a rendering decision in the serialiser and left one renderer able to
+   * show a caret the other could not. The caret belongs to the renderer now.
+   */
+  public String getSearchPrompt() {
+    ExecutionDataStack eds = getExecutionDataStack();
+    return eds.size() > 0 ? (String) eds.peek() : "";
+  }
+
   public ExecutionDataStack getExecutionDataStack() {
     return (ExecutionDataStack)editorModel.get(executionData);
   }

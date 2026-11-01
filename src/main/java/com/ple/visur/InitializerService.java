@@ -94,7 +94,7 @@ public class InitializerService {
 
     initializeCursorPositionDCBsAndBVVs();
 
-    emc.initializeEditorContent(initialEditorContent);
+    emc.initializeEditorContent(contentForThisRun(initialEditorContent));
     emc.updateNextLineIndices();
     emc.putLineWrapping(LineWrapping.wrapped);
 
@@ -180,6 +180,30 @@ public class InitializerService {
     emc.putIsAtQuantumStart(true);
     System.out.println("start bound = " + bounds[0]);
     System.out.println("end bound = " + bounds[1]);
+  }
+
+  /**
+   * Lets a run start with a large document, so the latency bar can be measured at a stated document size.
+   *
+   * <p>Nothing in Visur can load a file, and the built-in content is a few kilobytes, so without this a
+   * measurement at 5 MB is not possible. It is a measurement hook, not a feature: unset means the Declaration,
+   * and a malformed value fails loudly rather than quietly benchmarking the wrong document.
+   */
+  private static String contentForThisRun(String fallback) {
+    String requested = System.getenv("VISUR_CONTENT_BYTES");
+    if (requested == null || requested.isBlank()) {
+      return fallback;
+    }
+    int bytes;
+    try {
+      bytes = Integer.parseInt(requested.trim());
+    } catch (NumberFormatException notANumber) {
+      throw new IllegalArgumentException(
+        "VISUR_CONTENT_BYTES must be a number of bytes, but was \"" + requested + "\"", notANumber);
+    }
+    String content = SizedContent.of(bytes);
+    System.out.println("VISUR_CONTENT_BYTES=" + requested + " -> " + content.length() + " character document");
+    return content;
   }
 
   private void initializeKeymaps() {
