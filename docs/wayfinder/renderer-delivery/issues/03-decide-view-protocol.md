@@ -117,7 +117,7 @@ Instead: `View` reads the content in **exactly one named expression**, marked as
 
 1. Extract `Viewport` + `View` against the **current** payload. Pure refactor, no wire change, verifiable by running the browser client.
 2. Switch the wire — add `rows`/`origin`/`full`/`cursorRow`/`cursorCol`, drop `editorContent`/`ca`/`canvasEnd` — **and update `visur.js` in the same change**. The canvas renderer then deletes its wrap math and paints rows.
-3. Rename the events (`viewportWasChanged` both ways): [`BusEvent`](../../../../src/main/java/com/ple/visur/BusEvent.java), `MainVerticle` permits, `visur.js`, the spike.
+3. Rename the **inbound** event to `viewportWasChanged` ([`BusEvent`](../../../../src/main/java/com/ple/visur/BusEvent.java), `MainVerticle` inbound permit, `visur.js`, the spike). The outbound stays `viewWasChanged` — *correction added while writing [the spec](../spec.md) §2*: an earlier draft of this line said "both ways", which would have given inbound and outbound the same address and made a bridge echo each client's size message to every client.
 4. `emc.getSearchPrompt()`, deleting the `"_"` hack.
 
 Steps 2 and 3 go together so clients update once. No compatibility window: one deployed client, in this repo; the spike breaks until it is updated in about ten lines.

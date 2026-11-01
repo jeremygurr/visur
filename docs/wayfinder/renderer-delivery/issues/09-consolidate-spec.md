@@ -1,8 +1,9 @@
 # Consolidate the spec
 
 Type: task
-Status: open
-Blocked by: 03, 08
+Status: closed
+Closed: 2026-10-28
+Assignee: pi (agent session, 2026-10-28)
 
 ## Question
 
@@ -26,3 +27,14 @@ Also note open items that were deferred rather than decided (the surviving patch
 Written to `docs/wayfinder/renderer-delivery/spec.md` and linked from the map. Closing this ticket closes the map.
 
 Where to run this: with [Decide the terminal client's implementation language and TUI stack](04-decide-client-language.md) and [Decide the terminal client's process boundary and transport](05-decide-process-boundary.md) both resolved, this ticket is AFK-able — one agent, all inputs written down. Prefer that; the spec should not need a human in the room.
+
+## Answer
+
+Written to **[spec.md](../spec.md)** — ten sections, from the nine resolved tickets. Nothing new was decided while writing it; four consistencies had to be made explicit because two tickets had each left the same thing half-stated:
+
+1. **Addresses are per-direction.** [03](03-decide-view-protocol.md)'s migration step said the event rename went "`viewportWasChanged` both ways", which would have made a bridge echo each client's size message back to every client. The spec fixes it: inbound `viewportWasChanged` (size), outbound `viewWasChanged` (payload). Ticket 03 carries the correction note.
+2. **`Viewport` assumes `origin` is wrap-aligned** — a line start or `lineStart + k*width`. That follows from [`decrementCanvasStart`](../../../../src/main/java/com/ple/visur/EditorModelCoupler.java#L354-L379), but it is an invariant the implementer must not break, so it is stated in §3.1 rather than left as an inference.
+3. **`rows` may be empty and `cursorRow` may exceed `rows.length`** — neither ticket said what a renderer does at the boundary. The spec says clamp, paint blank, never crash.
+4. **The declared `rows` excludes client chrome** — the mode line is not part of the grid a client declares, which is what made the spike subtract one.
+
+Deliberately *not* in the spec: anything deferred. The map's fog emptied before this ticket, so §10 says "nothing" and the items that remain are prerequisites (§9, five of them) or non-goals (§8) — listed rather than left implicit, so the next effort starts from a known state.
