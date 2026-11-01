@@ -1,9 +1,9 @@
 # Kilo-shaped spike: Visur in a terminal
 
 Type: prototype
-Status: in progress
+Status: closed
+Closed: 2026-10-28
 Assignee: pi (agent session, 2026-10-28)
-Blocked by: 06
 
 ## Question
 
@@ -58,3 +58,20 @@ This ticket is HITL: the question is **what felt right and what felt wrong**, an
 - What does it do on exit and on a crash?
 - Does the Rust toolchain get in the way — build step, dependency weight, debugging ergonomics?
 - Which shape does this argue for in [Decide the terminal client's shape, transport, and parity](08-decide-terminal-shape.md)?
+
+## Answer (human verdict, recorded 2026-10-28)
+
+The user ran the spike in a real terminal and reported:
+
+- **Typing is very fast — the round trip is not perceptible.** Satisfied with it as-is.
+- **`Esc` behaved.** The bug seen in a past browser session did not reproduce in the terminal. (Note: the spike has no `DISAMBIGUATE_ESCAPE_CODES`, so `Esc` is on crossterm's timeout path and still felt fine at 100×30 on a local machine. That weakens the urgency of the kitty push, but does not remove the reason to probe — a slower machine or tmux may still show it.)
+- **Scrollback and alt screen caused no trouble.** "Scrolling the window works fine" — the spike's follow-the-cursor row offset was sufficient. This is the first evidence that a row-offset viewport model (not the canvas's pixel `fy`/`canvasStart` pair) is adequate for the terminal.
+- **Exiting is clean, with no side effects, and the edits survive.** Worth stating precisely: nothing is written to disk — there is no file I/O in Visur at all — so "changes survive" means the server's in-memory model survives the client, not that the document was saved.
+- **No toolchain friction.** Build, dependencies and debugging were unremarkable.
+
+**What the spike argues for, in [Decide the terminal client's shape, transport, and parity](08-decide-terminal-shape.md)'s terms:** a *structured-payload client*, not an ANSI pipe. The client had to lay out the viewport itself (wrap, place the cursor, draw the mode line) and was fast doing it; handing that work to the server would have bought nothing and cost the canvas renderer its structure. It says nothing about transport beyond "SockJS-over-WebSocket works but demands a client ping", and the 2.6–4.4 ms measured through it is already good enough that transport choice is a *simplicity* question rather than a latency one.
+
+### Two feature gaps found while doing this (recorded on the map as next-effort work)
+
+- **Span has a key, but span is binary.** `s` pushes the span submode and a digit sets it — `s 0` gives a thin cursor, `s 1` a one-quantum block. [`SetSpanOp`](../../../../src/main/java/com/ple/visur/SetSpanOp.java) clamps any positive value to 1 (`spanToSet > 0 ? 1 : 0`), so `s 3` silently does nothing different from `s 1`. Spanning several quantums is not implementable today, contrary to the README's "Spans 0-1" being a range of *counts*.
+- **There is no way to quit.** No quit/exit operator exists anywhere; `CommandStateService.exitCommandState` only leaves the `;` command line, and that line is itself unreachable by keypress. The client owns quitting (raw mode makes `Ctrl-C` a byte), so a terminal client must bind it — but "quit the editor" as a Visur concept does not exist to bind to.
