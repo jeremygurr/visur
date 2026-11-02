@@ -74,6 +74,13 @@ order across every frame. The live-server check failed loudly the first time and
 client. It also taught the test to stop trusting the shared document's mode: it presses `Esc` at attach and asserts a
 mode line exists rather than which mode it names, because the editor model outlives a run.
 
+### Frames go to fd 1 directly
+
+`std::io::Stdout` is line-buffered, so an 18 KB full repaint left as roughly a dozen `write(2)` calls — and a frame that
+lands in pieces is a frame that can tear. Frames now go to fd 1 through an unbuffered `File`, wrapped in `ManuallyDrop`
+so dropping it does not close the terminal under the restore guard. Verified by construction rather than by machine: no
+pty check can count syscalls.
+
 ### Not done
 
 - `Cell` still carries only `ch` and `inverse`; `fg`/`bg`/`attrs` wait for `VisurColor` (the ticket names them, the

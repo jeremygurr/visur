@@ -13,6 +13,7 @@ mod zseq;
 use crossterm::event::{self, Event};
 use crossterm::terminal;
 use std::io::Write;
+use std::os::unix::io::FromRawFd;
 use std::time::{Duration, Instant};
 use zseq::{Effect, Pending};
 
@@ -36,13 +37,16 @@ fn main() {
   transport::declare(&mut socket, cols, rows.saturating_sub(1));
 
   terminal::enable_raw_mode().expect("raw mode");
-  let mut out = std::io::stdout();
+  // fd 1 unbuffered, not `std::io::Stdout`: that is line-buffered here, so an 18 KB full repaint would be written in
+  // a dozen `write(2)` calls instead of one, and a frame can then land on the terminal in pieces (spec §5.5).
+  let tty = std::mem::ManuallyDrop::new(unsafe { std::fs::File::from_raw_fd(1) });
+  let mut out = &*tty;
   out.write_all(b"\x1b[?1049h").ok(); // alternate screen: this client owns the whole terminal
   out.write_all(caps::PUSH.as_bytes()).ok(); // unambiguous `Esc`, where the terminal understands it
   out.flush().ok();
 
   // Every way out, including a panic, hands the terminal back through this guard (spec §5.5).
-  let mut restore = lifecycle::Restore::new(std::io::stdout());
+  let mut restore = lifecycle::Restore::new(&*tty);
 
   let sync_output = probe_sync_output();
   let (cols, rows) = redeclare_if_resized(&mut socket, cols, rows);
@@ -69,9 +73,9 @@ const CAPS_TIMEOUT: Duration = Duration::from_millis(60);
 /// starts and while nothing else is reading. shortcut: bytes typed inside the probe window are consumed along with the
 /// answer; upgrade by handing the leftovers to crossterm's parser once its buffer is reachable.
 fn probe_sync_output() -> caps::Sync {
-  let mut out = std::io::stdout();
-  let _ = out.write_all(caps::PROBE.as_bytes());
-  let _ = out.flush();
+  // Wrapped so dropping it does not close fd 1 under the rest of the client.
+  let tty = std::mem::ManuallyDrop::new(unsafe { std::fs::File::from_raw_fd(1) });
+  let _ = (&*tty).write_all(caps::PROBE.as_bytes());
 
   let deadline = Instant::now() + CAPS_TIMEOUT;
   let mut reply: Vec<u8> = Vec::new();
