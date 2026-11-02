@@ -96,12 +96,58 @@ impl Terminal {
 
   /// The most recent *complete* frame, with the escape sequences removed: what a person would see.
   /// Empty until a frame has finished, so an assertion never reads a half-written screen.
+  /// The screen as a terminal would show it: every frame replayed in order, so a diff paints onto what is already
+  /// there. Reading only the last frame was right while every frame was a full repaint, and became wrong the moment
+  /// the client learned to send damage.
   fn screen(&self) -> String {
+    const WIDTH: usize = 260;
+    const HEIGHT: usize = 80;
+    let mut cells = vec![vec![' '; WIDTH]; HEIGHT];
+    let (mut row, mut col) = (0, 0);
     let raw = self.raw();
-    let Some(end) = raw.rfind(FRAME_END) else { return String::new() };
-    let before = &raw[..end];
-    let start = before.rfind(FRAME_END).map_or(0, |at| at + FRAME_END.len());
-    strip(&raw[start..end])
+    let mut text = raw.chars().peekable();
+    while let Some(ch) = text.next() {
+      if ch != '\u{1b}' {
+        if ch == '\n' {
+          row = (row + 1).min(HEIGHT - 1);
+        } else if ch != '\r' {
+          if row < HEIGHT && col < WIDTH {
+            cells[row][col] = ch;
+          }
+          col += 1;
+        }
+        continue;
+      }
+      if text.next() != Some('[') {
+        continue;
+      }
+      let mut params = String::new();
+      let mut final_byte = None;
+      for code in text.by_ref() {
+        if ('@'..='~').contains(&code) {
+          final_byte = Some(code);
+          break;
+        }
+        params.push(code);
+      }
+      match final_byte {
+        Some('H') => {
+          let (r, c) = params.split_once(';').unwrap_or(("1", "1"));
+          row = r.parse::<usize>().unwrap_or(1).saturating_sub(1);
+          col = c.parse::<usize>().unwrap_or(1).saturating_sub(1);
+        }
+        // Erase to the end of the row, which is how the client clears a blank tail.
+        Some('K') => {
+          if row < HEIGHT {
+            for cell in cells[row].iter_mut().skip(col) {
+              *cell = ' ';
+            }
+          }
+        }
+        _ => {}
+      }
+    }
+    cells.iter().map(|line| line.iter().collect::<String>()).collect::<Vec<_>>().join("\n")
   }
 
   /// Where the last frame left the cursor, one-based, straight from its final `CUP`.
@@ -124,6 +170,18 @@ impl Terminal {
   fn send(&mut self, bytes: &str) {
     let _ = self.keys.write_all(bytes.as_bytes());
     let _ = self.keys.flush();
+  }
+
+  /// Every complete frame, in order. A frame ends with the cursor sequence, so that is the separator.
+  fn frames_raw(&self) -> Vec<String> {
+    let raw = String::from_utf8_lossy(self.raw().as_bytes()).to_string();
+    let mut frames = Vec::new();
+    let mut rest = raw.as_str();
+    while let Some(end) = rest.find(FRAME_END) {
+      frames.push(rest[..end + FRAME_END.len()].to_string());
+      rest = &rest[end + FRAME_END.len()..];
+    }
+    frames
   }
 
   /// How many rows the last complete frame addressed: the height the client actually painted at.
@@ -214,26 +272,6 @@ impl Drop for Terminal {
 }
 
 /// Drop the escape sequences so the result is what a person would read.
-fn strip(bytes: &str) -> String {
-  let mut out = String::with_capacity(bytes.len());
-  let mut chars = bytes.chars();
-  while let Some(ch) = chars.next() {
-    if ch != '\u{1b}' {
-      out.push(ch);
-      continue;
-    }
-    if chars.next() != Some('[') {
-      continue;
-    }
-    // CSI: parameters until a final byte in 0x40..=0x7e.
-    for code in chars.by_ref() {
-      if ('@'..='~').contains(&code) {
-        break;
-      }
-    }
-  }
-  out
-}
 
 fn server_is_up() -> bool {
   std::net::TcpStream::connect(("127.0.0.1", 8888)).is_ok()
@@ -245,6 +283,8 @@ enum Fake {
   HangUp,
   /// Stay and record what the client sends.
   Listen,
+  /// Answer each message the client sends with the next view in the list, then keep listening.
+  Script(Vec<String>),
 }
 
 /// A WebSocket server on an ephemeral port that returns `(port, frames the client sent)`. Not the real server: these
@@ -257,13 +297,20 @@ fn fake_server(behaviour: Fake) -> (u16, Arc<Mutex<Vec<String>>>) {
   std::thread::spawn(move || {
     let Ok((stream, _)) = listener.accept() else { return };
     let Ok(mut socket) = tungstenite::accept(stream) else { return };
-    if matches!(behaviour, Fake::HangUp) {
-      let _ = socket.close(None);
-      return;
-    }
+    let mut script = match behaviour {
+      Fake::HangUp => {
+        let _ = socket.close(None);
+        return;
+      }
+      Fake::Listen => Vec::new(),
+      Fake::Script(views) => views,
+    };
     while let Ok(message) = socket.read() {
       if let tungstenite::Message::Text(text) = message {
         sink.lock().unwrap().push(text.to_string());
+        if !script.is_empty() {
+          let _ = socket.send(tungstenite::Message::Text(script.remove(0).into()));
+        }
       }
     }
   });
@@ -273,6 +320,43 @@ fn fake_server(behaviour: Fake) -> (u16, Arc<Mutex<Vec<String>>>) {
 /// Endpoint for a fake server, in the form the client takes from VISUR_WS.
 fn ws_to(port: u16) -> String {
   format!("ws://127.0.0.1:{port}/ws")
+}
+
+/// A `viewWasChanged` frame with one row of text, in the shape the client parses.
+fn view(text: &str, full: bool) -> String {
+  format!(
+    r#"{{"address":"viewWasChanged","body":{{"full":{full},"origin":0,"rows":[{{"start":0,"text":"{text}"}}],"span":0,"cursorRow":0,"cursorCol":0,"cursorQuantumStart":0,"cursorQuantumEnd":0,"isAtQuantumStart":true,"cursorQuantum":"character","scopeQuantum":"character","editorMode":"navigate","editorSubmode":"navigate","isInCommandState":false,"commandStateContent":"","commandCursor":0,"searchTarget":""}}}}"#
+  )
+}
+
+#[test]
+fn a_keystroke_paints_the_row_it_changed_not_the_screen() {
+  let (port, _sent) = fake_server(Fake::Script(vec![view("hello", true), view("hellp", false)]));
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+
+  assert!(
+    terminal.wait_for(Duration::from_secs(5), |t| t.frames() >= 1),
+    "the first view never got painted"
+  );
+  // After the first paint, not before: a key typed inside the 60 ms capability probe is consumed with its answer.
+  terminal.send("x");
+  assert!(
+    terminal.wait_for(Duration::from_secs(5), |t| t.frames() >= 2),
+    "the client painted only {} frame(s)",
+    terminal.frames()
+  );
+
+  let frames = terminal.frames_raw();
+  let (first, second) = (&frames[0], &frames[1]);
+  assert!(first.contains("\x1b[2;1H"), "the first frame is a full screen");
+  assert!(
+    second.len() * 4 < first.len(),
+    "a keystroke must paint the change, not the screen: {} bytes after the edit, {} for the full frame",
+    second.len(),
+    first.len()
+  );
+  assert!(second.contains("\x1b[1;5H"), "the changed row is re-sent from the column that changed: {second:?}");
+  assert!(!second.contains("\x1b[2;1H"), "the row that did not change is not re-sent: {second:?}");
 }
 
 #[test]
@@ -414,7 +498,13 @@ fn the_client_paints_edits_searches_and_detaches() {
     "the first paint did not show a document: {:?}",
     terminal.screen()
   );
-  assert!(terminal.screen().contains("NAVIGATE MODE"), "mode line: {:?}", terminal.screen());
+  // The document is shared with every earlier run, which may have left the editor in insert mode.
+  terminal.press("\u{1b}");
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.screen().contains("MODE")),
+    "no mode line was painted: {:?}",
+    terminal.screen()
+  );
 
   // Typing is the thing with a latency bar; sample the cheapest key.
   let samples: Vec<f64> = (0..10).filter_map(|_| terminal.press("j")).collect();

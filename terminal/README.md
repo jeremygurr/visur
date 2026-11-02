@@ -14,7 +14,7 @@ ticket in [terminal-build](../docs/wayfinder/terminal-build/map.md).
 | [`src/zseq.rs`](src/zseq.rs) | 7 quit | the `Z` prefix: `ZZ` save-and-detach, `ZQ` detach, `ZD` quit |
 | [`src/protocol.rs`](src/protocol.rs) | 10 codec | the view payload, decoded, tolerant of unknown fields |
 | [`src/screen.rs`](src/screen.rs) | 4 screen model | shadow + terminal size → a grid of cells, mode line included |
-| [`src/paint.rs`](src/paint.rs) | 6 escape emitter | a grid → escape bytes, one string per frame |
+| [`src/paint.rs`](src/paint.rs) | 5 compositor, 6 escape emitter | two grids → damage as row runs, then bytes; or a full repaint |
 | [`src/transport.rs`](src/transport.rs) | 9 transport | the `/ws` socket and its bus envelopes |
 | [`src/lifecycle.rs`](src/lifecycle.rs) | 7 restore | the ordered restore, on every exit path including a panic |
 | [`src/main.rs`](src/main.rs) | 7 lifecycle + loop | raw mode, alternate screen, the capability probe, the loop |
@@ -35,8 +35,8 @@ Visur quits and raw mode turns `Ctrl-C` into an ordinary byte.
 ## Testing
 
 ```bash
-cargo test                       # 36 unit tests, four pure seams, no server needed
-cargo test --test pty            # 5 checks in a pty; 4 of them use a fake server, so no JVM either
+cargo test                       # 45 unit tests, four pure seams, no server needed
+cargo test --test pty            # 6 checks in a pty; all but one use a fake server, so no JVM either
 VISUR_E2E=1 cargo test --test pty -- --nocapture  # the fifth, against the real server
 ```
 
@@ -48,3 +48,16 @@ client and is not reset between runs. For a clean measurement, start a fresh ser
 Environment overrides, all optional: `VISUR_WS` (endpoint, default `ws://127.0.0.1:8888/ws`), `VISUR_TRACE` (log events
 and keys to stderr), `VISUR_DUMP` (write the escape stream to a file when a test's client exits), `VISUR_E2E` (run the
 check that needs a live server).
+
+## Painting
+
+Frames are damage, not screens: `paint::frame` diffs the grid against the one the terminal is already showing and sends
+the rows that changed, ending with the cursor — a keystroke costs tens of bytes instead of a screen. Only `full: true`
+on the payload, the first frame of a session, and a geometry change discard the cache.
+
+To re-measure both paths (the numbers and the verdict live in
+[ticket 06](../docs/wayfinder/terminal-build/issues/06-client-damage.md)):
+
+```bash
+cargo test --release --bin visur-term measure_both -- --ignored --nocapture
+```

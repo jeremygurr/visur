@@ -269,6 +269,7 @@ Nothing else is meaningful: a longer string misses every keymap and is silently 
   - **`SIGWINCH` is not yet being watched**, because crossterm installs its handler on the first `poll`, so a resize during the window is a signal nobody receives. The client therefore re-reads the terminal size after the probe and declares again if it moved.
 - **One `write(2)` per frame** to fd 1, bypassing `std::io::Stdout`'s line buffering.
 - Cursor style: block (inverse video) for `span == 1`, bar for `span == 0`.
+- **Frames are damage, not screens** (§5.3 components 5–6): a frame carries the rows that changed, as row runs, and ends with the cursor. Measured 2026-11-01 (ticket 06): a keystroke is 26 bytes against 3,234 for a full repaint at 100×30, and keystroke → paint through the real server fell from 5.91 ms to ~3.6 ms. A full repaint is neither the fallback nor the average case: it is `full: true`, the first frame of a session, and a geometry change.
 
 ### 5.6 What the terminal cannot have, deliberately
 

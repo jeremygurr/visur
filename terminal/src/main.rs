@@ -107,7 +107,9 @@ fn redeclare_if_resized(socket: &mut transport::Socket, cols: usize, rows: usize
 /// The loop: take the newest view, take the keys, paint what changed. Nothing here interprets the document.
 fn run(socket: &mut transport::Socket, out: &mut impl Write, mut cols: usize, mut rows: usize, sync: bool) -> i32 {
   let mut view = protocol::ViewUpdate::default();
-  let mut painted = false;
+  // The only cached state in the client, and the only thing a diff needs: what the terminal is already showing.
+  let mut shown: Option<screen::Grid> = None;
+  let mut needs_paint = true;
   let mut pending = Pending::None;
 
   loop {
@@ -117,7 +119,7 @@ fn run(socket: &mut transport::Socket, out: &mut impl Write, mut cols: usize, mu
       Taken::Gone => return SERVER_GONE,
       Taken::Views(Some(newer)) => {
         view = newer;
-        painted = false;
+        needs_paint = true;
       }
       Taken::Views(None) => {}
     }
@@ -131,17 +133,18 @@ fn run(socket: &mut transport::Socket, out: &mut impl Write, mut cols: usize, mu
           cols = new_cols as usize;
           rows = new_rows as usize;
           transport::declare(socket, cols, rows.saturating_sub(1));
-          painted = false;
+          needs_paint = true;
         } else if let Step::Finish(effect) = act(socket, &mut pending, event) {
           return finish(effect);
         }
       }
     }
 
-    if !painted {
+    if needs_paint {
       // One write per frame, and synchronized output when the terminal has it: a half-painted screen is what tearing
       // looks like (spec §5.5).
-      let frame = paint::full(&screen::compose(&view, cols, rows));
+      let grid = screen::compose(&view, cols, rows);
+      let frame = paint::frame(shown.as_ref(), &grid, view.full);
       let frame = if sync {
         format!("\x1b[?2026h{frame}\x1b[?2026l")
       } else {
@@ -149,7 +152,8 @@ fn run(socket: &mut transport::Socket, out: &mut impl Write, mut cols: usize, mu
       };
       out.write_all(frame.as_bytes()).ok();
       out.flush().ok();
-      painted = true;
+      shown = Some(grid);
+      needs_paint = false;
     }
   }
 }
