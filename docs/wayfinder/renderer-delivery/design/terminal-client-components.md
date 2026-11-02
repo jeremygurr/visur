@@ -110,7 +110,7 @@ client                                  server
   │◄──── viewWasChanged (full) ─────────┤  (forced full repaint path)
 ```
 
-Today the browser sends `canvasWasChanged` with **cells derived from a pixel canvas** ([visur.js:110-120](../../../../src/main/resources/static/visur.js#L110-L120) — it divides by `cellWidth`/`cellHeight`). A terminal has `cols` and `rows` natively, so the terminal client sends them directly and the arithmetic disappears. Whether the event keeps its name or becomes `viewportWasChanged` is 08's business.
+Today the browser sends `canvasWasChanged` with **cells derived from a pixel canvas** ([visur.js:110-120](../../../../src/main/resources/static/visur.js#L110-L120) — it divides by `cellWidth`/`cellHeight`). A terminal has `cols` and `rows` natively, so the terminal client sends them directly and the arithmetic disappears. **Settled and implemented**: it became `viewportWasChanged` with body `{cols, rows}`, content cells only ([ticket 04](../../terminal-build/issues/04-transport-and-renames.md)).
 
 Today the browser also *forces* a redraw by echoing `modelWasChanged` back at the server ([visur.js:116-119](../../../../src/main/resources/static/visur.js#L116-L119)). In this design that becomes either an explicit `redrawRequested` message or nothing at all — the client can repaint from its shadow without a round trip, which is strictly better and worth stating in the spec.
 
@@ -133,7 +133,10 @@ visur
 
 Details that matter:
 
-- **Readiness ≠ port open.** Gradle boots the JVM in a couple of seconds; the port appears before the editor model is initialised. Wait for a successful handshake (a `viewportWasChanged` that yields a `viewWasChanged`), not just a `connect`.
+- **Readiness ≠ port open** — though the server side of this was fixed on 2026-11-01: the port now opens only after
+  the bus consumers exist, so one declaration suffices and no resend loop is needed ([ticket 04](../../terminal-build/issues/04-transport-and-renames.md)).
+  The client should still treat "connected" and "ready" as different states, because a refused connection is what
+  an early client now sees.
 - **Spawn path.** Prefer the shadow/fat jar over `./gradlew run` (no Gradle daemon, no compile check, ~sub-second start); fall back to `./gradlew run` when the jar is missing or older than `src/`. Choosing which is a packaging decision that lands in the spec.
 - **Ownership on exit.** A server the launcher started is killed when the client exits; a server it found is left alone. This is the choice that stops `visur` from becoming a rogue-process factory — and it needs a spec line, because the alternative (keep it warm for the next invocation) is defensible for latency.
 - **One command means one command.** `./gradlew run` stays the answer for *starting the server alone*; `visur` is the answer for *using Visur*. Neither should require the other's knowledge.

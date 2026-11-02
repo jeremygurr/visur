@@ -2,7 +2,7 @@ package com.ple.visur;
 
 public enum BusEvent {
   //sent in js in eb.onopen, consumed by CanvasWasChangedVerticle
-  canvasWasChanged,
+  viewportWasChanged,
 
   //sent in js in keyDown event listener, consumed by KeyWasPressedVerticle
   keyWasPressed,

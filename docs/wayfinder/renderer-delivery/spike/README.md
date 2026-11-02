@@ -16,7 +16,10 @@ Build first if needed:
 cd visur-term && cargo build --release
 ```
 
-Requires the server's own `src/` to be unmodified — the spike speaks SockJS over WebSocket to the existing `/eventbus`, so **no Java change is needed**.
+It speaks plain JSON to the server's `/ws` socket ([frame shape](../spec.md)), so it needs a server that has that
+route. It originally spoke SockJS to `/eventbus`, needing no Java change at all; that was replaced when the route
+existed, because the SockJS ritual — framing, a 5 s ping, a re-sent declaration — was three browser-specific
+obligations a terminal client had no business carrying.
 
 ## What works
 
@@ -30,13 +33,13 @@ Diffing, damage regions, scrollback beyond the viewport, mouse, resize handling 
 
 ## Three things it taught us, cheaper than the spec would have
 
-1. **The SockJS session must be pinged.** The vert.x eventbus JS client sends `{"type":"ping"}` about every 5 s; without it the server reaps the session after exactly **10 s** with `c[3000,"Go away!"]`. A Rust client on this transport has to implement that, which is one concrete cost of reusing SockJS rather than a plain socket (ticket 08).
-2. **Readiness is a handshake, not an open port.** The first `canvasWasChanged` is regularly lost because the verticles are not subscribed yet when the socket opens. The spike re-sends it every 300 ms until the first view arrives.
+1. **The SockJS session must be pinged.** The vert.x eventbus JS client sends `{"type":"ping"}` about every 5 s; without it the server reaps the session after exactly **10 s** with `c[3000,"Go away!"]`. This is why SockJS was rejected for the terminal (ticket 08) and why `/ws` exists (ticket 04): on a plain socket there is no session to keep alive. *No longer applies — the spike uses `/ws`.*
+2. **Readiness is a handshake, not an open port.** The first declaration was regularly lost because the verticles are not subscribed yet when the socket opens. *Fixed at the source 2026-11-01*: the server now opens its port only after they are deployed, so the spike declares once and the 300 ms resend loop is deleted.
 3. **The client must reimplement the browser's wrapping.** `x % canvasWidth` was needed just to know where to put the cursor, because the server sent an unwrapped character array. This is the wrapping hole in [the component design](../design/terminal-client-components.md), now observed rather than predicted.
    **Superseded 2026-11-01**: this finding is *why* the protocol changed. The server now sends pre-wrapped `rows` and `cursorRow`/`cursorCol`, so the spike's `Layout` pass — the wrapping, the absolute-index table and `cursor_cell` — is deleted ([terminal-build ticket 03](../../terminal-build/issues/03-switch-payload.md)). It was the last client reimplementing the wrap.
 
 ## Files
 
-- `visur-term/src/main.rs` — the whole client: SockJS framing, view parsing, paint, key adapter
+- `visur-term/src/main.rs` — the whole client: `/ws` frames, view parsing, paint, key adapter
 - `visur` — the launcher
 - `drive.py` — pty harness used to verify it headlessly (sends keys, captures the screen, prints the latency line)

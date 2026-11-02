@@ -12,7 +12,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
   }
 
   public void handle(Message event) {
-    JsonObject keyJson = new JsonObject((String) event.body());
+    JsonObject keyJson = jsonBody(event);
     final String key = keyJson.getString("key");
     KeyPressed keyPressed = KeyPressed.from(key);
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;

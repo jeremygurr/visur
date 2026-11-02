@@ -89,7 +89,7 @@ public class EditorModelCoupler {
   }
 
   public int getCanvasEnd() {
-    int canvasHeight = getCanvasHeight() - 1; //because last line on actual canvas isn't used for content
+    int canvasHeight = getCanvasHeight(); //declared height is content rows already
     int canvasWidth = getCanvasWidth();
     int rowsAdded = 0;
     int canvasEnd = getCanvasStart();

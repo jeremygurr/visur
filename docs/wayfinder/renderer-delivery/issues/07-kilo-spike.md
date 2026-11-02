@@ -46,7 +46,7 @@ Verified in a real pty (`spike/drive.py` drives keys and captures the screen): a
 2. **Readiness is a handshake, not an open port.** The first `canvasWasChanged` is regularly lost because the verticles are not subscribed when the socket opens. The spike re-sends it every 300 ms until the first view. This is the launcher requirement in [Decide the terminal client's implementation language and TUI stack](04-decide-client-language.md), confirmed empirically.
 3. **The client must reimplement the browser's wrapping** — `x % canvasWidth` ([visur.js:167-171](../../../../src/main/resources/static/visur.js#L167-L171)) — merely to place the cursor, because the server sends an unwrapped character array. [Decide the view-update protocol and where its seam sits](03-decide-view-protocol.md) sub-question C, now observed rather than predicted.
 
-Also observed, server-side: `CanvasWasChangedVerticle.handle` prints every line of the document on every resize ([CanvasWasChangedVerticle.java:25-33](../../../../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L25-L33)) — 55 log lines per attach at 8 KB, and O(document) per resize. Harmless here; a real cost at 5 MB.
+Also observed, server-side: `CanvasWasChangedVerticle.handle` prints every line of the document on every resize ([ViewportWasChangedVerticle.java:25-33](../../../../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java#L25-L33)) — 55 log lines per attach at 8 KB, and O(document) per resize. Harmless here; a real cost at 5 MB.
 
 ### Not resolved by the above
 

@@ -100,6 +100,22 @@ A client declares the content grid it can paint.
 
 **Addresses are per-direction.** Inbound is `viewportWasChanged`; the payload stays `viewWasChanged`. They must not share a name, or a bridge would echo each client's size message back to every client.
 
+### 2.1 Frames on `/ws`
+
+The terminal's socket is a pipe to the event bus, and nothing more. A frame is the bus envelope in both
+directions — `{"address": …, "body": …}` — so the transport invents no vocabulary of its own:
+
+```jsonc
+// inbound
+{"address": "viewportWasChanged", "body": {"cols": 100, "rows": 29}}
+{"address": "keyWasPressed",      "body": {"key": "j"}}
+// outbound
+{"address": "viewWasChanged",     "body": { /* §1.2 */ }}
+```
+
+Plain JSON, no framing, no heartbeat, no session id: the socket is loopback-only and one client is attached at a
+time. The SockJS bridge at `/eventbus` carries the identical messages for the browser, with its own framing.
+
 ---
 
 ## 3. The seam
@@ -129,7 +145,7 @@ violated precondition ([terminal-build ticket 02](../terminal-build/issues/02-ex
 | [`View`](../../../src/main/java/com/ple/visur/View.java) | no longer a mutable holder of `ca`/`editorContent`; becomes the payload producer (`of`, `render`) |
 | **`Viewport`** | **new** — layout value type |
 | [`ModelWasChangedVerticle`](../../../src/main/java/com/ple/visur/ModelWasChangedVerticle.java) | loses the `View view` **field** (shared mutable state across messages on a shared event loop) and `toJson()`; becomes a pipe |
-| [`CanvasWasChangedVerticle`](../../../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java) | renamed `ViewportWasChangedVerticle`; body becomes `putViewport` → `modelWasChanged`; **the debug loop at lines 25-33 is deleted** (it prints every line of the document on every resize) |
+| [`CanvasWasChangedVerticle`](../../../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java) | renamed `ViewportWasChangedVerticle`; body becomes `putViewport` → `modelWasChanged`; **the debug loop at lines 25-33 is deleted** (it prints every line of the document on every resize) |
 | [`BusEvent`](../../../src/main/java/com/ple/visur/BusEvent.java) | `canvasWasChanged` → `viewportWasChanged`; `viewWasChanged`, `keyWasPressed`, `modelWasChanged` unchanged; comments updated |
 | [`MainVerticle`](../../../src/main/java/com/ple/visur/MainVerticle.java) | inbound permit renamed; `/ws` route added (§5.2) |
 | [`EditorModelCoupler`](../../../src/main/java/com/ple/visur/EditorModelCoupler.java) | gains `getSearchPrompt()` (replacing the `"_"` concatenation in the serializer); `getCanvasStart/End` stay as scroll logic, **not** protocol fields |
@@ -253,7 +269,11 @@ Canvas keeps what the terminal cannot express, and the spec does not try to unif
 
 - `./gradlew run` starts the **server**. Unchanged, and it must stay the answer for that.
 - The terminal client is started by the `visur` launcher: probe `127.0.0.1:8888`; if reachable, use it and leave it running on exit; if not, spawn it, own it, and shut it down on exit.
-- **Readiness is a handshake, not an open port.** Gradle's JVM opens the port before the editor model is initialised; the spike measured the first `viewportWasChanged` being lost regularly. Resend the declaration every 300 ms until the first `viewWasChanged` arrives.
+- ~~**Readiness is a handshake, not an open port.**~~ **Fixed at the source 2026-11-01.** The spike measured the
+  first `viewportWasChanged` being lost regularly, because `deployVerticle` is asynchronous and the port opened
+  before the bus consumers existed — a `send` to an address with no consumer is dropped silently. The server now
+  opens its port only after the verticles are deployed, so one declaration is enough and the 300 ms resend is
+  gone. A client that connects too early gets a refused connection, which is visible and retryable.
 - Packaging (prebuilt fat jar vs `./gradlew run`) is the launcher's choice; no binary is committed.
 
 ### 5.8 Scrolling

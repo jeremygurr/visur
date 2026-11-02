@@ -22,7 +22,7 @@ Both are answered by one artifact — a renderer-neutral view-update protocol pl
 - **Read before any ticket** — the current renderer path, in order:
   - [KeyWasPressedVerticle.java](../../../src/main/java/com/ple/visur/KeyWasPressedVerticle.java) — every key becomes `modelWasChanged`
   - [ModelWasChangedVerticle.java](../../../src/main/java/com/ple/visur/ModelWasChangedVerticle.java) — full buffer serialized per key
-  - [CanvasWasChangedVerticle.java](../../../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java) — canvas dimensions, plus a leftover debug loop
+  - [ViewportWasChangedVerticle.java](../../../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java) — was `CanvasWasChangedVerticle`: canvas dimensions and a leftover debug loop, since renamed and cleaned ([terminal-build 04](../terminal-build/issues/04-transport-and-renames.md))
   - [visur.js](../../../src/main/resources/static/visur.js) — clear whole canvas, repaint every viewport cell
   - [EditorModelCoupler.java](../../../src/main/java/com/ple/visur/EditorModelCoupler.java) — all editor state, server-side
 - **Facts already in the build, not yet used**: `vertx-shell` and `vertx-tcp-eventbus-bridge` are existing dependencies ([build.gradle.kts:30-34](../../../build.gradle.kts#L30-34)). Neither is referenced by any source file. They are the two cheapest starting points for a terminal client and for reaching the event bus without SockJS — but see the settled decision below before reaching for either.

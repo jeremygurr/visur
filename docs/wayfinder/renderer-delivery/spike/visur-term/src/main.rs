@@ -175,49 +175,32 @@ fn key_token(k: KeyEvent) -> Option<String> {
 
 // ------------------------------------------------------------------- transport
 
-fn sockjs_url() -> String {
-    let n = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos() as u64;
-    let alphabet = b"abcdefghijklmnopqrstuvwxyz0123456789";
-    let session: String = (0..8)
-        .map(|i| alphabet[((n >> (i * 3)) % 36) as usize] as char)
-        .collect();
-    format!("ws://127.0.0.1:8888/eventbus/{:03}/{}/websocket", n % 1000, session)
-}
+/// The `/ws` socket: plain JSON in, plain JSON out. No SockJS framing, no heartbeat, no session id.
+const WS_URL: &str = "ws://127.0.0.1:8888/ws";
 
-fn frame(v: Value) -> Message {
-    let arr = serde_json::to_string(&vec![v.to_string()]).unwrap();
-    Message::Text(arr.into())
-}
-
+/// Frames are the bus envelope, the same shape the server writes back.
 fn send_event(ws: &mut tungstenite::WebSocket<MaybeTlsStream<std::net::TcpStream>>, address: &str, body: Value) {
-    let body = if body.is_string() {
-        body.as_str().unwrap().to_string()
-    } else {
-        body.to_string()
-    };
-    ws.send(frame(json!({"type": "send", "address": address, "body": body}))).ok();
+    let frame = json!({ "address": address, "body": body });
+    ws.send(Message::Text(frame.to_string().into())).ok();
 }
 
 // ------------------------------------------------------------------------ main
 
 fn main() {
-    let mut ws = match connect(sockjs_url()) {
+    let mut ws = match connect(WS_URL) {
         Ok((ws, _)) => ws,
         Err(e) => {
             eprintln!("connect failed: {e}\n(is the server running? try ./gradlew run)");
             std::process::exit(1);
         }
     };
-    ws.send(frame(json!({"type": "register", "address": "viewWasChanged"}))).ok();
 
     let (cols, rows) = terminal::size().unwrap_or((100, 30));
     let (cols, rows) = (cols as usize, rows as usize);
     let content_rows = rows.saturating_sub(1).max(1);
 
-    send_event(&mut ws, "canvasWasChanged", json!({"width": cols, "height": content_rows}));
+    // Declared once. The server does not open its port until the bus consumers exist, so this cannot be lost.
+    send_event(&mut ws, "viewportWasChanged", json!({"cols": cols, "rows": content_rows}));
 
     // Blocking socket with a short read timeout: reads are resumable across
     // WouldBlock in tungstenite, but a WouldBlock mid-write is not — so writes
@@ -239,25 +222,8 @@ fn main() {
     let mut seen = 0usize;
     let mut dirty = true;
     let mut fatal: Option<String> = None;
-    let mut last_ping = Instant::now();
-    let mut last_nudge = Instant::now();
-    let mut nudges = 0u32;
 
     'outer: loop {
-        // The vert.x eventbus JS client pings every ~5s; without it the SockJS
-        // session is reaped after 10s with c[3000,"Go away!"].
-        // Readiness is a handshake, not an open port: the verticles may not be
-        // subscribed yet when we connect, so keep asking until a view arrives.
-        if seen == 0 && last_nudge.elapsed() > Duration::from_millis(300) && nudges < 60 {
-            send_event(&mut ws, "canvasWasChanged", json!({"width": cols, "height": content_rows}));
-            last_nudge = Instant::now();
-            nudges += 1;
-        }
-        if last_ping.elapsed() > Duration::from_secs(4) {
-            ws.send(frame(json!({"type": "ping"}))).ok();
-            last_ping = Instant::now();
-        }
-
         // drain everything the socket has right now
         loop {
             match ws.read() {
@@ -266,26 +232,15 @@ fn main() {
                     if std::env::var("VISUR_SPIKE_DEBUG").is_ok() {
                         eprintln!("<< {}", &text.chars().take(160).collect::<String>());
                     }
-                    // SockJS heartbeat frames ("h") need no reply; the session is
-                    // kept alive by our periodic {"type":"ping"} instead.
-                    if text == "h" {
-                        continue;
-                    }
-                    if let Some(rest) = text.strip_prefix('a') {
-                        if let Ok(items) = serde_json::from_str::<Vec<String>>(rest) {
-                            for item in items {
-                                let Ok(v) = serde_json::from_str::<Value>(&item) else { continue };
-                                if v.get("address").and_then(|a| a.as_str()) != Some("viewWasChanged") {
-                                    continue;
+                    if let Ok(v) = serde_json::from_str::<Value>(text) {
+                        if v.get("address").and_then(|a| a.as_str()) == Some("viewWasChanged") {
+                            if let Some(body) = v.get("body") {
+                                view = parse_view(body);
+                                seen += 1;
+                                if let Some(t0) = last_key.take() {
+                                    latencies.push(t0.elapsed().as_secs_f64() * 1000.0);
                                 }
-                                if let Some(body) = v.get("body") {
-                                    view = parse_view(body);
-                                    seen += 1;
-                                    if let Some(t0) = last_key.take() {
-                                        latencies.push(t0.elapsed().as_secs_f64() * 1000.0);
-                                    }
-                                    dirty = true;
-                                }
+                                dirty = true;
                             }
                         }
                     }

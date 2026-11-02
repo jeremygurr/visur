@@ -36,9 +36,6 @@ public record View(
   String searchTarget
 ) {
 
-  /** The browser's canvas carries one row of chrome, and never content, in its last row. */
-  private static final int LAST_CANVAS_ROW_IS_NOT_CONTENT = 1;
-
   /**
    * Reads the editor model and lays out what is visible.
    *
@@ -56,7 +53,7 @@ public record View(
    */
   public static View of(EditorModelCoupler emc, boolean full) {
     int origin = emc.getCanvasStart();
-    int height = Math.max(emc.getCanvasHeight() - LAST_CANVAS_ROW_IS_NOT_CONTENT, 0);
+    int height = Math.max(emc.getCanvasHeight(), 0); // declared rows are content rows: no chrome to subtract
     List<Viewport.Row> rows = Viewport.rows(emc.getEditorContent(), emc.getCanvasWidth(), origin, height);
     Viewport.Position cursor = Viewport.position(rows, cursorIndex(emc));
     return new View(

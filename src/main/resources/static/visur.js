@@ -45,11 +45,12 @@ eb.onopen = function() {
     drawModeLine()
   })
 
+  // Cells, not pixels, and content rows only: the last canvas row is chrome. The server lays out that many rows.
   let canvasInfo = {
-    width: (canvas.width - cxContentOffset) / cellWidth + 1,
-    height: (canvas.height - cyContentOffset) / cellHeight + 1
+    cols: (canvas.width - cxContentOffset) / cellWidth + 1,
+    rows: (canvas.height - cyContentOffset) / cellHeight
   };
-  eb.send("canvasWasChanged", JSON.stringify(canvasInfo));
+  eb.send("viewportWasChanged", canvasInfo);
 }
 
 function sendKeyPressedEvent(keyPressed) {
@@ -57,7 +58,7 @@ function sendKeyPressedEvent(keyPressed) {
   let keyPressedInfo = {
     key: keyPressed
   }
-  eb.send("keyWasPressed", JSON.stringify(keyPressedInfo))
+  eb.send("keyWasPressed", keyPressedInfo)
   console.log(keyPressedInfo.key + " key was pressed")
 }
 
