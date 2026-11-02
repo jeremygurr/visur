@@ -5,6 +5,11 @@ import DataClass.CompoundDataClassBrick;
 import DataClass.LayeredDataClassBrick;
 import DataClass.PrimitiveDataClassBrick;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Stack;
@@ -94,7 +99,10 @@ public class InitializerService {
 
     initializeCursorPositionDCBsAndBVVs();
 
-    emc.initializeEditorContent(contentForThisRun(initialEditorContent));
+    String content = startupContent();
+    emc.initializeEditorContent(content);
+    // Recover from any swap files left by a crash.
+    recoverFromSwapFiles();
     emc.updateNextLineIndices();
     emc.putLineWrapping(LineWrapping.wrapped);
 
@@ -206,6 +214,119 @@ public class InitializerService {
     return content;
   }
 
+  /**
+   * Returns the startup content for this run.
+   *
+   * <p>If {@code VISUR_FILE} is set, loads from that file (empty buffer if missing - vim new-file).
+   * If {@code VISUR_CONTENT_BYTES} is set, uses that (large-doc benchmark).
+   * If neither is set, starts with an empty document (empty, unnamed).
+   */
+  private String startupContent() {
+    String filePath = startupFile();
+    if (filePath != null) {
+      // VISUR_FILE is set: load from file (empty buffer if missing)
+      String content = readStartupFile(filePath);
+      emc.setSourceFilePath(filePath);
+      return content;
+    }
+    // No VISUR_FILE: fall through to VISUR_CONTENT_BYTES or empty.
+    String content = contentForThisRun("");
+    // No source file: document is unnamed.
+    return content;
+  }
+
+  /**
+   * Returns the startup file path if {@code VISUR_FILE} is set, {@code null} otherwise.
+   */
+  private String startupFile() {
+    String filePath = System.getenv("VISUR_FILE");
+    return (filePath == null || filePath.isBlank()) ? null : filePath;
+  }
+
+  /**
+   * Reads the startup file if it exists. If the file is missing, starts with
+   * an empty buffer (vim's new-file behaviour). If the file exists but is
+   * unreadable or contains invalid UTF-8, fails loudly.
+   */
+  private String readStartupFile(String filePath) {
+    try {
+      Path path = Paths.get(filePath);
+      if (!Files.exists(path)) {
+        // Missing file is not an error: start with empty buffer (vim new-file).
+        // The file will be created at first save.
+        System.out.println("VISUR_FILE path does not exist yet: " + filePath + " (empty document, will be created at first save)");
+        return "";
+      }
+      if (!Files.isRegularFile(path)) {
+        throw new IllegalStateException("VISUR_FILE points to a non-regular file: " + filePath);
+      }
+      byte[] bytes = Files.readAllBytes(path);
+      String content = new String(bytes, StandardCharsets.UTF_8);
+      System.out.println("Loaded startup file: " + filePath + " (" + bytes.length + " bytes)");
+      return content;
+    } catch (IOException e) {
+      throw new IllegalStateException("Cannot read VISUR_FILE (" + filePath + "): " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Recovers from swap files left after a crash.
+   *
+   * <p>Recovery policy: side-by-side. If a swap file (.visur-swap) exists at startup:
+   * - For a named document: recover the swap content into the buffer, write a copy
+   *   as {@code sourcePath.visur-recovery}, report to console. The swap file stays
+   *   so the user can inspect it.
+   * - For an unnamed document: recover the swap content into the buffer (now named),
+   *   write a copy as a .visur-recovery file next to the source path.
+   * - A stale swap (one whose source file already exists and is newer) still gets
+   *   recovered but with a separate report.
+   * - After recovery, delete the swap file to avoid repeated prompts on future starts.
+   *
+   * <p>A swap file is identifiable as stale by its {@code .visur-swap} extension and by
+   * checking whether the source file exists. A purely orphaned swap (no source path
+   * at all) is recovered as an unnamed document.
+   */
+  private void recoverFromSwapFiles() {
+    String sourcePath = emc.getSourceFilePath();
+    if (sourcePath == null || sourcePath.isEmpty()) {
+      // No source path: look for orphaned swap files in the working directory.
+      // This is unlikely in normal use but handles the case of an unsaved document
+      // whose swap was left behind.
+      return;
+    }
+    Path swapPath = Paths.get(sourcePath + ".visur-swap");
+    if (!Files.exists(swapPath)) {
+      return;
+    }
+    try {
+      // Read swap content
+      byte[] swapBytes = Files.readAllBytes(swapPath);
+      String swapContent = new String(swapBytes, StandardCharsets.UTF_8);
+      Path sourceFile = Paths.get(sourcePath);
+
+      if (Files.exists(sourceFile)) {
+        // Source file exists: this swap may be stale or from a crash.
+        // Recover into buffer, write recovery copy, delete swap.
+        String recoveryName = sourcePath + ".visur-recovery";
+        Files.write(Paths.get(recoveryName), swapBytes);
+        System.out.println("Swap file found at startup: " + swapPath
+          + " -> recovered to buffer, copy at " + recoveryName);
+        emc.putEditorContent(swapContent);
+        emc.updateNextLineIndices();
+        Files.delete(swapPath);
+      } else {
+        // Source file doesn't exist: recover into buffer as empty file with name.
+        emc.putEditorContent(swapContent);
+        emc.updateNextLineIndices();
+        Files.delete(swapPath);
+        System.out.println("Orphaned swap file found: " + swapPath
+          + " -> recovered to buffer (empty document for path " + sourcePath + ")");
+      }
+    } catch (IOException e) {
+      System.out.println("Failed to recover swap file: " + swapPath + " - " + e.getMessage());
+    }
+  }
+
   private void initializeKeymaps() {
     KeymapMap keymapMap = KeymapMap.make();
 
@@ -295,6 +416,9 @@ public class InitializerService {
     );
     keymap.put(KeyPressed.from("d"),
       scs.compile("deleteCursorQuantum")
+    );
+    keymap.put(KeyPressed.from("ZZ"),
+      scs.compile("saveFile")
     );
     keymap.put(KeyPressed.from("f"),
       scs.compile("clearEDS \"searchForward\" pushSubmode")

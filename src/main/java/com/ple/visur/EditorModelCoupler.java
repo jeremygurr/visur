@@ -4,6 +4,12 @@ import CursorPositionDC.EditorContentService;
 import io.vertx.rxjava3.core.shareddata.LocalMap;
 import io.vertx.rxjava3.core.shareddata.SharedData;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.StandardOpenOption;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Stack;
 
@@ -12,6 +18,11 @@ import static com.ple.visur.EditorModelKey.*;
 public class EditorModelCoupler {
 
   LocalMap<EditorModelKey, Object> editorModel;
+  // Simple time-based debounce for swap file writes: only write if last write was > 500ms ago.
+  // Chosen because writing a few KB to a local filesystem takes microseconds; 500ms is cheap
+  // enough to avoid noticeable keystroke latency while keeping the swap fresh.
+  private volatile long lastSwapWriteTime = 0;
+  private static final long SWAP_DEBOUNCE_MS = 500;
   private EditorContentService ecs = ServiceHolder.editorContentService;
 
   private EditorModelCoupler(SharedData sharedData) {
@@ -195,6 +206,34 @@ public class EditorModelCoupler {
 
   public void putEditorContent(String content) {
     ecs.putEditorContent(content, editorModel);
+    writeSwapFileDebounced(content);
+  }
+
+  /**
+   * Writes the swap file for the current source path, debounced by 500ms.
+   *
+   * <p>Chosen hook: every call to {@code putEditorContent}. This covers all content changes
+   * (startup load, save, loadFile, edits) in a single place. The 500ms debounce prevents
+   * excessive I/O on rapid edits while keeping the swap reasonably fresh.
+   */
+  private void writeSwapFileDebounced(String content) {
+    String sourcePath = getSourceFilePath();
+    if (sourcePath == null || sourcePath.isEmpty()) {
+      return;
+    }
+    long now = System.currentTimeMillis();
+    if (now - lastSwapWriteTime < SWAP_DEBOUNCE_MS) {
+      return; // debounce: not enough time since last write
+    }
+    lastSwapWriteTime = now;
+    try {
+      Path swapPath = Paths.get(sourcePath + ".visur-swap");
+      Files.write(swapPath, content.getBytes(StandardCharsets.UTF_8),
+        StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+    } catch (IOException e) {
+      // Non-fatal: if swap write fails, the document is still correct.
+      System.out.println("Swap write failed: " + e.getMessage());
+    }
   }
 
   public void putGlobalVar(String globalVarName, VisurVar globalVarValue) {
@@ -394,4 +433,16 @@ public class EditorModelCoupler {
     System.out.println(message);
   }
 
+  public String getSourceFilePath() {
+    Object val = editorModel.get(sourceFilePath);
+    return val == null ? null : (String) val;
+  }
+
+  public void setSourceFilePath(String path) {
+    if (path == null) {
+      editorModel.remove(sourceFilePath);
+    } else {
+      editorModel.put(sourceFilePath, path);
+    }
+  }
 }
