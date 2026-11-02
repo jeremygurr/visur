@@ -23,13 +23,13 @@
     lesson, you should be able to
     <strong>describe what this project is</strong>, <strong>explain its high-level
     architecture</strong>, <strong>build it</strong>, and <strong>run it</strong> so
-    that a browser connects to it and renders an editable canvas. Everything else in
+    that a browser can render an editable canvas, and how the Rust terminal client connects. Everything else in
     this course will build on this foundation.
   </p>
 
   <div class="callout">
-    <strong>Goal this lesson:</strong> Understand what Visur is, how its three server
-    verticles communicate with a browser, and how to get it running on your machine.
+    <strong>Goal this lesson:</strong> Understand the three server verticles, the
+    browser and terminal renderers, and how to get Visur running on your machine.
   </div>
 
   <hr class="divider">
@@ -39,15 +39,14 @@
   <p>
     Visur is a <strong>Vim-inspired text editor</strong> built as a
     <strong>Vert.x event-driven application</strong>. In plain English: it is a
-    server-side Java program that listens for keyboard input from a web browser,
-    edits an in-memory text document, and pushes the result back to the browser over
-    a SockJS/WebSocket connection—a bidirectional, low-latency protocol that keeps
-    an open connection between browser and server. The drawing happens in the
-    browser using the HTML5 Canvas API—there is no DOM-based editing, no
-    contenteditable, no HTML input fields. The document state—content, cursor,
-    mode, and which slice of the document is visible—is computed on the server; the
-    browser only paints glyphs at coordinates its own canvas code derives from that
-    state (see <a href="../src/main/resources/static/visur.js#L136-173">visur.js</a>).
+    server-side Java program that edits an in-memory text document and publishes
+    a viewport-bounded view to its renderers. The browser uses the SockJS bridge
+    at <code>/eventbus</code> and paints on an HTML5 canvas; the Rust terminal
+    client in <a href="../terminal/README.md">terminal/</a> uses a plain loopback
+    WebSocket at <code>/ws</code>. Both receive server-laid-out rows and projected
+    cursor coordinates; neither owns editor state or wraps the document
+    (<a href="../src/main/resources/static/visur.js">visur.js</a>,
+    <a href="../src/main/java/com/ple/visur/Viewport.java">Viewport.java</a>).
     Editor state lives only in memory, in a Vert.x <code>LocalMap</code>: nothing is
     persisted, so “event-sourced” in the project notes means “state mutated by
     events”, not an event log you could replay.
@@ -129,8 +128,9 @@
   </p>
 
   <p>
-    Visur deploys exactly <strong>three verticles</strong>, each responsible for a
-    distinct concern:
+    The server deploys <strong>three verticles</strong> for key handling,
+    viewport declarations, and view publication. Two renderer clients consume
+    their published views: the browser canvas and the Rust terminal client.
   </p>
 
   <figure>
@@ -150,27 +150,20 @@ keydown
                                         │ reads EditorModelCoupler
                                         │ send viewWasChanged
 viewWasChanged ◄────────────────────────┘
-  └─ drawCanvas() repaints text + cursor
+  └─ drawView() paints rows + cursor
 
-canvas measured once, on page load
-  └─ send canvasWasChanged ─────────► CanvasWasChangedVerticle
+viewport change (cells, from either renderer)
+  └─ send viewportWasChanged ─────────► ViewportWasChangedVerticle
                                         │ putCanvasWidth / putCanvasHeight
-                                        │ send modelWasChanged ──► (as above)
+                                        │ modelWasChanged {full:true} ──► (as above)
     </pre>
-    <figcaption>Figure 1: The three verticles and the four event bus addresses
- they use. <code>KeyWasPressedVerticle</code> does all editing;
- <code>ModelWasChangedVerticle</code> turns the shared model into a View and sends
- it to the browser; <code>CanvasWasChangedVerticle</code> stores the viewport size
- and then re-triggers <code>ModelWasChangedVerticle</code>. Note the asymmetry:
- only the canvas verticle re-sends <code>modelWasChanged</code>; the model verticle
- answers with <code>viewWasChanged</code>, never with another
- <code>modelWasChanged</code>.</figcaption>
+    <figcaption>Figure 1: Three server verticles and two renderer clients. The key verticle edits state, the viewport verticle stores a cell grid and triggers a full update, and the model verticle projects a view and publishes it to browser and terminal renderers.</figcaption>
   </figure>
 
   <h3 id="verticle-1">Verticle 1: <code>KeyWasPressedVerticle</code> — The Editor's Brain</h3>
 
   <p>
-    This verticle receives keyboard events from the browser on the event bus
+    This verticle receives key events from either renderer on the event bus
     address <code>"keyWasPressed"</code>. Its job is to interpret the keystroke
     and mutate the editor model. The source is
     <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>.
@@ -230,17 +223,12 @@ handle(Message event) {
     <li>Reads the current editor state from the
       <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler</a>
       (the shared state hub).</li>
-    <li>Builds a <a href="../src/main/java/com/ple/visur/View.java">View</a>
-      object—which holds only two fields, <code>ca</code> and
-      <code>editorContent</code>—then fills in the rest of the JSON directly from
-      the coupler in
-      <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L24-52">toJson()</a>:
-      span, canvasStart, canvasEnd, cursorQuantumStart/End, editorMode,
-      editorSubmode, cursorQuantum, scopeQuantum, isAtQuantumStart,
-      isInCommandState, commandStateContent, commandCursor, plus
-      <code>searchTarget</code> (only while in a search submode).</li>
-    <li>Sends that JSON on the event bus address <code>"viewWasChanged"</code>
-      (<a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L18-22">handleChange()</a>).</li>
+    <li>Projects a <a href="../src/main/java/com/ple/visur/View.java">View</a>
+      record from the coupler; <a href="../src/main/java/com/ple/visur/Viewport.java">Viewport</a>
+      supplies pre-wrapped rows, row origins and cursor row/column. The 17-field
+      payload always includes <code>searchTarget</code> (empty when not searching).</li>
+    <li>Publishes the complete JSON on <code>viewWasChanged</code> to all
+      attached renderers.</li>
   </ol>
 
   <p>
@@ -249,45 +237,34 @@ handle(Message event) {
     the footer.
   </p>
 
-  <h3 id="verticle-3">Verticle 3: <code>CanvasWasChangedVerticle</code> — The Viewport Manager</h3>
+  <h3 id="verticle-3">Verticle 3: <code>ViewportWasChangedVerticle</code> — The Viewport Manager</h3>
 
   <p>
-    This verticle listens on <code>"canvasWasChanged"</code>. The browser sends the
-    canvas width and height <em>once</em>, right after it connects (there is no
-    resize listener—more on that below). It:
+    This verticle listens on <code>"viewportWasChanged"</code>. Browser and
+    terminal clients send their available grid as cell-valued <code>{cols,rows}</code>.
+    The browser updates its declaration on resize; the terminal declares again
+    after a terminal resize. It:
   </p>
 
   <ol>
     <li>Stores the canvas dimensions in the
       <code>EditorModelCoupler</code>
-      (<a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L15-21">source</a>).</li>
-    <li>Prints a debug listing of the document's lines. Careful: that loop indexes
-      the newline list with <code>cy</code> (the cursor's line) instead of the loop
-      counter, so it logs the cursor's line N times rather than logging every line
-      (<a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L22-33">source</a>).</li>
-    <li>Posts <code>modelWasChanged</code> so the ModelWasChangedVerticle sends a
-      fresh View that carries the new dimensions
-      (<a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L34">source</a>).</li>
+      (<a href="../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java#L15-21">source</a>).</li>
+    <li>Triggers <code>modelWasChanged</code> with <code>full:true</code>, so
+      the renderers receive a fresh viewport and discard cached rows.</li>
   </ol>
 
   <p>
-    What it does <em>not</em> do is compute the visible region: it never touches
-    <code>canvasStart</code>. <code>canvasStart</code> is maintained by the coupler's
-    scrolling helpers
-    (<a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L230-232">putCanvasStart</a>,
-    <code>incrementCanvasStart</code>/<code>decrementCanvasStart</code>), while
-    <code>canvasEnd</code> is derived on demand from canvas width/height, the
-    newline list and the first visible line <code>fy</code>
-    (<a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L91-109">getCanvasEnd()</a>).
+    The handler stores dimensions; layout belongs to the pure
+    <a href="../src/main/java/com/ple/visur/Viewport.java">Viewport</a> class.
+    Its rows carry absolute origins, and <code>canvasStart</code>/<code>canvasEnd</code>
+    are no longer fields in the renderer payload.
   </p>
 
   <p>
-    One real limitation: because <code>canvasWasChanged</code> is sent only inside
-    <code>eb.onopen</code>
-    (<a href="../src/main/resources/static/visur.js#L120">visur.js</a>), resizing
-    the browser window does not update the server's notion of the viewport. The
-    canvas element itself grows or shrinks, but the server keeps describing the old
-    rectangle until the page is reloaded.
+    The browser declares its viewport in cells and updates it when the canvas
+    viewport changes. The terminal uses native cell dimensions and reports
+    <code>SIGWINCH</code> changes. In both cases the server recomputes the rows.
   </p>
 
   <hr class="divider">
@@ -314,16 +291,16 @@ MainVerticle.start()
   ├── 2. vertx.deployVerticle(new KeyWasPressedVerticle())
   │       └── Listens on event bus address "keyWasPressed"
   │
-  ├── 3. vertx.deployVerticle(new CanvasWasChangedVerticle())
-  │       └── Listens on event bus address "canvasWasChanged"
+  ├── 3. vertx.deployVerticle(new ViewportWasChangedVerticle())
+  │       └── Listens on event bus address "viewportWasChanged"
   │
   ├── 4. vertx.deployVerticle(new ModelWasChangedVerticle())
   │       └── Listens on event bus address "modelWasChanged"
   │
-  ├── 5. Build Router + SockJSBridgeOptions (permission rules)
-  │       └── Allows browser to send:    keyWasPressed, canvasWasChanged,
-  │                                      modelWasChanged
-  │       └── Allows browser to receive: modelWasChanged, viewWasChanged
+  ├── 5. Build Router + SockJS bridge permissions and /ws terminal route
+  │       └── Allows browser to send:    keyWasPressed, viewportWasChanged
+  │       └── Allows browser to receive: viewWasChanged
+  │       └── /ws accepts loopback terminal bus-envelope frames
   │
   ├── 6. Route /static/* → serve static files (HTML, CSS, JS)
   │
@@ -408,10 +385,10 @@ MainVerticle.start()
     </thead>
     <tbody>
       <tr>
-        <td><code>"canvasWasChanged"</code></td>
-        <td>Browser → Server</td>
-        <td>Browser JS (once, on connect—not on resize)</td>
-        <td><code>CanvasWasChangedVerticle</code></td>
+        <td><code>"viewportWasChanged"</code></td>
+        <td>Renderer → Server</td>
+        <td>Browser or terminal on viewport change, with <code>{cols,rows}</code> in cells</td>
+        <td><code>ViewportWasChangedVerticle</code></td>
       </tr>
       <tr>
         <td><code>"keyWasPressed"</code></td>
@@ -421,17 +398,15 @@ MainVerticle.start()
       </tr>
       <tr>
         <td><code>"modelWasChanged"</code></td>
-        <td>Browser → Server (and permitted Server → Browser)</td>
-        <td>Browser JS (echo sent from <code>eb.onopen</code>, after
-          <code>canvasWasChanged</code>), <code>KeyWasPressedVerticle</code>,
-          <code>CanvasWasChangedVerticle</code></td>
+        <td>Internal trigger</td>
+        <td><code>KeyWasPressedVerticle</code> and <code>ViewportWasChangedVerticle</code></td>
         <td><code>ModelWasChangedVerticle</code></td>
       </tr>
       <tr>
         <td><code>"viewWasChanged"</code></td>
-        <td>Server → Browser</td>
-        <td><code>ModelWasChangedVerticle</code></td>
-        <td>Browser JS (sockJS on <code>viewWasChanged</code>)</td>
+        <td>Server → attached renderers</td>
+        <td><code>ModelWasChangedVerticle</code> publishes</td>
+        <td>Browser canvas and Rust terminal</td>
       </tr>
     </tbody>
   </table>
@@ -445,20 +420,14 @@ MainVerticle.start()
     <pre class="diagram">
 Inbound  (browser → server):  Outbound  (server → browser):
 ────────────────────────────  ─────────────────────────────
-keyWasPressed                 modelWasChanged
-canvasWasChanged              viewWasChanged
-modelWasChanged
+keyWasPressed                 viewWasChanged
+viewportWasChanged
     </pre>
-    <figcaption>Figure 4: Explicit permission rules on the SockJS bridge.
- Notice that the browser can only <em>send</em> three specific addresses—key
- events, canvas dimensions, and the <code>modelWasChanged</code> nudge that asks
- for a redraw. It cannot send arbitrary messages, and it can only <em>receive</em>
- model changes and view updates. This is a deliberate security design—a wildcard
- or open bridge would let a malicious page read or write arbitrary server state.
- The <code>modelWasChanged</code> address appears on both sides because the
- browser echoes it back after sending <code>canvasWasChanged</code>, which is how
- the very first frame gets drawn (the two sends are ordered, so
- <code>getCanvasWidth</code> is never read before <code>putCanvasWidth</code> ran).</figcaption>
+    <figcaption>Figure 4: The browser SockJS bridge permits only key and viewport
+ input and view output. <code>modelWasChanged</code> is internal and not bridge
+ permission: a viewport handler triggers it, and the model verticle publishes
+ the resulting view. The terminal sends the same inbound addresses over its
+ loopback <code>/ws</code> transport.</figcaption>
   </figure>
 
   <hr class="divider">
@@ -576,9 +545,9 @@ modelWasChanged
   │  (Listens on "modelWasChanged")                      │  │
   │                                                     │  │
   │  1. Read EditorModelCoupler for all state            │  │
-  │  2. Build View object (content, cursor, mode, etc.)  │  │
-  │  3. Serialize to JSON                               │  │
-  │  4. bus.send("viewWasChanged", JSON)                │  │
+  │  2. View.of(emc) projects the current editor state  │  │
+  │     Viewport lays out bounded rows and cursor cell  │  │
+  │  3. ModelWasChangedVerticle publishes the full view  │  │
   └─────────────────────────────────────────────────────┘  │
                                                              │
          │                                                 │
@@ -589,15 +558,15 @@ modelWasChanged
   │  eb.on("viewWasChanged", response) ─────────────────┘  │
   │         │                                           │
   │         ▼                                           │
-  │  drawCanvas(response)                               │
+  │  drawView()                               │
   │    └── redraws text on canvas                       │
   │    └── repositions cursor                           │
   │    └── updates mode/submode/status text             │
   └─────────────────────────────────────────────────────┘
     </pre>
-    <figcaption>Figure 5: The complete request loop—from keystroke to canvas
- redraw. Five steps, crossing the network boundary exactly twice (send
- keystroke, receive view). Every single keypress triggers this entire cycle.</figcaption>
+    <figcaption>Figure 5: The browser path from keydown to canvas repaint. The
+ same published view also reaches the Rust terminal client. The server lays out
+ bounded rows and cursor coordinates before either renderer paints.</figcaption>
   </figure>
 
   <hr class="divider">
@@ -703,14 +672,16 @@ modelWasChanged
   <ul>
     <li><strong>What is Visur?</strong> A Vim-inspired text editor running as
       a server, with the browser as a thin rendering terminal.</li>
-    <li><strong>How many verticles are there?</strong> Three:
-      KeyWasPressedVerticle (editing logic), ModelWasChangedVerticle (view
-      building), CanvasWasChangedVerticle (viewport size + redraw trigger).</li>
+    <li><strong>What does the server deploy?</strong> Three verticles:
+      KeyWasPressedVerticle (editing), ViewportWasChangedVerticle (grid
+      declaration), and ModelWasChangedVerticle (view projection/publication).
+      The browser and Rust terminal are two renderers.</li>
     <li><strong>How does the browser communicate with the server?</strong> Through
       Vert.x's SockJS bridge (WebSocket transport, HTTP fallbacks) at
-      <code>/eventbus</code>, using four event bus addresses. The bridge permits
-      three inbound addresses (keyWasPressed, canvasWasChanged, modelWasChanged) and
-      two outbound (modelWasChanged, viewWasChanged).</li>
+      <code>/eventbus</code>, using the shared renderer protocol. It permits
+      inbound <code>keyWasPressed</code> and <code>viewportWasChanged</code>,
+      and outbound <code>viewWasChanged</code>; the terminal sends the same
+      messages over loopback WebSocket at <code>/ws</code>.</li>
     <li><strong>What is the single source of truth for editor state?</strong> The
       <code>EditorModelCoupler</code>, a shared
       <code>LocalMap&lt;EditorModelKey, Object&gt;</code> that also contains a
@@ -719,8 +690,8 @@ modelWasChanged
     <li><strong>How do you build and run it?</strong> <code>./gradlew run</code>
       (or <code>./gradlew shadowJar</code> then
       <code>java -jar build/libs/visur-1.0.0-SNAPSHOT-fat.jar run com.ple.visur.MainVerticle</code>).</li>
-    <li><strong>What is the request loop?</strong> Browser sends keystroke → server
-      mutates state → server sends View JSON → browser redraws canvas.</li>
+    <li><strong>What is the request loop?</strong> A renderer sends a key → server mutates state → server publishes a complete
+      viewport view → attached renderers paint their own screens.</li>
   </ul>
 
   <hr class="divider">
@@ -762,7 +733,7 @@ modelWasChanged
       <a href="../src/main/java/com/ple/visur/AbstractVisurVerticle.java">AbstractVisurVerticle.java</a>,
       <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>,
       <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>,
-      <a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java">CanvasWasChangedVerticle.java</a>,
+      <a href="../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java">ViewportWasChangedVerticle.java</a>,
       <a href="../src/main/java/com/ple/visur/ServiceHolder.java">ServiceHolder.java</a>,
       <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler.java</a>,
       <a href="../src/main/java/com/ple/visur/BusEvent.java">BusEvent.java</a>,

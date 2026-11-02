@@ -526,42 +526,42 @@ if (word instanceof RecallWord) {
 
   <hr class="divider">
 
-  <h2 id="browser">7. What the Browser Sees: Nothing Directly</h2>
+  <h2 id="browser">7. What the Renderers See: Nothing Directly</h2>
 
   <p>
     The itinerary says "how the frontend reads and displays global state". It
     does not. A search of <code>visur.js</code> for
     <code>variable</code>/<code>VariableMap</code>/<code>global</code> returns
-    nothing, and the <code>View</code> class carries only
-    <code>ca</code> and <code>editorContent</code>. Variables reach the browser
-    only as <em>copied fields</em> of the snapshot:
+    nothing. The <code>View</code> record projects only the fields needed by
+    renderers; it does not carry the map. Variables reach the browser
+    only as <em>projected fields</em> of the viewport snapshot:
   </p>
 
   <table>
     <thead>
-      <tr><th>Snapshot field</th><th>Line in <code>toJson()</code></th><th>Comes from variable</th></tr>
+      <tr><th>Snapshot field</th><th>Projection</th><th>Comes from variable</th></tr>
     </thead>
     <tbody>
-      <tr><td><code>ca</code></td><td>27</td><td><code>ca</code> (via <code>View</code>)</td></tr>
-      <tr><td><code>span</code></td><td>29</td><td><code>span</code></td></tr>
-      <tr><td><code>cursorQuantum</code></td><td>36</td><td><code>cursorQuantum.getName()</code></td></tr>
-      <tr><td><code>scopeQuantum</code></td><td>37</td><td><code>scopeQuantum.getName()</code></td></tr>
-      <tr><td><code>searchTarget</code> <span class="annotation">(conditional)</span></td><td>49</td><td>peek of the stack, seeded by <code>previousSearchTarget</code></td></tr>
+      <tr><td><code>span</code></td><td><code>View.render()</code></td><td><code>span</code></td></tr>
+      <tr><td><code>cursorQuantum</code></td><td><code>View.render()</code></td><td><code>cursorQuantum.getName()</code></td></tr>
+      <tr><td><code>scopeQuantum</code></td><td><code>View.render()</code></td><td><code>scopeQuantum.getName()</code></td></tr>
+      <tr><td><code>searchTarget</code> (always present)</td><td><code>View.render()</code></td><td>prompt or empty string</td></tr>
+      <tr><td><code>rows</code>, cursor position</td><td><code>Viewport</code> / <code>View.of</code></td><td>pre-wrapped rows and <code>cursorRow</code>/<code>cursorCol</code></td></tr>
     </tbody>
   </table>
 
   <p class="source-ref">
-    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L24-52">ModelWasChangedVerticle.toJson():24–52</a> ·
-    <a href="../src/main/java/com/ple/visur/View.java#L3-6">View.java:3–6</a> ·
+    <a href="../src/main/java/com/ple/visur/View.java">View.of/render</a> ·
+    <a href="../src/main/java/com/ple/visur/Viewport.java">Viewport row layout</a> ·
+    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle publication</a> ·
     <a href="../src/main/resources/static/visur.js">visur.js</a> (no variable references).
   </p>
 
   <p>
-    The map is a <em>server-side implementation detail</em>. The client never
-    sees a name, only the resolved value it needs to draw. This is why adding a
-    variable is safe from the client's point of view — but it also means a
-    variable that nothing copies into <code>toJson()</code> is invisible to the
-    user.
+    The map is a <em>server-side implementation detail</em>. Renderers never
+    see the map itself, only values projected into the shared view protocol. The
+    protocol contains no <code>ca</code> or <code>editorContent</code>; it carries
+    bounded <code>rows</code> and the state needed to render them.
   </p>
 
   <hr class="divider">
@@ -596,8 +596,8 @@ if (word instanceof RecallWord) {
       </tr>
       <tr>
         <td>"How the frontend reads and displays global state"</td>
-        <td>It does not. Five snapshot fields are <em>copied</em> from
-          variables in <code>toJson()</code>; the map itself never crosses the
+        <td>It does not. The payload projects selected values from
+          variables in the view projection; the map itself never crosses the
           wire.</td>
       </tr>
       <tr>
@@ -824,7 +824,7 @@ if (word instanceof RecallWord) {
           "It is written into editorContent as an inline annotation"
         ],
         "answer": 0,
-        "explain": "Neither View nor the wire carries the map. ModelWasChangedVerticle.toJson copies span, cursorQuantum, scopeQuantum, and ca into the payload; everything else stays server-side."
+        "explain": "Neither View nor the wire carries the map. View.of projects needed state and Viewport supplies bounded rows; the variable map stays server-side."
       },
       {
         "q": "When does RecallWord compile to a real operator?",
@@ -908,7 +908,7 @@ if (word instanceof RecallWord) {
     <li><strong><code>nl</code> is the bridge to the coordinate system.</strong>
       One read-only brick, computed on every content write, shared by both
       decompositions.</li>
-    <li><strong>The browser never sees the map.</strong> Five snapshot fields
+    <li><strong>Renderers never see the map.</strong> The payload
       are copied from variables; the names stay on the server.</li>
   </ul>
 
@@ -934,7 +934,7 @@ if (word instanceof RecallWord) {
     A natural next project, straight from the mission: <strong>add a variable
     and watch it travel</strong>. Pick a value the editor already computes,
     expose it as a global variable via <code>emc.putGlobalVar</code>, copy it
-    into <code>ModelWasChangedVerticle.toJson()</code>, and render it in the
+    into <code>View</code>'s renderer payload, and render it in the
     footer. If you can do that without guessing where each step goes, the
     mission's "add a word, operator, or quantum by following existing patterns"
     goal is within reach.

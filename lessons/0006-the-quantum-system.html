@@ -666,21 +666,21 @@ if(bounds[0] == bounds[1] || spanToSet == 0) emc.putSpan(0); else emc.putSpan(1)
   </figure>
 
   <p>
-    <code>ModelWasChangedVerticle</code> ships all three roles to the browser,
-    which is how the UI can both highlight a region and print the scope in the
-    search prompt:
+    <code>View.of</code> projects these roles into the shared view payload for
+    both renderers. The canvas and terminal can highlight a region and display
+    the scope in the search prompt without receiving the global variable map:
   </p>
 
   <figure>
     <pre class="diagram">
-// ModelWasChangedVerticle.java:26-38 (abridged)
-output.put("span", emc.getSpan());
-output.put("cursorQuantumStart", emc.getCursorQuantumStart());
-output.put("cursorQuantumEnd",   emc.getCursorQuantumEnd());
-output.put("cursorQuantum", emc.getCursorQuantum().getName());
-output.put("scopeQuantum",  emc.getScopeQuantum().getName());
+// View.java: of(emc) projects these fields into the shared payload
+span = emc.getSpan();
+cursorQuantumStart = emc.getCursorQuantumStart();
+cursorQuantumEnd = emc.getCursorQuantumEnd();
+cursorQuantum = emc.getCursorQuantum().getName();
+scopeQuantum = emc.getScopeQuantum().getName();
     </pre>
-    <figcaption><a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L26-38">ModelWasChangedVerticle.java:26–38</a>.
+    <figcaption><a href="../src/main/java/com/ple/visur/View.java">View.java</a>.
  The status bar prints <code>scopeQuantum.toUpperCase()</code> while searching
  (<a href="../src/main/resources/static/visur.js#L96-105">visur.js:96–105</a>) and
  <code>SPAN = n</code> otherwise.</figcaption>
