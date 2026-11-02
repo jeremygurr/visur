@@ -62,6 +62,12 @@ public class NativeOpWord implements Word {
         case "deleteCursorQuantum":
           op = new DeleteCursorQuantumOp();
           break;
+        case "yankSpan":
+          op = new YankSpanOp();
+          break;
+        case "pasteYankRegister":
+          op = new PasteYankRegisterOp();
+          break;
         case "replaceChar":
           op = new ReplaceCharOp();
           break;

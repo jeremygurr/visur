@@ -420,6 +420,8 @@ public class InitializerService {
     keymap.put(KeyPressed.from("ZZ"),
       scs.compile("saveFile")
     );
+    keymap.put(KeyPressed.from("y"), scs.compile("yankSpan"));
+    keymap.put(KeyPressed.from("p"), scs.compile("pasteYankRegister"));
     keymap.put(KeyPressed.from("f"),
       scs.compile("clearEDS \"searchForward\" pushSubmode")
     );

@@ -40,8 +40,12 @@ public class MainVerticle extends AbstractVerticle {
       .flatMap(ignored -> vertx.deployVerticle(new ViewportWasChangedVerticle()))
       .flatMap(ignored -> vertx.deployVerticle(new ModelWasChangedVerticle()))
       .subscribe(
-        ignored -> vertx.createHttpServer().requestHandler(router()).listen(8888),
+        ignored -> vertx.createHttpServer().requestHandler(router()).listen(serverPort()),
         error -> LOGGER.error("could not deploy the verticles", error));
+  }
+
+  private static int serverPort() {
+    return Integer.parseInt(System.getenv().getOrDefault("VISUR_PORT", "8888"));
   }
 
   private Router router() {
@@ -49,6 +53,7 @@ public class MainVerticle extends AbstractVerticle {
 
     SockJSBridgeOptions opts = new SockJSBridgeOptions()
       .addInboundPermitted(new PermittedOptions().setAddress(BusEvent.keyWasPressed.name()))
+      .addInboundPermitted(new PermittedOptions().setAddress(BusEvent.pasteWasReceived.name()))
       .addInboundPermitted(new PermittedOptions().setAddress(BusEvent.viewportWasChanged.name()))
       .addOutboundPermitted(new PermittedOptions().setAddress(BusEvent.viewWasChanged.name()));
 

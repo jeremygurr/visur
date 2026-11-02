@@ -59,6 +59,10 @@ pub fn send_key(socket: &mut Socket, token: &str) {
   send(socket, "keyWasPressed", json!({ "key": token }));
 }
 
+pub fn send_paste(socket: &mut Socket, text: &str) {
+  send(socket, "pasteWasReceived", json!({ "text": text }));
+}
+
 /// Whatever the socket has right now, one frame at a time.
 pub fn next(socket: &mut Socket) -> Incoming {
   match socket.read() {

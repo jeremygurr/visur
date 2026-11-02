@@ -10,7 +10,7 @@ use std::io::Write;
 /// Ordered, as the spec requires: attributes, synchronized output off, the cursor, the keyboard flags, the alternate
 /// screen, and raw mode last (spec §5.5). Assembled from `caps` so the pop can never drift from the push.
 pub fn restore_sequence() -> String {
-  ["\x1b[0m\x1b[?2026l\x1b[?25h", crate::caps::POP, "\x1b[?1049l"].concat()
+  ["\x1b[0m\x1b[?2026l\x1b[?25h\x1b[?2004l", crate::caps::POP, "\x1b[?1049l"].concat()
 }
 
 pub struct Restore<W: Write> {
@@ -75,10 +75,11 @@ mod tests {
     let text = written(&shared);
     let sync = text.find("\x1b[?2026l").expect("synchronized output must be turned off first");
     let cursor = text.find("\x1b[?25h").expect("the cursor must be made visible again");
+    let paste = text.find("\x1b[?2004l").expect("bracketed paste must be disabled");
     let flags = text.find("\x1b[<u").expect("the keyboard flags must be popped");
     let screen = text.find("\x1b[?1049l").expect("the alternate screen must be left");
     assert!(
-      sync < cursor && cursor < flags && flags < screen,
+      sync < cursor && cursor < paste && paste < flags && flags < screen,
       "spec §5.5 order is ?2026l, ?25h, pop flags, ?1049l: {text:?}"
     );
   }

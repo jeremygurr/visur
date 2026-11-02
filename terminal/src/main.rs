@@ -41,7 +41,7 @@ fn main() {
   // a dozen `write(2)` calls instead of one, and a frame can then land on the terminal in pieces (spec §5.5).
   let tty = std::mem::ManuallyDrop::new(unsafe { std::fs::File::from_raw_fd(1) });
   let mut out = &*tty;
-  out.write_all(b"\x1b[?1049h").ok(); // alternate screen: this client owns the whole terminal
+  out.write_all(b"\x1b[?1049h\x1b[?2004h").ok(); // alternate screen and bracketed paste
   out.write_all(caps::PUSH.as_bytes()).ok(); // unambiguous `Esc`, where the terminal understands it
   out.flush().ok();
 
@@ -173,6 +173,13 @@ fn act(socket: &mut transport::Socket, pending: &mut Pending, event: Event) -> S
   if trace {
     eprintln!("\r\ntrace: event {:?}", event);
   }
+  let event = match event {
+    Event::Paste(text) => {
+      transport::send_paste(socket, &text);
+      return Step::Continue;
+    }
+    other => other,
+  };
   let Some(token) = keys::action(event) else { return Step::Continue };
   if trace {
     eprintln!("\r\ntrace: token {token:?}");
