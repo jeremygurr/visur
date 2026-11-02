@@ -8,15 +8,16 @@ from the source in order to hold the whole system in their head and turn it into
 a durable training course for other Java developers.
 
 ## Success looks like
-- Trace one keystroke end to end (browser → EventBus → `KeyWasPressedVerticle` →
-  keymap/handler → operator → model mutation → `ModelWasChangedVerticle` /
-  `CanvasWasChangedVerticle` → browser re-render).
+- Trace one keystroke end to end (browser or terminal → EventBus → `KeyWasPressedVerticle` →
+  keymap/handler → operator → model mutation → `ModelWasChangedVerticle` →
+  viewport-bounded `viewWasChanged` → canvas or terminal re-render); explain how `ViewportWasChangedVerticle` handles `viewportWasChanged`.
 - Place any `*Op.java` in the operator taxonomy and predict its effect.
 - Predict mode/submode behavior for any key, including which submode is on top.
-- Given cursor state and `nl`, derive `ca` / `cx` / `cy` and say which coordinate
+- Given cursor state and `nl`, derive `cx` / `cy` and say which coordinate
   decomposition is materialized.
 - State the two data-class conflict rules (Catalyst Permanence, No Outer Left
   Behind) and apply them to a new node.
+- Explain how the terminal client in `terminal/` consumes the same viewport-bounded view protocol as the canvas client, and how terminal damage painting and detach/quit behavior work.
 - Add a new word, operator, or quantum by following existing patterns.
 - Produce the full lesson set (`lessons/`) and reference material
   (`reference/`), and answer "where does X live and why" from the source or

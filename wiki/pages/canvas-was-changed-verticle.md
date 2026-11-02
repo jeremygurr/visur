@@ -1,49 +1,41 @@
 ---
 type: Sources
-title: CanvasWasChangedVerticle
-description: Verticle handling canvas/viewport updates and sending rendering info to clients
-resource: src/main/java/com/ple/visur/CanvasWasChangedVerticle.java
-tags: [verticle, canvas, rendering]
-generated: { by: visur-wiki-updater/pi, at: 2026-10-13T17:00:00Z }
-updated: { by: visur-wiki-updater/pi, at: 2026-10-13T17:00:00Z }
+title: ViewportWasChangedVerticle
+description: Handles viewport declarations and triggers a full viewport view update
+tags: [verticle, viewport, rendering]
+resource: src/main/java/com/ple/visur/ViewportWasChangedVerticle.java
+generated: { by: pi, at: 2026-11-02T06:40:00Z }
+updated: { by: pi, at: 2026-11-02T06:40:00Z }
 ---
 
-# CanvasWasChangedVerticle
+# ViewportWasChangedVerticle
 
-**Source:** [[CanvasWasChangedVerticle.java](../../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java)]
-**Date updated:** 2026-10-13
+**Source:** [[ViewportWasChangedVerticle.java](../../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java)]
+**Date updated:** 2026-11-02
 
 ## Summary
 
-The CanvasWasChangedVerticle handles canvas/viewport update requests from clients. When a client resizes the canvas or requests a viewport redraw, this verticle processes the canvas dimensions, updates the EditorModelCoupler with the new canvas width and height, and calculates the visible region (canvasStart, canvasEnd) based on cursor position and canvas size.[^1]
+`ViewportWasChangedVerticle` consumes `viewportWasChanged`, stores the declared cell dimensions in the shared `EditorModelCoupler`, then sends `modelWasChanged` with `full: true`. That trigger makes [[model-was-changed-verticle](model-was-changed-verticle.md) project and publish a complete viewport payload. Both browser and terminal clients use the same inbound event; the terminal transport is the loopback `/ws` socket, while the browser uses the SockJS bridge.[^1]
+
+The old `CanvasWasChangedVerticle` role and `canvasWasChanged` address have been retired. The historic page slug is retained for existing wiki links, but the deployed class is `ViewportWasChangedVerticle`.[^2]
 
 ## Key Takeaways
 
-- Handles canvas resize events from browser
-- Updates canvas dimensions in EditorModelCoupler
-- Calculates visible region (canvasStart, canvasEnd)[^2]
+- Handles `viewportWasChanged` from renderers; dimensions are cells (`cols`, `rows`).
+- Stores canvas width and height through `EditorModelCoupler` and requests `full: true` after layout changes.
+- It does not build or send the view payload; `ModelWasChangedVerticle` does that.
 
 ## Entities & Concepts
 
-- [[main-verticle](main-verticle.md)] — deploys this verticle
-- [[editor-model-coupler](editor-model-coupler.md)] — stores canvas dimensions
+- [[main-verticle](main-verticle.md)] — deploys this verticle and exposes renderer transports
+- [[model-was-changed-verticle](model-was-changed-verticle.md)] — projects and publishes the view
+- [[view](view.md)] — viewport-bounded payload and layout
 
 ## Relation to Other Wiki Pages
 
-Coordinates with ModelWasChangedVerticle: canvas size determines what portion of the editor is rendered.
-
-## Related Concepts
-
-- [[view](view.md)] — server-side view model
-- [[line-wrapping](line-wrapping.md)] — line wrapping management
-
-## Related Pages
-
-- [[abstract-visur-verticle](abstract-visur-verticle.md)]
-- [[view](view.md)]
-- [[line-wrapping](line-wrapping.md)]
+The viewport declaration is the inbound half of the protocol; [[bus-event](bus-event.md) lists the current addresses and [[frontend-overview](frontend-overview.md) describes both clients.
 
 ## References
 
-[^1]: [[CanvasWasChangedVerticle.java](../../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L1-37)] — processes canvas resize and updates dimensions
-[^2]: [[CanvasWasChangedVerticle.java](../../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L1-37)] — calculates visible region (canvasStart, canvasEnd)
+[^1]: [[ViewportWasChangedVerticle.java](../../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java#L1-30)] L1-30 [synthesis] — consumes the viewport declaration, stores dimensions, and triggers a full model update
+[^2]: [[BusEvent.java](../../src/main/java/com/ple/visur/BusEvent.java#L1-16)] L1-16 [synthesis] — the current enum contains `viewportWasChanged` and no `canvasWasChanged`
