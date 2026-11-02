@@ -7,6 +7,8 @@ public enum BusEvent {
   //sent in js in keyDown event listener, consumed by KeyWasPressedVerticle
   keyWasPressed,
 
+  pasteWasReceived,
+
   //sent in KeyWasPressedVerticle and in visur.js in eb.onopen, consumed by ModelWasChangedVerticle
   modelWasChanged,
 

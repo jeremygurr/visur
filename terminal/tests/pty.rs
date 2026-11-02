@@ -280,7 +280,8 @@ impl Drop for Terminal {
 /// Drop the escape sequences so the result is what a person would read.
 
 fn server_is_up() -> bool {
-  std::net::TcpStream::connect(("127.0.0.1", 8888)).is_ok()
+  let port = std::env::var("VISUR_PORT").ok().and_then(|value| value.parse().ok()).unwrap_or(8888);
+  std::net::TcpStream::connect(("127.0.0.1", port)).is_ok()
 }
 
 /// What a fake server does once the handshake is done.
@@ -362,6 +363,37 @@ fn semicolon_command_line_is_painted_and_escape_returns_to_navigation() {
   assert!(messages.contains("\"key\":\";\""), "semicolon was not sent: {messages}");
   assert!(messages.contains("\"key\":\"x\""), "text was not sent: {messages}");
   assert!(messages.contains("\"key\":\"Escape\""), "Escape was not sent: {messages}");
+}
+
+#[test]
+fn bracketed_multiline_paste_is_one_wire_message_and_paints_the_reply() {
+  let reply = serde_json::json!({
+    "address": "viewWasChanged",
+    "body": {
+      "full": false, "origin": 0,
+      "rows": [{"start": 0, "text": "first"}, {"start": 6, "text": "second"}],
+      "span": 0, "cursorRow": 1, "cursorCol": 5,
+      "cursorQuantumStart": 12, "cursorQuantumEnd": 13, "isAtQuantumStart": true,
+      "cursorQuantum": "character", "scopeQuantum": "character",
+      "editorMode": "navigate", "editorSubmode": "navigate", "isInCommandState": false,
+      "commandStateContent": "", "commandCursor": 0, "searchTarget": ""
+    }
+  }).to_string();
+  let (port, sent) = fake_server(Fake::Script(vec![view("", true), reply]));
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+  assert!(terminal.wait_for(Duration::from_secs(5), |t| t.frames() >= 1), "initial view was not painted");
+
+  terminal.send("\x1b[200~first\r\nsecond\x1b[201~");
+  assert!(terminal.wait_for(Duration::from_secs(5), |t| t.frames() >= 2), "paste reply was not painted");
+  assert!(terminal.screen().contains("first") && terminal.screen().contains("second"), "multiline reply not painted: {:?}", terminal.screen());
+
+  let messages = sent.lock().unwrap();
+  let paste_messages = messages.iter().filter(|frame| {
+    serde_json::from_str::<serde_json::Value>(frame).is_ok_and(|value| value["address"] == "pasteWasReceived")
+  }).collect::<Vec<_>>();
+  assert_eq!(paste_messages.len(), 1, "paste must be one request, not one key per character: {messages:?}");
+  let payload: serde_json::Value = serde_json::from_str(paste_messages[0]).unwrap();
+  assert_eq!(payload["body"]["text"], "first\r\nsecond");
 }
 
 #[test]
@@ -547,6 +579,49 @@ fn a_resize_during_a_search_submode_keeps_the_search_and_repaints() {
   );
   let (row, col) = terminal.cursor().expect("a cursor position after the resize");
   assert!(row <= 40 && col <= 120, "the cursor left the resized grid at {row},{col}");
+
+  terminal.send("Z");
+  terminal.send("Q");
+  assert_eq!(terminal.quit().code(), Some(0), "ZQ should detach");
+}
+
+#[test]
+fn live_multiline_paste_and_document_jumps() {
+  if std::env::var("VISUR_E2E").is_err() {
+    eprintln!("skipped: set VISUR_E2E=1 with a server running to run paste and jump checks");
+    return;
+  }
+  assert!(server_is_up(), "no server on 127.0.0.1:8888 — start one with ./gradlew run");
+  let mut terminal = Terminal::spawn();
+  assert!(terminal.wait_for(Duration::from_secs(5), |t| t.screen().contains("MODE")), "initial view was not painted");
+  terminal.press("\x1b");
+
+  terminal.send("\x1b[200~FM_PASTE_FIRST\r\nFM_PASTE_SECOND\x1b[201~");
+  assert!(terminal.wait_for(Duration::from_secs(5), |t| t.screen().contains("FM_PASTE_FIRST") && t.screen().contains("FM_PASTE_SECOND")), "server did not insert the multiline paste: {:?}", terminal.screen());
+
+  terminal.press("g");
+  terminal.press("g");
+  let top = terminal.cursor().expect("cursor after gg");
+  terminal.press("g");
+  terminal.press("l");
+  let after_prefix_fallback = terminal.cursor().expect("cursor after g then l");
+  assert!(after_prefix_fallback.1 > top.1, "non-g key must clear the prefix and still move: {top:?} -> {after_prefix_fallback:?}");
+  terminal.press("g");
+  terminal.press("g");
+  terminal.press("G");
+  let bottom = terminal.cursor().expect("cursor after G");
+  assert!(bottom.0 > top.0, "G should reach the bottom line after gg: {top:?} -> {bottom:?}");
+  if std::env::var("VISUR_EXPECT_SHORT").is_ok() {
+    assert!(bottom.0 < rows() as usize - 1, "short document bottom should stay above the viewport edge: {bottom:?}");
+  }
+
+  terminal.press("g");
+  terminal.press("g");
+  terminal.press("s");
+  terminal.press("1");
+  terminal.press("y");
+  terminal.press("p");
+  assert!(terminal.wait_for_screen("FFM_PASTE_FIRST"), "yank and paste-from-register did not duplicate the active span: {:?}", terminal.screen());
 
   terminal.send("Z");
   terminal.send("Q");
