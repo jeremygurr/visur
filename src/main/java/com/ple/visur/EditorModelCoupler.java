@@ -394,4 +394,16 @@ public class EditorModelCoupler {
     System.out.println(message);
   }
 
+  public String getSourceFilePath() {
+    Object val = editorModel.get(sourceFilePath);
+    return val == null ? null : (String) val;
+  }
+
+  public void setSourceFilePath(String path) {
+    if (path == null) {
+      editorModel.remove(sourceFilePath);
+    } else {
+      editorModel.put(sourceFilePath, path);
+    }
+  }
 }

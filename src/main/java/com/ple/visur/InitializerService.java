@@ -5,6 +5,11 @@ import DataClass.CompoundDataClassBrick;
 import DataClass.LayeredDataClassBrick;
 import DataClass.PrimitiveDataClassBrick;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Stack;
@@ -94,7 +99,13 @@ public class InitializerService {
 
     initializeCursorPositionDCBsAndBVVs();
 
-    emc.initializeEditorContent(contentForThisRun(initialEditorContent));
+    String content = contentForThisRun(initialEditorContent);
+    String startupPath = startupFile();
+    if (startupPath != null) {
+      content = readStartupFile(startupPath);
+      emc.setSourceFilePath(startupPath);
+    }
+    emc.initializeEditorContent(content);
     emc.updateNextLineIndices();
     emc.putLineWrapping(LineWrapping.wrapped);
 
@@ -206,6 +217,37 @@ public class InitializerService {
     return content;
   }
 
+  /**
+   * Returns the startup file path if {@code VISUR_FILE} is set, {@code null} otherwise.
+   */
+  private String startupFile() {
+    String filePath = System.getenv("VISUR_FILE");
+    return (filePath == null || filePath.isBlank()) ? null : filePath;
+  }
+
+  /**
+   * Reads and validates the startup file, returning its content.
+   *
+   * <p>Fails loudly if the file does not exist, is not a regular file, or contains invalid UTF-8.
+   */
+  private String readStartupFile(String filePath) {
+    try {
+      Path path = Paths.get(filePath);
+      if (!Files.exists(path)) {
+        throw new IllegalStateException("VISUR_FILE points to a non-existent path: " + filePath);
+      }
+      if (!Files.isRegularFile(path)) {
+        throw new IllegalStateException("VISUR_FILE points to a non-regular file: " + filePath);
+      }
+      byte[] bytes = Files.readAllBytes(path);
+      String content = new String(bytes, StandardCharsets.UTF_8);
+      System.out.println("Loaded startup file: " + filePath + " (" + bytes.length + " bytes)");
+      return content;
+    } catch (IOException e) {
+      throw new IllegalStateException("Cannot read VISUR_FILE (" + filePath + "): " + e.getMessage(), e);
+    }
+  }
+
   private void initializeKeymaps() {
     KeymapMap keymapMap = KeymapMap.make();
 
@@ -295,6 +337,9 @@ public class InitializerService {
     );
     keymap.put(KeyPressed.from("d"),
       scs.compile("deleteCursorQuantum")
+    );
+    keymap.put(KeyPressed.from("ZZ"),
+      scs.compile("saveFile")
     );
     keymap.put(KeyPressed.from("f"),
       scs.compile("clearEDS \"searchForward\" pushSubmode")
