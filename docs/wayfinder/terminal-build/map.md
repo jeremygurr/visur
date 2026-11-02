@@ -22,6 +22,8 @@ Reaching the destination means: the protocol in [the spec](../renderer-delivery/
 
 <!-- one line per closed ticket: gist, then link to the ticket holding the detail -->
 
+- [Terminal client skeleton](issues/05-client-skeleton.md): the client exists — `terminal/`, 28 unit tests at four pure seams plus a Rust pty test that types keys and reads the screen back, so no second language is needed to verify it. **3.45–3.74 ms** median keystroke → paint (5.7 ms against a just-started server, which is JVM warm-up). Found a spec bug (`SHIFT` arrives set on uppercase, so dropping modifiers made `Z` and every uppercase binding unreachable) and a server bug (`viewWasChanged` was `send`-ed, so a second renderer silently stole half the views; now published).
+
 - [Make large documents loadable](issues/01-benchmark-content.md): `VISUR_CONTENT_BYTES` + `SizedContent`; verified at 6 KB, 1 MB and 5 MB with the browser rendering each.
 - [`/ws`, the inbound rename, and the startup race](issues/04-transport-and-renames.md): one name per direction, content-cell viewports, a loopback-only plain JSON socket, and the port now opens only after the verticles deploy — which deleted the declaration-resend ritual every client had been carrying. Spike: 4.3 ms median with no SockJS.
 - [Switch the wire to viewport rows](issues/03-switch-payload.md): payload flat at ~5 KB from 6 KB to 5 MB (1,038× smaller at 5 MB), key→paint flat at 32 ms, 44 `fillText` per frame instead of 3,558. The browser's `modelWasChanged` echo — which was silently stealing half of all views — is gone.

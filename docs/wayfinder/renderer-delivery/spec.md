@@ -100,6 +100,11 @@ A client declares the content grid it can paint.
 
 **Addresses are per-direction.** Inbound is `viewportWasChanged`; the payload stays `viewWasChanged`. They must not share a name, or a bridge would echo each client's size message back to every client.
 
+**A view is published, not sent.** `viewWasChanged` is state addressed to every attached renderer, so the server
+broadcasts it (`publish`). With a point-to-point `send` the bus picks exactly one consumer per message, and a second
+renderer — or the ghost of one whose socket died without unregistering — swallows half the views with no error
+anywhere. Found 2026-11-01 when the terminal client made a second consumer normal rather than hypothetical.
+
 ### 2.1 Frames on `/ws`
 
 The terminal's socket is a pipe to the event bus, and nothing more. A frame is the bus envelope in both
@@ -242,14 +247,14 @@ Nothing else is meaningful: a longer string misses every keymap and is silently 
 | `KeyCode::Enter` | `"Enter"` | raw mode ⇒ `0d` |
 | `KeyCode::Backspace` | `"Backspace"` | `7f` or `08` |
 | `KeyCode::{Left,Right,Up,Down}` | `"ArrowLeft"` … | both `CSI` and `SS3` forms parsed by crossterm |
-| `KeyCode::Char(c)`, `mods == NONE` | `c.to_string()` | the `F`/`N` uppercase bindings come through here |
+| `KeyCode::Char(c)`, `mods` without a chord | `c.to_string()` | the `F`/`N` uppercase bindings come through here |
 | `KeyCode::Char(c)` with `CONTROL`/`ALT`/`SUPER`/`HYPER` | **drop** | otherwise `Ctrl-d` → `Char('d')` → fires navigate's `d` = `deleteCursorQuantum` |
 | `KeyCode::Tab`, `Home`, `End`, `Insert`, `Delete`, `F(n)`, `PageUp`, `PageDown` | **drop** | unbound; keep the wire honest |
 | `Event::Paste(s)` | **not a key** — see P3 | |
 | `KeyEventKind::Release` | **drop** | Visur has only ever seen `keydown` |
 | `KeyEventKind::Repeat` | **forward one token per repeat** | not one token per held key |
 
-`SHIFT` alone needs no special handling: it already appears as the uppercase `Char`.
+`SHIFT` must not be dropped. This line originally said "`SHIFT` alone needs no special handling: it already appears as the uppercase `Char`", and that is wrong in a way that costs every uppercase binding: crossterm reports `SHIFT` *alongside* `Char('Z')`, so a rule that drops every non-empty modifier set makes `F`, `N` and the `Z` prefix unreachable. Measured 2026-11-01 in a pty on macOS. The rule is "drop chords", not "drop modifiers": `CONTROL`/`ALT`/`SUPER`/`HYPER` are dropped, `SHIFT` is kept.
 
 **The lone-`Esc` ambiguity.** crossterm resolves it with a private timeout; the exact constant was not verified and must be measured before it enters a test. The client should sidestep it: push kitty's `DISAMBIGUATE_ESCAPE_CODES` (`CSI >1u`), after which `Esc` arrives as the self-delimiting `CSI 27 u`. Treat that as best-effort — tmux traditionally swallows the push, which is why tmux users feel a ~50 ms `Esc`.
 
@@ -285,13 +290,17 @@ Canvas keeps what the terminal cannot express, and the spec does not try to unif
 
 ### 5.9 Parity
 
-**Must** — paint rows and cursor (block for `span` 1, bar for `span` 0) from `cursorRow`/`cursorCol`; mode line with mode/submode/quantum/span; command-state line when `isInCommandState`; `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`+digit; search (`f`/`F`/`n`/`N`/`/` and typing the target); `SIGWINCH` → `viewportWasChanged` → full repaint; `?2026` probe; alt screen, raw mode, ordered restore on panic **and** normal exit; **quit on `Ctrl-C` and `Ctrl-Q`**.
+**Must** — paint rows and cursor (block for `span` 1, bar for `span` 0) from `cursorRow`/`cursorCol`; mode line with mode/submode/quantum/span; command-state line when `isInCommandState`; `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`+digit; search (`f`/`F`/`n`/`N`/`/` and typing the target); `SIGWINCH` → `viewportWasChanged` → full repaint; `?2026` probe; alt screen, raw mode, ordered restore on panic **and** normal exit; **`ZZ` save-and-detach, `ZQ` detach, `ZD` quit**.
 
 **Should** — kitty `DISAMBIGUATE_ESCAPE_CODES` push; `?2026` on every frame; overscan/local scroll; page-scroll without moving the cursor; truecolor once `VisurColor` is wired up.
 
 **Won't** — mouse, panes, tabs, images; opening the `;` command line (no keybinding can — P4); search-and-replace (doesn't exist); file I/O (doesn't exist); per-client viewports (needs P1).
 
-`Ctrl-C`/`Ctrl-Q` = quit/detach is the *terminal's* binding, not a Visur command: raw mode makes `Ctrl-C` a byte, and **nothing in Visur quits** — `CommandStateService.exitCommandState` only leaves the command line. A `:q` equivalent waits for P4.
+`ZZ`/`ZQ`/`ZD` is the *terminal's* binding, not a Visur command: raw mode makes `Ctrl-C` a byte, and **nothing in Visur quits** — `CommandStateService.exitCommandState` only leaves the command line. A `:q` equivalent waits for P4. Decided by the user 2026-11-01, replacing the earlier `Ctrl-C`/`Ctrl-Q` proposal, because in a shell those read as "kill this command".
+
+- **`ZZ`** saves and detaches, **`ZQ`** detaches, **`ZD`** quits. *Detach* leaves the server running; *quit* asks for it to stop. `ZZ`'s save has nothing to save until file I/O exists (P5), so today it equals `ZQ` with intent — bound now so it starts working the day saving does.
+- The distinction reaches the launcher as the **exit code**: `0` detach, `3` quit ([ticket 08](../terminal-build/issues/08-launcher.md)).
+- Consequence, recorded rather than hidden: `Ctrl-C` is dropped by the chord rule like `Ctrl-d`, so a wedged client is stopped with `SIGTERM` from outside, not from the keyboard.
 
 ---
 

@@ -81,13 +81,13 @@ A renderer receives only its viewport's rows, so **it cannot scroll past them** 
 
 ### D. Parity split
 
-**Must** — paint rows and cursor (block for `span` 1, bar for `span` 0) from `cursorRow`/`cursorCol`; mode line with mode/submode/quantum/span; command-state line when `isInCommandState`; `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`+digit; search (`f`/`F`/`n`/`N`/`/` and typing the target); `SIGWINCH` → `viewportWasChanged` → full repaint; capability probe for `?2026` via `DECRQM`, degrading silently; alt screen, raw mode, ordered restore on panic *and* normal exit; **quit on `Ctrl-C` and `Ctrl-Q`**.
+**Must** — paint rows and cursor (block for `span` 1, bar for `span` 0) from `cursorRow`/`cursorCol`; mode line with mode/submode/quantum/span; command-state line when `isInCommandState`; `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`+digit; search (`f`/`F`/`n`/`N`/`/` and typing the target); `SIGWINCH` → `viewportWasChanged` → full repaint; capability probe for `?2026` via `DECRQM`, degrading silently; alt screen, raw mode, ordered restore on panic *and* normal exit; **`ZZ` save-and-detach, `ZQ` detach, `ZD` quit** (revised 2026-11-01 from the `Ctrl-C`/`Ctrl-Q` proposed below — see [spec §5.9](../spec.md)).
 
 **Should** — kitty `DISAMBIGUATE_ESCAPE_CODES` push, degrading gracefully when tmux swallows it; `?2026` brackets on every frame; overscan/local scroll; page-scroll without moving the cursor; truecolor once `VisurColor` is wired up.
 
 **Won't** — mouse reporting, panes, tabs, images; opening the `;` command line (no keybinding can, server-side — see [06](06-terminal-io-non-jvm.md)); search-and-replace (does not exist); any file I/O (does not exist); per-client viewports (needs session scoping).
 
-`Ctrl-C`/`Ctrl-Q` = quit/detach is the terminal's own binding, not a Visur command; a `:q` equivalent waits until command state is reachable.
+`Ctrl-C`/`Ctrl-Q` = quit/detach is the terminal's own binding, not a Visur command; a `:q` equivalent waits until command state is reachable. **Superseded 2026-11-01:** the binding is the `Z` prefix — `ZZ` save-and-detach, `ZQ` detach, `ZD` quit — because `Ctrl-C`/`Ctrl-Q` read as "kill this command" in a shell. The reasoning above (the client owns quitting, not Visur) stands unchanged.
 
 ### E. What the canvas renderer keeps that the terminal cannot have
 

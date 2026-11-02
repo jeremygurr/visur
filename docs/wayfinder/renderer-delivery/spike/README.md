@@ -42,4 +42,7 @@ Diffing, damage regions, scrollback beyond the viewport, mouse, resize handling 
 
 - `visur-term/src/main.rs` — the whole client: `/ws` frames, view parsing, paint, key adapter
 - `visur` — the launcher
-- `drive.py` — pty harness used to verify it headlessly (sends keys, captures the screen, prints the latency line)
+
+Its Python pty harness (`drive.py`) is gone: the real client's end-to-end check is a Rust test that does the same
+job — open a pty, set its size, type keys, read the escape stream back — so no second language is needed to
+verify a client ([terminal/tests/pty.rs](../../../../terminal/tests/pty.rs)).

@@ -22,7 +22,10 @@ public class ModelWasChangedVerticle extends AbstractVisurVerticle {
 
   /** The trigger may ask for a full repaint; a keystroke changes no layout, so it does not. */
   public void handleChange(Message<Object> event) {
-    vertx.eventBus().send(BusEvent.viewWasChanged.name(), View.of(emc, isFull(event.body())).render());
+    // publish, not send: a view is state addressed to every renderer, not a job for one of them. `send` picks a
+    // single consumer per message, so a renderer attached a moment ago -- or one whose socket died without
+    // unregistering -- silently swallows the views meant for the others. Every renderer paints its own copy.
+    vertx.eventBus().publish(BusEvent.viewWasChanged.name(), View.of(emc, isFull(event.body())).render());
   }
 
   private static boolean isFull(Object trigger) {

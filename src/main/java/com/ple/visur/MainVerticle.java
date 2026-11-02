@@ -94,7 +94,10 @@ public class MainVerticle extends AbstractVerticle {
           JsonObject message = new JsonObject(frame);
           vertx.eventBus().send(message.getString("address"), message.getValue("body"));
         });
+        // Both paths: a socket can fail without ever reporting a close, and a consumer left pointing at a dead
+        // socket would keep swallowing published views.
         socket.closeHandler(closed -> outbound.unregister());
+        socket.exceptionHandler(failure -> outbound.unregister());
       },
       error -> LOGGER.error("websocket upgrade failed", error));
   }
