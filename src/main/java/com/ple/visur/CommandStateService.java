@@ -1,6 +1,13 @@
 package com.ple.visur;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class CommandStateService {
+
+  private static final int HISTORY_LIMIT = 20;
+  private final List<String> history = new ArrayList<>();
+  private int historyCursor;
 
   public static CommandStateService make() {
     return new CommandStateService();
@@ -13,9 +20,31 @@ public class CommandStateService {
     if(commandStateKeyPressed.equals("Escape")) {
       exitCommandState();
     } else if(commandStateKeyPressed.equals("Enter")) {
-      VisurCommand visurCommand = ServiceHolder.commandCompileService.compile(ems.getCommandStateContent());
+      String command = ems.getCommandStateContent();
+      VisurCommand visurCommand = ServiceHolder.commandCompileService.compile(command);
       ServiceHolder.commandExecutionService.execute(visurCommand);
+      if(!command.isEmpty()) {
+        history.add(command);
+        if(history.size() > HISTORY_LIMIT) {
+          history.remove(0);
+        }
+      }
+      historyCursor = history.size();
       exitCommandState();
+    } else if(commandStateKeyPressed.equals("ArrowUp")) {
+      if(historyCursor > 0) {
+        recall(ems, --historyCursor);
+      }
+    } else if(commandStateKeyPressed.equals("ArrowDown")) {
+      if(historyCursor < history.size()) {
+        historyCursor++;
+        if(historyCursor == history.size()) {
+          ems.putCommandStateContent("");
+          ems.putCommandCursor(0);
+        } else {
+          recall(ems, historyCursor);
+        }
+      }
     } else if(commandStateKeyPressed.equals("ArrowLeft") || commandStateKeyPressed.equals("ArrowRight")) {
       switch(commandStateKeyPressed) {
         case "ArrowLeft":
@@ -52,6 +81,12 @@ public class CommandStateService {
       ems.putCommandStateContent(newCommandStateContent);
       ems.putCommandCursor(commandCursor + 1);
     }
+  }
+
+  private void recall(EditorModelCoupler ems, int index) {
+    String command = history.get(index);
+    ems.putCommandStateContent(command);
+    ems.putCommandCursor(command.length());
   }
 
   private void exitCommandState() {

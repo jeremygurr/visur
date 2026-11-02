@@ -3,560 +3,253 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lesson 9 — The Wire: Four Addresses, One Snapshot, One Browser</title>
+  <title>Lesson 9 — The Wire: Viewport Protocol and Two Renderers</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
   <div class="lesson-header">
     <div class="lesson-number">Lesson 9 of 10</div>
-    <h1>The Wire: Four Addresses, One Snapshot, One Browser</h1>
-    <div class="lesson-meta">
-      Reads ~16 min · Hands-on: trace both boot and one keystroke, hop by hop,
-      with instant feedback
-    </div>
+    <h1>The Wire: Viewport Protocol and Two Renderers</h1>
+    <div class="lesson-meta">Reads ~16 min · Hands-on: trace a viewport declaration and one keystroke</div>
   </div>
 
   <p class="lead">
-    Everything lessons 1–8 built lives on the server. This lesson is the
-    <em>only</em> place it can be observed: four event-bus addresses, one JSON
-    snapshot, and a Canvas 2D loop in <code>visur.js</code>. The surprise is that
-    the class called <code>View</code> is not the view model, and the two
-    verticles the itinerary says "broadcast" do not broadcast anything — each
-    one consumes one address and sends a <em>different</em> one, forming a
-    chain.
+    The editor model is server-side; renderers receive complete, viewport-bounded
+    <code>viewWasChanged</code> snapshots. The browser remains a canvas client over
+    SockJS, and <code>terminal/</code> adds a Rust terminal client over a plain
+    WebSocket. Both paint the same server-laid-out rows; neither owns editor state
+    or decides how text wraps.
   </p>
 
   <h2 id="mission">Mission Anchor</h2>
-
   <p>
     <a href="0008-cursor-position-coordinates-and-display.html">Lesson 8</a>
-    ended on the wire: how <code>ca</code>, <code>canvasStart</code>, and
-    <code>virtualCX</code> become pixels. This lesson answers the mission's
-    end-to-end question at its last hop: <strong>browser → EventBus → server →
-    EventBus → browser</strong>.
+    followed cursor coordinates inside the editor model. Here we follow the
+    renderer boundary: <strong>client input → event bus → editor state → complete
+    view → browser canvas or terminal grid</strong>.
   </p>
-
   <div class="callout">
-    <strong>Goal this lesson:</strong> Name the address on the envelope for
-    every hop of a keystroke and of the first paint; say which of the 16 snapshot
-    fields drives the cursor, the highlight, and the footer; and explain why the
-    browser registers a handler for a message the server "only sends to itself".
+    <strong>Goal this lesson:</strong> Name the inbound and outbound addresses,
+    explain the 17-field viewport snapshot, distinguish the browser and terminal
+    transports, and trace startup and one keystroke without confusing layout with painting.
   </div>
 
   <hr class="divider">
-
-  <h2 id="loop">1. Four Addresses, All Pointing One Way Round</h2>
-
+  <h2 id="loop">1. Addresses and the Viewport Loop</h2>
   <p>
-    <code>BusEvent</code> is a four-value enum, and each value's comment names
-    its sender and receiver. Read the enum as a ring, not a menu:
+    <a href="../src/main/java/com/ple/visur/BusEvent.java">BusEvent</a> names
+    four current addresses. The directions are asymmetric: clients declare a
+    viewport and send keys; the server publishes a complete view.
   </p>
-
   <figure>
     <pre class="diagram">
-                       ┌──────────────── browser (visur.html + visur.js) ───────────────┐
-                       │  keydown → eb.send("keyWasPressed",  {key})                  │
-                       │  eb.onopen → eb.send("canvasWasChanged",{width,height})      │
-                       │  eb.registerHandler("viewWasChanged", …)  → repaint          │
-                       │  eb.registerHandler("modelWasChanged", …) → re-send          │
-                       └───────┬───────────────────────────────▲───────────────┬──────┘
-              keyWasPressed    │                     viewWasChanged    │    canvasWasChanged
-                               ▼                                │       ▼
-                    KeyWasPressedVerticle              ModelWasChanged  CanvasWasChanged
-                               │                     Verticle                │
-                               └── modelWasChanged ────────▶│◀──── modelWasChanged ─┘
+Browser (SockJS /eventbus)                  Server                  Terminal (/ws)
+──────────────────────────                  ──────                  ─────────────
+viewportWasChanged {cols,rows} ───────────► ViewportWasChangedVerticle ◄──── same
+keyWasPressed {key} ──────────────────────► KeyWasPressedVerticle ◄──────── same
+                                                   │
+                                             modelWasChanged
+                                                   ▼
+                                           ModelWasChangedVerticle
+                                                   │ publish
+                              ◄──────────── viewWasChanged ────────────►
+                         browser paints canvas                  Rust client paints cells
     </pre>
-    <figcaption>
-      Two inbound addresses from the browser, one outbound address to it, and
-      one internal address that closes the loop. Every message is
-      point-to-point (<code>.send</code>); nothing here uses
-      <code>publish</code>.
-    </figcaption>
+    <figcaption>Viewport input is <code>viewportWasChanged</code>; the complete output is
+      <code>viewWasChanged</code>. <code>modelWasChanged</code> is an internal trigger, not a view payload.</figcaption>
   </figure>
-
   <table>
-    <thead>
-      <tr><th>Address</th><th>Sent by</th><th>Consumed by</th><th>Body</th></tr>
-    </thead>
+    <thead><tr><th>Address</th><th>Direction</th><th>Body</th><th>Consumer / producer</th></tr></thead>
     <tbody>
-      <tr>
-        <td><code>keyWasPressed</code></td>
-        <td><code>visur.js:128</code> (keydown)</td>
-        <td><code>KeyWasPressedVerticle:11</code></td>
-        <td><code>{"key":"j"}</code> as a JSON <em>string</em></td>
-      </tr>
-      <tr>
-        <td><code>canvasWasChanged</code></td>
-        <td><code>visur.js:120</code> (onopen, once)</td>
-        <td><code>CanvasWasChangedVerticle:12</code></td>
-        <td><code>{width, height}</code> in cells</td>
-      </tr>
-      <tr>
-        <td><code>modelWasChanged</code></td>
-        <td><code>KeyWasPressedVerticle:31</code> · <code>CanvasWasChangedVerticle:34</code> · <code>visur.js:118</code></td>
-        <td><code>ModelWasChangedVerticle:13</code> · the browser's bridge handler</td>
-        <td><code>null</code> / <code>"true"</code> — ignored</td>
-      </tr>
-      <tr>
-        <td><code>viewWasChanged</code></td>
-        <td><code>ModelWasChangedVerticle:21</code></td>
-        <td><code>visur.js:49</code></td>
-        <td>the 16-field JsonObject of §2</td>
-      </tr>
+      <tr><td><code>viewportWasChanged</code></td><td>client → server</td><td><code>{"cols":100,"rows":29}</code>, cell counts</td><td><code>ViewportWasChangedVerticle</code></td></tr>
+      <tr><td><code>keyWasPressed</code></td><td>client → server</td><td><code>{"key":"j"}</code></td><td><code>KeyWasPressedVerticle</code></td></tr>
+      <tr><td><code>modelWasChanged</code></td><td>internal trigger</td><td>usually <code>null</code>; viewport change carries <code>{"full":true}</code></td><td><code>ModelWasChangedVerticle</code></td></tr>
+      <tr><td><code>viewWasChanged</code></td><td>server → all renderers</td><td>complete 17-field viewport snapshot</td><td>browser and terminal clients</td></tr>
     </tbody>
   </table>
-
   <p class="source-ref">
-    <a href="../src/main/java/com/ple/visur/BusEvent.java#L3-15">BusEvent.java:3–15</a> ·
-    <a href="../src/main/resources/static/visur.js#L116-134">visur.js:116–134</a> ·
-    <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java#L11-33">KeyWasPressedVerticle.java:11–33</a> ·
-    <a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L11-35">CanvasWasChangedVerticle.java:11–35</a> ·
-    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L11-22">ModelWasChangedVerticle.java:11–22</a>.
+    <a href="../src/main/java/com/ple/visur/BusEvent.java">BusEvent.java</a> ·
+    <a href="../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java">ViewportWasChangedVerticle.java</a> ·
+    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>
   </p>
-
   <p>
-    Only three addresses are reachable across the wire, and the bridge in
-    <code>MainVerticle</code> permits exactly those, in exactly these
-    directions:
+    <code>viewportWasChanged</code> carries <code>cols</code> and
+    <code>rows</code> in cells, not pixels. Rows exclude renderer chrome. The
+    handler stores the dimensions and triggers a full view; the terminal
+    subtracts its own mode-line row before declaring its grid. The browser
+    computes cell counts from canvas pixels and declares again when its viewport
+    changes. See <a href="../src/main/resources/static/visur.js">visur.js</a> and
+    <a href="../terminal/src/main.rs">terminal/src/main.rs</a>.
+  </p>
+  <p class="source-ref">
+    <a href="../src/main/java/com/ple/visur/MainVerticle.java">MainVerticle.java</a>
+    permits browser input on <code>viewportWasChanged</code> and
+    <code>keyWasPressed</code>, and output on <code>viewWasChanged</code>.
+    Its <code>/eventbus</code> SockJS bridge is for the browser; <code>/ws</code>
+    is the terminal's WebSocket route.
   </p>
 
+  <hr class="divider">
+  <h2 id="payload">2. The Snapshot Is Built by <code>View</code></h2>
+  <p>
+    The old mutable <code>View.ca</code>/<code>View.editorContent</code> holder
+    is gone. Current <a href="../src/main/java/com/ple/visur/View.java">View</a>
+    is a record: <code>View.of(emc)</code> projects editor state, delegates row
+    layout to <a href="../src/main/java/com/ple/visur/Viewport.java">Viewport</a>,
+    and <code>render()</code> produces the JSON. The model verticle is a pipe:
+    it publishes that payload on <code>viewWasChanged</code>.
+  </p>
   <table>
-    <thead>
-      <tr><th>Direction</th><th>Permitted addresses</th></tr>
-    </thead>
+    <thead><tr><th>Payload field</th><th>Meaning</th><th>Renderer use</th></tr></thead>
     <tbody>
-      <tr><td>Browser → server (inbound)</td><td><code>keyWasPressed</code> · <code>canvasWasChanged</code> · <code>modelWasChanged</code></td></tr>
-      <tr><td>Server → browser (outbound)</td><td><code>modelWasChanged</code> · <code>viewWasChanged</code></td></tr>
+      <tr><td><code>full</code></td><td>Discard cached rows; do not diff</td><td>Full refresh on viewport change; browser already repaints fully</td></tr>
+      <tr><td><code>origin</code></td><td>Absolute character index of the viewport anchor</td><td>Viewport position</td></tr>
+      <tr><td><code>rows</code></td><td>Screen rows, each <code>{start,text}</code>; text has no newline</td><td>Paint exactly these pre-wrapped rows</td></tr>
+      <tr><td><code>span</code></td><td>Selection flag, 0 or 1</td><td>Highlight / cursor presentation</td></tr>
+      <tr><td><code>cursorQuantumStart</code>, <code>cursorQuantumEnd</code></td><td>Absolute, half-open quantum bounds</td><td>Selection range</td></tr>
+      <tr><td><code>cursorRow</code>, <code>cursorCol</code></td><td>Cursor cell within <code>rows</code></td><td>Cursor placement; clamp to grid</td></tr>
+      <tr><td><code>isAtQuantumStart</code></td><td>Which quantum end anchors a collapsed cursor</td><td>Cursor projection is already reflected in row/column</td></tr>
+      <tr><td><code>cursorQuantum</code>, <code>scopeQuantum</code></td><td>Quantum names</td><td>Status / search line</td></tr>
+      <tr><td><code>editorMode</code>, <code>editorSubmode</code></td><td>Current mode and submode</td><td>Status line</td></tr>
+      <tr><td><code>isInCommandState</code>, <code>commandStateContent</code>, <code>commandCursor</code></td><td>Command-line state</td><td>Status / command line</td></tr>
+      <tr><td><code>searchTarget</code></td><td>Search prompt; always present, empty when not searching</td><td>Search line</td></tr>
     </tbody>
   </table>
-
-  <p class="source-ref">
-    <a href="../src/main/java/com/ple/visur/MainVerticle.java#L42-47">MainVerticle.java:42–47</a>.
-    The page is served by a 302 from <code>/</code> to
-    <code>/static/visur.html</code>
-    (<a href="../src/main/java/com/ple/visur/MainVerticle.java#L49-66">MainVerticle.java:49–66</a>),
-    and the bridge is mounted at <code>/eventbus</code>
-    (<a href="../src/main/java/com/ple/visur/MainVerticle.java#L50">line 50</a>);
-    <code>visur.js</code> connects to <code>http://localhost:8888/eventbus</code>
-    (<a href="../src/main/resources/static/visur.js#L46">visur.js:46</a>).
+  <p>
+    These are exactly 17 fields. <code>editorContent</code>, <code>ca</code>,
+    <code>canvasStart</code>, and <code>canvasEnd</code> are not payload fields.
+    Each row carries its own absolute origin; renderers do not need the document,
+    a wrap table, or a delta. Every message is a complete viewport state. On
+    <code>full: true</code>, discard cached rows; clamp cursor coordinates; if
+    rows are empty, paint a blank screen.
   </p>
-
+  <p class="source-ref">
+    <a href="../docs/wayfinder/renderer-delivery/spec.md">Protocol payload specification</a> ·
+    <a href="../src/main/java/com/ple/visur/View.java">View.java</a> ·
+    <a href="../src/main/java/com/ple/visur/Viewport.java">Viewport.java</a> ·
+    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>
+  </p>
   <div class="callout warning">
-    <strong>Outbound <code>modelWasChanged</code> is the odd permission.</strong>
-    It exists only because <code>visur.js</code> registers a handler for it
-    (<a href="../src/main/resources/static/visur.js#L116">visur.js:116</a>),
-    which the bridge turns into a real server-side consumer. §4 shows why that
-    is load-bearing rather than leftover.
+    <strong>Keep the seam straight.</strong> The server lays out and projects
+    cursor position. A renderer neither re-wraps rows nor owns editor state.
+    <code>viewWasChanged</code> is published because every attached renderer
+    needs the same update; point-to-point <code>send</code> would select only one consumer.
   </div>
 
   <hr class="divider">
-
-  <h2 id="payload">2. The Snapshot Is Built Inline — Not in <code>View</code></h2>
-
-  <p>
-    <code>View</code> is six lines long:
-  </p>
-
-  <figure>
-    <pre class="diagram">
-// View.java:3-6  — the whole class
-public class View {
-  public int ca;
-  public String editorContent;
-}
-    </pre>
-    <figcaption>
-      Two public fields, no methods, no accessors. This is a scratch object owned
-      by <code>ModelWasChangedVerticle</code>, not a view model.
-    </figcaption>
-  </figure>
-
-  <p>
-    The actual snapshot is assembled in
-    <code>ModelWasChangedVerticle.handleChange</code>, which fills the
-    two <code>View</code> fields from the <code>EditorModelCoupler</code> and
-    then serialises <em>fresh</em> values straight onto the bus from
-    <code>toJson()</code>. Fifteen fields are always present; a sixteenth
-    (<code>searchTarget</code>) appears only in the search submodes.
-  </p>
-
-  <table>
-    <thead>
-      <tr><th>Field</th><th>Source on the server</th><th>What the browser does with it</th></tr>
-    </thead>
-    <tbody>
-      <tr><td><code>ca</code></td><td><code>emc.getCA()</code> → <code>view.ca</code></td><td><strong>Nothing.</strong> Assigned at <code>visur.js:50</code> and never read again.</td></tr>
-      <tr><td><code>editorContent</code></td><td><code>emc.getEditorContent()</code></td><td>Indexed by absolute position in the draw loop.</td></tr>
-      <tr><td><code>span</code></td><td>global var <code>"span"</code></td><td><code>&gt;0</code> ⇒ yellow highlight; <code>0</code> ⇒ a <code>|</code> caret.</td></tr>
-      <tr><td><code>canvasStart</code> · <code>canvasEnd</code></td><td>viewport bounds</td><td>The inclusive <code>absX</code> range that gets drawn.</td></tr>
-      <tr><td><code>cursorQuantumStart</code> · <code>cursorQuantumEnd</code></td><td>quantum bounds</td><td>Highlight range; equal values ⇒ zero-width caret.</td></tr>
-      <tr><td><code>isAtQuantumStart</code></td><td>editor model</td><td>Which end of the quantum the caret sits at when <code>span == 0</code>.</td></tr>
-      <tr><td><code>editorMode</code> · <code>editorSubmode</code></td><td>mode + top of submode stack</td><td>Footer text: mode name, submode name, or neither.</td></tr>
-      <tr><td><code>cursorQuantum</code> · <code>scopeQuantum</code></td><td><code>.getName()</code> strings</td><td>Footer: <code>"CHARACTER QUANTUM"</code>, and the scope name while searching.</td></tr>
-      <tr><td><code>isInCommandState</code> · <code>commandStateContent</code> · <code>commandCursor</code></td><td>command-line state</td><td>Footer switches to a <code>;…</code> command line with a <code>|</code> at the cursor index.</td></tr>
-      <tr><td><code>searchTarget</code> <span class="annotation">(conditional)</span></td><td>peek of the execution-data stack + <code>"_"</code></td><td>Footer <code>(f)</code> / <code>(F)</code> search prompt.</td></tr>
-    </tbody>
-  </table>
-
-  <p class="source-ref">
-    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L18-52">ModelWasChangedVerticle.java:18–52</a> (all sixteen <code>put</code> calls) ·
-    <a href="../src/main/java/com/ple/visur/View.java#L3-6">View.java:3–6</a> ·
-    <a href="../src/main/resources/static/visur.js#L49-108">visur.js:49–108</a> (the handler that reads each one).
-  </p>
-
-  <div class="callout">
-    <strong>Why <code>ca</code> is on the wire but unused.</strong> The cursor is
-    transmitted as a <em>quantum range</em> plus <code>span</code>, not as a
-    point. <code>drawCanvas</code> decides the caret from
-    <code>cursorQuantumStart</code>/<code>End</code> and
-    <code>isAtQuantumStart</code>, so the absolute index has no consumer left.
-    It is a field the server computes, ships, and the client discards.
-  </div>
-
-  <hr class="divider">
-
   <h2 id="keymap">3. The Keymap Is Server-Side and Keyed by Submode</h2>
-
   <p>
-    The browser never decides what a key <em>means</em>. It forwards
-    <code>event.key</code> verbatim; the meaning lives in
-    <code>InitializerService.initializeKeymaps()</code>, which builds one
-    <code>Keymap</code> per submode at startup and compiles each binding into a
-    <code>VisurCommand</code> on the spot:
+    Both clients forward key tokens; editing semantics remain on the server.
+    <code>KeyWasPressedVerticle</code> chooses the keymap by the current
+    submode, executes a command when one matches, then triggers
+    <code>modelWasChanged</code>. The keymap arc is unchanged from earlier
+    lessons; the change is that either renderer can send the key.
   </p>
+  <figure><pre class="diagram">
+client keydown / terminal key adapter
+  └─ keyWasPressed {key}
+       └─ KeyWasPressedVerticle
+            └─ keymapMap.get(getEditorSubmode())
+                 └─ command execution mutates EditorModelCoupler
+                      └─ modelWasChanged → publish viewWasChanged
+  </pre><figcaption>The terminal adapts crossterm events to Visur key tokens; it does not
+    implement a second keymap or editing model.</figcaption></figure>
+  <p class="source-ref"><a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a> ·
+    <a href="../src/main/java/com/ple/visur/InitializerService.java">InitializerService.java</a> ·
+    <a href="../terminal/src/keys.rs">terminal/src/keys.rs</a></p>
 
-  <figure>
-    <pre class="diagram">
-// InitializerService.java:186-224  — one Keymap per EditorSubmode value
-keymapMap.put(EditorSubmode.navigate, navigateKeymap)   // 9 submodes in all
-keymapMap.put(EditorSubmode.insert,   insertKeymap)
-…
-
-// InitializerService.java:228-244  — the navigate bindings, as compiled sentences
-keymap.put(KeyPressed.from("h"), ccs.compile("-1 0 relativeMove"))
-keymap.put(KeyPressed.from("l"), ccs.compile( "1 0 relativeMove"))
-keymap.put(KeyPressed.from("j"), ccs.compile( "0 1 relativeMove"))
-keymap.put(KeyPressed.from("k"), ccs.compile( "0 -1 relativeMove"))
-keymap.put(KeyPressed.from("i"), ccs.compile("\"span\" \"tempSpan\" -> … \"insert\" changeMode …"))
-    </pre>
-    <figcaption>
-      <code>Keymap.get</code> checks the static map first, then falls back to the
-      keymap's <code>KeymapHandler[]</code> — that fallback is how insert and
-      replace mode turn <em>any</em> character into a command.
-    </figcaption>
-  </figure>
-
-  <p class="source-ref">
-    <a href="../src/main/java/com/ple/visur/InitializerService.java#L186-224">InitializerService.java:186–224</a> ·
-    <a href="../src/main/java/com/ple/visur/InitializerService.java#L228-269">lines 228–269</a> ·
-    <a href="../src/main/java/com/ple/visur/Keymap.java#L21-39">Keymap.java:21–39</a> ·
-    <a href="../src/main/java/com/ple/visur/KeymapMap.java#L10-22">KeymapMap.java:10–22</a> ·
-    <a href="../src/main/java/com/ple/visur/EditorSubmode.java#L3-12">EditorSubmode.java:3–12</a>.
-  </p>
-
-  <figure>
-    <pre class="diagram">
-// KeyWasPressedVerticle.java:14-33 — the whole dispatch
-handle(event):
-  key = json(event.body())["key"]
-  if isInCommandState → commandStateService.executeCommandState(key)
-  else:
-     keymap = emc.getKeymapMap().get(emc.getEditorSubmode())   // top of stack
-     cmd    = keymap.get(KeyPressed.from(key))
-     if cmd != null → commandExecutionService.execute(cmd)
-  bus.send("modelWasChanged", null)                            // always, even on a no-op
-    </pre>
-    <figcaption>
-      The lookup is by <strong>submode</strong>, and the pushed submode always
-      wins (<code>getEditorSubmode</code> peeks the stack). There is no
-      per-mode branch here at all.
-    </figcaption>
-  </figure>
-
-  <p class="source-ref">
-    <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java#L14-33">KeyWasPressedVerticle.java:14–33</a> ·
-    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L115-118">EditorModelCoupler.java:115–118</a> ·
-    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L128-130">lines 128–130</a>.
-  </p>
-
+  <hr class="divider">
+  <h2 id="relay">4. The <code>modelWasChanged</code> Trigger and Published View</h2>
   <p>
-    Two consequences worth memorising. First, a keystroke that matches nothing
-    still ends with <code>modelWasChanged</code>, so the browser always receives
-    a fresh snapshot — the client is a pure function of the last payload, never a
-    local predictor of the next state. Second, because routing is by submode,
-    releasing control (<code>"navigate" pushSubmode</code>,
-    <code>removeSubmode</code>) is part of the command sentence itself: the
-    handler compiles its own way out.
+    A key handler sends the internal <code>modelWasChanged</code> trigger after
+    dispatch. A viewport declaration updates the stored grid and sends the same
+    trigger with <code>{"full":true}</code>. The model verticle then projects
+    the current state and <em>publishes</em> the view. The old browser relay and
+    its extra <code>modelWasChanged</code> bridge permissions are no longer part
+    of the protocol.
   </p>
-
-  <p class="source-ref">
-    <a href="../src/main/java/com/ple/visur/SpanSubmodeHandler.java#L12-25">SpanSubmodeHandler.java:12–25</a> ·
-    <a href="../src/main/java/com/ple/visur/SearchForwardSubmodeHandler.java#L9-37">SearchForwardSubmodeHandler.java:9–37</a> ·
-    <a href="../src/main/java/com/ple/visur/ChangeScopeSubmodeHandler.java#L10-21">ChangeScopeSubmodeHandler.java:10–21</a>.
+  <p>
+    The browser bridge permits only key and viewport input and view output.
+    The terminal's socket is a direct pipe to the event bus: frames in both
+    directions use <code>{"address":…,"body":…}</code>. On connection it
+    registers for published views; on close or exception it unregisters. The
+    route is loopback-only at <code>127.0.0.1:8888/ws</code>, with no SockJS
+    framing, session id, or heartbeat. Source:
+    <a href="../src/main/java/com/ple/visur/MainVerticle.java">MainVerticle</a> and
+    <a href="../terminal/src/transport.rs">terminal/src/transport.rs</a>.
   </p>
 
   <hr class="divider">
-
-  <h2 id="relay">4. The <code>modelWasChanged</code> Relay</h2>
-
+  <h2 id="render">5. Two Renderers, One View</h2>
+  <h3>Browser canvas</h3>
   <p>
-    <code>KeyWasPressedVerticle</code> closes the loop with
-    <code>bus.send(BusEvent.modelWasChanged.name(), null)</code>. Vert.x
-    <code>send</code> is <em>point-to-point</em>: it picks exactly one local
-    handler for the address, round-robin. That matters because the bridge adds a
-    second one.
+    <a href="../src/main/resources/static/visur.js">visur.js</a> keeps the
+    latest view, clears and repaints the canvas, draws the provided row strings,
+    and uses the server-projected cursor row/column. It still owns browser
+    presentation details—font, cell metrics, pixel offsets, canvas painting and
+    HTML status text. It does not wrap the document or send a
+    <code>modelWasChanged</code> echo. Browser traffic remains SockJS through
+    <code>/eventbus</code>.
   </p>
-
-  <figure>
-    <pre class="diagram">
-                                                        Vert.x, local event bus
-  bus.send("modelWasChanged")  ──────────────▶  handlers for "modelWasChanged"
-                                                 ├── ModelWasChangedVerticle:13   (consumer)
-                                                 └── bridge outbound handler      (consumer,
-                                                      created when the browser         created by
-                                                      called registerHandler)          EventBusBridgeImpl:243
-
-  deliverMessageLocally: "//Choose one" → nextHandler → handlers.next()   (round robin)
-    </pre>
-    <figcaption>
-      Verified in the framework, not inferred: the bridge registers a plain
-      local consumer per outbound registration
-      (<a href="https://github.com/eclipse-vertx/vert.x/blob/4.4.4/vertx-web/src/main/java/io/vertx/ext/web/handler/sockjs/impl/EventBusBridgeImpl.java#L243">EventBusBridgeImpl:243</a>),
-      and <code>send</code> delivers to one handler
-      (<a href="https://github.com/eclipse-vertx/vert.x/blob/4.4.4/src/main/java/io/vertx/core/eventbus/impl/EventBusImpl.java#L353-364">EventBusImpl:353–364</a>).
-    </figcaption>
-  </figure>
-
+  <h3>Rust terminal client</h3>
   <p>
-    So once a browser page is open, roughly half of the
-    <code>modelWasChanged</code> sends land back in the browser instead of in
-    <code>ModelWasChangedVerticle</code>. The browser's handler then re-sends the
-    same address (<code>visur.js:116–119</code>), which is another point-to-point
-    send through the same two-way choice. The view therefore still updates — it
-    just takes an extra browser round trip whenever the first send was routed to
-    the bridge.
+    <a href="../terminal/README.md">terminal/</a> is a separate Rust renderer.
+    Its protocol codec consumes the same <code>viewWasChanged</code> envelope;
+    the client keeps a view shadow and cell grid, composes rows, computes row-run
+    damage, and emits terminal escape sequences. It has its own lifecycle and
+    launcher; <a href="../visur">the root launcher</a> uses an existing server
+    or starts and owns one as needed. <code>./gradlew run</code> still starts the
+    server by itself. See the component breakdown in
+    <a href="../docs/wayfinder/renderer-delivery/spec.md#5-the-terminal-client">the renderer specification</a>.
   </p>
-
-  <p class="source-ref">
-    <a href="../src/main/resources/static/visur.js#L116-119">visur.js:116–119</a> ·
-    <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java#L31">KeyWasPressedVerticle.java:31</a> ·
-    <a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L34">CanvasWasChangedVerticle.java:34</a> ·
-    <a href="../src/main/java/com/ple/visur/MainVerticle.java#L46">MainVerticle.java:46</a> (the outbound permission that makes the handler legal).
+  <p>
+    The client is a stateless painter in the editor sense: its cache is only what
+    it paints, not authoritative document or editing state. It can restart and
+    reconstruct the display from a complete view. Terminal viewport rows exclude
+    the mode line, and resize reports a new viewport then receives a full view.
   </p>
-
-  <div class="callout warning">
-    <strong>Verified vs. inferred.</strong> That the bridge registers a competing
-    consumer, and that <code>send</code> chooses one handler round-robin, are
-    both read from the Vert.x 4.4.4 source. That the browser's re-send was
-    written <em>on purpose</em> as a relay is an inference — the strongest
-    supporting evidence is the otherwise-unnecessary outbound permission for
-    <code>modelWasChanged</code>. Ask the author before repeating the "why".
-  </div>
 
   <hr class="divider">
-
-  <h2 id="render">5. What the Browser Does With the Snapshot</h2>
-
-  <p>
-    The handler assigns each field to a module-level variable
-    (<code>visur.js:1–11</code>), clears the canvas, and calls
-    <code>drawCanvas()</code>. That function is a single walk over the visible
-    absolute range:
-  </p>
-
-  <figure>
-    <pre class="diagram">
-// visur.js:136-173
-for absX = canvasStart … canvasEnd:
-    if span > 0                     → highlight the cell if cursorQuantumStart ≤ absX &lt; cursorQuantumEnd
-    else if isAtQuantumStart        → caret at absX == cursorQuantumStart
-    else                            → caret at absX == cursorQuantumEnd
-    if absX &lt; editorContent.length → fillText(editorContent[absX], x, y);  x++
-    if editorContent[absX] == "\n" or x % canvasWidth == 0 → y++; x = 0
-
-// then the footer, from the same payload (visur.js:75-107)
-isInCommandState        → ";" + commandStateContent with "|" at commandCursor
-submode == searchForward→ scopeQuantum + " (f) " + searchTarget
-submode …               → "ABOVE SUBMODE" / mode == submode ? "… MODE" : "… SUBMODE"
-else                    → + "; SPAN = " + span
-    </pre>
-    <figcaption>
-      The renderer is stateless: every frame is derived from the payload plus its
-      own canvas metrics. There is no rendering cache to invalidate.
-    </figcaption>
-  </figure>
-
-  <p class="source-ref">
-    <a href="../src/main/resources/static/visur.js#L136-173">visur.js:136–173</a> ·
-    <a href="../src/main/resources/static/visur.js#L199-209">drawCursor:199–209</a> ·
-    <a href="../src/main/resources/static/visur.js#L75-107">footer:75–107</a> ·
-    <a href="../src/main/resources/static/visur.html#L30-35">visur.html:30–35</a> (one canvas, two footer divs, three scripts).
-  </p>
-
-  <p>
-    Note where <code>canvasWidth</code> comes from in that loop: the browser's
-    <em>own</em> <code>let canvasWidth = Math.floor(canvas.width / cellWidth)</code>
-    (<code>visur.js:29</code>). The payload never carries it. The server keeps a
-    second copy, computed from the numbers the browser sent at startup as
-    <code>(canvas.width − 6) / cellWidth + 1</code>
-    (<code>visur.js:110–113</code> → <code>CanvasWasChangedVerticle:15–21</code>),
-    and uses it for scroll and quantum bounds. Two formulas, two owners, one
-    notion of "a line": the wrap agreement between server and client is a
-    coincidence to watch, not a guarantee.
-  </p>
-
-  <div class="callout">
-    <strong>The first paint has its own path.</strong> On
-    <code>eb.onopen</code> the browser registers the <code>viewWasChanged</code>
-    handler, registers the <code>modelWasChanged</code> relay, and <em>then</em>
-    sends <code>canvasWasChanged</code> — which is what triggers
-    <code>CanvasWasChangedVerticle</code> → <code>modelWasChanged</code> →
-    <code>viewWasChanged</code> and the first frame. There is no resize
-    listener anywhere in <code>visur.js</code>: the canvas is sized once
-    (<code>visur.js:13–19</code>) and <code>canvasWasChanged</code> is sent once
-    (<code>visur.js:120</code>).
-  </div>
-
-  <hr class="divider">
-
-  <h2 id="corrections">6. Itinerary and Wiki Corrections</h2>
-
-  <p>
-    Lesson 9's bullets name real types, but three of them mis-state direction or
-    ownership. Trust the source.
-  </p>
-
+  <h2 id="corrections">6. What Changed from the Earlier Protocol</h2>
   <table>
-    <thead>
-      <tr><th>The itinerary / wiki says</th><th>What the code does</th></tr>
-    </thead>
+    <thead><tr><th>Former teaching claim</th><th>Current source</th></tr></thead>
     <tbody>
-      <tr>
-        <td><code>View</code> — "the complete editor state snapshot sent to the
-          browser (content, cursor, mode, quantum, span, search target, command
-          state)". The wiki's <code>view.md</code> repeats this field list.</td>
-        <td><code>View</code> has exactly <strong>two</strong> fields,
-          <code>ca</code> and <code>editorContent</code>
-          (<a href="../src/main/java/com/ple/visur/View.java#L3-6">View.java:3–6</a>).
-          The snapshot is an inline <code>JsonObject</code> of 15 (+1 conditional)
-          fields built in
-          <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L24-52">ModelWasChangedVerticle.toJson()</a>,
-          and the one <code>View</code> field that does ship
-          (<code>ca</code>) is never read by the client.</td>
-      </tr>
-      <tr>
-        <td><code>ModelWasChangedVerticle</code> — "broadcasts
-          <code>modelWasChanged</code>"</td>
-        <td>It <em>consumes</em> <code>modelWasChanged</code> and sends
-          <code>viewWasChanged</code> (<a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L11-22">ModelWasChangedVerticle.java:11–22</a>).
-          It never sends <code>modelWasChanged</code>.</td>
-      </tr>
-      <tr>
-        <td><code>CanvasWasChangedVerticle</code> — "broadcasts
-          <code>canvasWasChanged</code>"</td>
-        <td>It <em>consumes</em> <code>canvasWasChanged</code> and sends
-          <code>modelWasChanged</code>
-          (<a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java#L12-34">CanvasWasChangedVerticle.java:12–34</a>).
-          It never sends <code>canvasWasChanged</code>.</td>
-      </tr>
-      <tr>
-        <td><code>Keymap</code> — "maps keyboard events to actions, organized by
-          mode"; <code>KeymapHandler</code> "dispatches key events through
-          mode-specific routing"</td>
-        <td>The <code>KeymapMap</code> is keyed by <strong>EditorSubmode</strong>
-          (<a href="../src/main/java/com/ple/visur/KeymapMap.java#L10">KeymapMap.java:10</a>),
-          and dispatch reads the top of the submode stack
-          (<a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java#L22-24">KeyWasPressedVerticle.java:22–24</a>).
-          The model slot is even named <code>modeToKeymap</code> while holding
-          the submode-keyed map
-          (<a href="../src/main/java/com/ple/visur/EditorModelCoupler.java#L128-130">EditorModelCoupler.java:128–130</a>).</td>
-      </tr>
-      <tr>
-        <td>Wiki <code>bus-event.md</code>: "<code>modelWasChanged</code> —
-          Server → Server: internal notification"</td>
-        <td>True for the server's own <code>send</code>, but the browser also
-          registers a handler for it and re-sends it: it is both an internal
-          address and a browser-relayed one (§4).</td>
-      </tr>
+      <tr><td><code>canvasWasChanged</code> / <code>CanvasWasChangedVerticle</code></td><td><code>viewportWasChanged {cols,rows}</code> / <code>ViewportWasChangedVerticle</code></td></tr>
+      <tr><td><code>View</code> is a two-field scratch object and JSON is built by <code>toJson()</code></td><td><code>View</code> is a 17-field record with <code>of</code> and <code>render</code>; the verticle pipes and publishes it</td></tr>
+      <tr><td>Payload includes <code>editorContent</code>, <code>ca</code>, <code>canvasStart</code>, <code>canvasEnd</code></td><td>Payload includes <code>origin</code>, pre-wrapped <code>rows</code>, and server-derived <code>cursorRow</code>/<code>cursorCol</code>; old fields are removed</td></tr>
+      <tr><td><code>searchTarget</code> is conditional</td><td>It is always present; empty when not searching</td></tr>
+      <tr><td>All event-bus traffic is point-to-point; no publishing</td><td>View state is published to all attached renderers</td></tr>
+      <tr><td>SockJS is the only renderer transport</td><td>Browser uses SockJS; Rust terminal uses plain JSON WebSocket at <code>/ws</code></td></tr>
+      <tr><td>Browser wraps and computes the cursor cell</td><td>Server <code>Viewport</code> wraps rows and projects cursor coordinates; clients paint them</td></tr>
     </tbody>
   </table>
 
   <hr class="divider">
-
   <h2 id="trace">7. Retrieval Practice: Trace Both Paths</h2>
-
-  <p>
-    Pick the address for each hop from memory. A wrong pick is marked and you can
-    try again; the receiver, payload, and reasoning appear when you are right.
-    Switch traces between the boot path and a keystroke.
-  </p>
-
+  <p>Choose the address for each hop. Browser boot and terminal resize enter through the viewport declaration; a key from either renderer follows the editing path. Each trace ends at the same complete view contract.</p>
   <div class="protocol-trace">
     <script type="application/json">
     {
-      "addresses": ["canvasWasChanged", "keyWasPressed", "modelWasChanged", "viewWasChanged"],
+      "addresses": ["viewportWasChanged", "keyWasPressed", "modelWasChanged", "viewWasChanged"],
       "traces": [
         {
-          "label": "Boot: the first paint",
+          "label": "Viewport declaration: browser startup or terminal resize",
           "steps": [
-            {
-              "from": "visur.js · eb.onopen",
-              "addr": "canvasWasChanged",
-              "to": "CanvasWasChangedVerticle",
-              "payload": "{ width: (canvas.width - 6) / cellWidth + 1,\n  height: (canvas.height - 20) / cellHeight + 1 }",
-              "note": "The browser's first message. It is inbound-permitted and its only consumer is CanvasWasChangedVerticle, which stores the two numbers on the editor model."
-            },
-            {
-              "from": "CanvasWasChangedVerticle",
-              "addr": "modelWasChanged",
-              "to": "ModelWasChangedVerticle (or the bridge, §4)",
-              "payload": "\"true\"",
-              "note": "The verticle stores width and height, prints the visible lines to stdout, then re-enters the same internal address a keystroke would use. This is what makes the first frame happen."
-            },
-            {
-              "from": "ModelWasChangedVerticle",
-              "addr": "viewWasChanged",
-              "to": "visur.js · viewWasChanged handler",
-              "payload": "{ ca, editorContent, span, canvasStart, canvasEnd,\n  cursorQuantumStart, cursorQuantumEnd, editorMode, editorSubmode,\n  cursorQuantum, scopeQuantum, isAtQuantumStart, isInCommandState,\n  commandStateContent, commandCursor }",
-              "note": "The only server → browser address that carries state. Built inline in toJson(); View contributes just ca and editorContent."
-            }
+            {"from":"Browser or terminal","addr":"viewportWasChanged","to":"ViewportWasChangedVerticle","payload":"{cols: 100, rows: 29}","note":"Cell counts, with renderer chrome already excluded. Terminal sends the bus envelope over /ws; the browser sends through the SockJS bridge."},
+            {"from":"ViewportWasChangedVerticle","addr":"modelWasChanged","to":"ModelWasChangedVerticle","payload":"{full:true}","note":"The server stores the new grid and requests a full view because row geometry changed."},
+            {"from":"ModelWasChangedVerticle","addr":"viewWasChanged","to":"All attached renderers","payload":"17-field complete viewport snapshot","note":"The view is published, not point-to-point sent. Rows and cursor coordinates are ready to paint."}
           ],
-          "coda": "Boot is the same loop as editing, entered from the canvas side: canvasWasChanged → modelWasChanged → viewWasChanged. Nothing repaints until the browser asks for the canvas size."
+          "coda":"A viewport change changes layout, so the next complete view carries full:true."
         },
         {
-          "label": "One keystroke: j",
+          "label":"One keystroke: j",
           "steps": [
-            {
-              "from": "visur.js · keydown",
-              "addr": "keyWasPressed",
-              "to": "KeyWasPressedVerticle",
-              "payload": "JSON.stringify({ key: \"j\" })",
-              "note": "event.key is forwarded verbatim. No client-side keymap; the browser does not know what j means."
-            },
-            {
-              "from": "KeyWasPressedVerticle",
-              "addr": "modelWasChanged",
-              "to": "ModelWasChangedVerticle (or the bridge, §4)",
-              "payload": "null",
-              "note": "Sent unconditionally after dispatch — including for keys that matched no binding. The body is null and is ignored by the receiver."
-            },
-            {
-              "from": "ModelWasChangedVerticle",
-              "addr": "viewWasChanged",
-              "to": "visur.js · viewWasChanged handler",
-              "payload": "the same 15-field JsonObject, with new values for\ncanvasStart / cursorQuantumStart / cursorQuantumEnd / span\n(and ca / editorContent if the command edited text)",
-              "note": "handleChange re-reads the EditorModelCoupler for every field, so the payload is a fresh snapshot, not an increment."
-            },
-            {
-              "from": "visur.js (no bus)",
-              "addr": "viewWasChanged",
-              "to": "the canvas",
-              "payload": "clearCanvas() → drawCanvas() → footer update",
-              "note": "No address at all: the handler repaints locally from the payload it just received. The next hop is a pixel, and the loop starts again on the next keydown."
-            }
+            {"from":"Browser or terminal","addr":"keyWasPressed","to":"KeyWasPressedVerticle","payload":"{key: j}","note":"Both clients forward a Visur key token; command meaning stays on the server."},
+            {"from":"KeyWasPressedVerticle","addr":"modelWasChanged","to":"ModelWasChangedVerticle","payload":"null","note":"The key handler triggers a fresh projection after command dispatch."},
+            {"from":"ModelWasChangedVerticle","addr":"viewWasChanged","to":"All attached renderers","payload":"complete 17-field viewport state","note":"The server has already laid out rows and cursor position; each renderer paints its own display."}
           ],
-          "coda": "One key, one command, one snapshot, one repaint. The browser is a terminal: it sends the key and draws whatever comes back. Note that 'j' contributes 0 1 relativeMove to the bus only after CommandCompileService compiled it at startup — the wire carries a VisurCommand, not text."
+          "coda":"One key mutates shared editor state; the server publishes a complete viewport snapshot to every attached renderer."
         }
       ]
     }
@@ -564,248 +257,81 @@ else                    → + "; SPAN = " + span
   </div>
 
   <div class="callout success">
-    <strong>Hands-on (10 min): watch the wire.</strong>
-    <ol>
-      <li>Build and run: <code>./gradlew fatJar</code> then
-        <code>java -jar build/libs/visur-1.0.0-SNAPSHOT-fat.jar</code>. Open
-        <code>http://localhost:8888</code> (it 302s to
-        <code>/static/visur.html</code>).</li>
-      <li>DevTools → console. The page creates a global <code>eb</code>
-        (<code>var eb = new EventBus(…)</code>, <code>visur.js:46</code>).
-        Inject a keystroke without pressing a key:
-        <code>eb.send("keyWasPressed", JSON.stringify({key:"j"}))</code>. The
-        cursor should move down one line and
-        <code>"modelWasChanged message: …"</code> should print — you are standing
-        in the relay of §4.</li>
-      <li>Re-send the canvas size and watch the footer's wrap and
-        <code>SPAN</code> text change:
-        <code>eb.send("canvasWasChanged", JSON.stringify({width:40,height:20}))</code>.</li>
-      <li>Prove <code>ca</code> is dead on the client:
-        <code>grep -n "\bca\b" src/main/resources/static/visur.js</code> returns
-        only its declaration and its one assignment.</li>
-      <li>Watch a payload land: <code>eb.registerHandler("viewWasChanged", (e,m) =&gt; console.log(m.body))</code> and press a key.</li>
-    </ol>
+    <strong>Hands-on:</strong> Run <code>./gradlew run</code> and open
+    <code>http://localhost:8888/static/visur.html</code>, or use
+    <code>./visur</code> to launch the Rust client. Inspect a view and verify
+    <code>rows</code>, <code>origin</code>, <code>cursorRow</code>,
+    <code>cursorCol</code>, and the always-present <code>searchTarget</code>.
+    Resize either client and observe a viewport declaration followed by
+    <code>full: true</code>.
   </div>
 
   <hr class="divider">
-
   <h2 id="quiz">8. Retrieval Practice: The Model and the Wire</h2>
-
-  <p>Answer from memory before scrolling back. Options are shuffled each time.</p>
-
+  <p>Answer from memory before checking the explanation.</p>
   <div class="quiz">
     <script type="application/json">
     [
-      {
-        "q": "Which class actually holds the editor snapshot sent to the browser?",
-        "options": [
-          "The inline JSON object built in toJson",
-          "The View class declaring two public fields",
-          "The EditorModelCoupler shared state hub",
-          "The CanvasWasChangedVerticle storing widths"
-        ],
-        "answer": 0,
-        "explain": "View is a 2-field scratch object (ca, editorContent). ModelWasChangedVerticle.toJson() puts the other 14 fields on a fresh JsonObject and ships that."
-      },
-      {
-        "q": "What does ModelWasChangedVerticle send when it wakes up?",
-        "options": [
-          "One viewWasChanged carrying the snapshot",
-          "One canvasWasChanged carrying the viewport",
-          "One modelWasChanged carrying the snapshot",
-          "One keyWasPressed carrying the last key"
-        ],
-        "answer": 0,
-        "explain": "It consumes modelWasChanged and sends viewWasChanged. The itinerary's claim that it broadcasts modelWasChanged inverts its direction."
-      },
-      {
-        "q": "Which address does the browser's very first send travel on?",
-        "options": [
-          "The canvasWasChanged address with two cell counts",
-          "The keyWasPressed address with an empty key",
-          "The modelWasChanged address with a null body",
-          "The viewWasChanged address with no body set"
-        ],
-        "answer": 0,
-        "explain": "eb.onopen sends canvasWasChanged {width, height}; that reaches CanvasWasChangedVerticle, which sends modelWasChanged, which yields the first viewWasChanged."
-      },
-      {
-        "q": "Which snapshot field does the browser read but never act on?",
-        "options": [
-          "The absolute character index named ca",
-          "The viewport start index named canvasStart",
-          "The highlight width number named span",
-          "The command line cursor named commandCursor"
-        ],
-        "answer": 0,
-        "explain": "visur.js assigns ca at line 50 and never reads it again. The cursor is drawn from cursorQuantumStart/End plus isAtQuantumStart instead."
-      },
-      {
-        "q": "What is the KeymapMap actually keyed by in Visur?",
-        "options": [
-          "Editor submodes, with navigate and insert included",
-          "Editor modes, with navigate and insert included",
-          "Editor submodes, with only the six non-default ones",
-          "Editor modes, with only the three named in the enum"
-        ],
-        "answer": 0,
-        "explain": "KeymapMap is Map<EditorSubmode, Keymap> and includes navigate, insert, and replace among its nine keys. Dispatch peeks the top of the submode stack."
-      },
-      {
-        "q": "Why can a modelWasChanged send reach the browser?",
-        "options": [
-          "The bridge registers a consumer for outbound addresses",
-          "The bridge publishes modelWasChanged to every socket",
-          "The verticle publishes modelWasChanged to every socket",
-          "The event bus mirrors sends across the SockJS socket"
-        ],
-        "answer": 0,
-        "explain": "A browser registerHandler for an outbound-permitted address makes the bridge add a real local consumer; send then picks one of the two handlers round-robin. The browser re-sends to relay it."
-      }
+      {"q":"Which address declares a renderer's content grid?","options":["viewportWasChanged with cell-valued cols and rows","viewWasChanged with pixel width and height","modelWasChanged with a viewport object","keyWasPressed with terminal dimensions"],"answer":0,"explain":"viewportWasChanged carries cols and rows in cells; clients exclude their own chrome."},
+      {"q":"What does a viewWasChanged body contain?","options":["A complete 17-field viewport snapshot","The whole editorContent and a delta","Only cursorQuantumStart and cursorQuantumEnd","A renderer-specific screen buffer"],"answer":0,"explain":"The message is complete and bounded: pre-wrapped rows, origins, cursor row/column and editor display state."},
+      {"q":"Which renderer uses the plain WebSocket route /ws?","options":["The Rust terminal client","The browser canvas","Both use SockJS only","Neither; /ws is a SockJS alias"],"answer":0,"explain":"The terminal connects to loopback WebSocket /ws using address/body bus envelopes. The browser remains on SockJS /eventbus."},
+      {"q":"Why does ModelWasChangedVerticle publish the view?","options":["Every attached renderer must receive the state update","The browser must relay modelWasChanged","Only one renderer is allowed to consume the message","Publish performs row wrapping in the client"],"answer":0,"explain":"viewWasChanged is shared renderer state, so every attached renderer gets the complete view."},
+      {"q":"Who wraps document text into screen rows?","options":["The server's Viewport; renderers paint the supplied rows","Each renderer independently","The terminal only","The browser's canvasWidth loop"],"answer":0,"explain":"Viewport performs layout once on the server; row boundaries and origins travel in the payload."}
     ]
     </script>
   </div>
 
   <hr class="divider">
-
   <h2 id="primary-source">9. Primary Source</h2>
-
-  <p>
-    This lesson's ground truth is small enough to read completely; read these
-    four in order, in one sitting:
-  </p>
-
   <ol>
-    <li><a href="../src/main/java/com/ple/visur/BusEvent.java">BusEvent.java</a> —
-      four values, four direction comments. The whole protocol in 15 lines.</li>
-    <li><a href="../src/main/resources/static/visur.js">visur.js</a> — the
-      production client. Read <code>eb.onopen</code> (
-      <a href="../src/main/resources/static/visur.js#L46-121">46–121</a>),
-      <code>sendKeyPressedEvent</code>
-      (<a href="../src/main/resources/static/visur.js#L123-134">123–134</a>), and
-      <code>drawCanvas</code>
-      (<a href="../src/main/resources/static/visur.js#L136-173">136–173</a>).
-      Everything above the canvas is state assignment.</li>
-    <li><a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a> —
-      the real view model, and the only place <code>View</code> is used.</li>
-    <li><a href="../src/main/java/com/ple/visur/MainVerticle.java#L30-66">MainVerticle.java:30–66</a> —
-      the bridge permissions. Compare them line by line with
-      <code>BusEvent</code>; every permission has exactly one sender.</li>
+    <li><a href="../src/main/java/com/ple/visur/BusEvent.java">BusEvent.java</a> and <a href="../src/main/java/com/ple/visur/MainVerticle.java">MainVerticle.java</a> — addresses, routes and permissions.</li>
+    <li><a href="../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java">ViewportWasChangedVerticle.java</a> — viewport declaration and full refresh trigger.</li>
+    <li><a href="../src/main/java/com/ple/visur/View.java">View.java</a>, <a href="../src/main/java/com/ple/visur/Viewport.java">Viewport.java</a>, and <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a> — projection, layout and publication.</li>
+    <li><a href="../src/main/resources/static/visur.js">visur.js</a> — browser renderer; <a href="../terminal/src/protocol.rs">terminal/src/protocol.rs</a>, <a href="../terminal/src/screen.rs">screen.rs</a>, and <a href="../terminal/src/paint.rs">paint.rs</a> — terminal protocol and painting.</li>
+    <li><a href="../terminal/src/transport.rs">transport.rs</a>, <a href="../terminal/src/lifecycle.rs">lifecycle.rs</a>, <a href="../terminal/src/main.rs">main.rs</a>, and <a href="../visur">launcher</a> — transport, terminal lifecycle and startup.</li>
   </ol>
-
-  <p>
-    For the framework layer under §§1 and 4 the primary sources are the Vert.x
-    4.4.4 classes themselves:
-    <a href="https://github.com/eclipse-vertx/vert.x/blob/4.4.4/src/main/java/io/vertx/core/eventbus/impl/EventBusImpl.java#L353-390">EventBusImpl</a>
-    (point-to-point delivery and round-robin handler choice) and
-    <a href="https://github.com/eclipse-vertx/vert.x/blob/4.4.4/vertx-web/src/main/java/io/vertx/ext/web/handler/sockjs/impl/EventBusBridgeImpl.java#L185-264">EventBusBridgeImpl</a>
-    (how <code>registerHandler</code> becomes a local consumer).
-    Do not take Visur's behaviour on faith from this lesson — both files are
-    short and settle §4 definitively.
-  </p>
-
-  <p>
-    A useful external analogy for the whole design is a
-    <a href="https://en.wikipedia.org/wiki/Remote_procedure_call">remote
-    procedure call</a> with a server-push channel: the client sends a request
-    (<code>keyWasPressed</code>), the server replies on a different channel
-    (<code>viewWasChanged</code>), and the client holds no model of its own. The
-    difference here is that the server pushes the <em>whole</em> snapshot rather
-    than a delta, so there is nothing to reconcile.
-  </p>
+  <p>For the exact payload contract and renderer obligations, read
+    <a href="../docs/wayfinder/renderer-delivery/spec.md">renderer-delivery/spec.md</a>;
+    measured implementation verdicts are in
+    <a href="../docs/wayfinder/terminal-build/conformance.md">terminal-build/conformance.md</a>.</p>
 
   <hr class="divider">
-
   <h2 id="takeaways">10. Key Takeaways</h2>
-
   <ul>
-    <li><strong>Four addresses, one ring.</strong>
-      <code>keyWasPressed</code> and <code>canvasWasChanged</code> are inbound,
-      <code>viewWasChanged</code> is outbound, and <code>modelWasChanged</code>
-      is the internal hinge — sent by both the keystroke verticle and the canvas
-      verticle, and (see below) by the browser too.</li>
-    <li><strong>Each of the three verticles consumes one address and sends a
-      different one.</strong> Nothing in Visur broadcasts or publishes.</li>
-    <li><strong>The view model is an inline JsonObject in
-      <code>toJson()</code>.</strong> <code>View</code> is a two-field scratch
-      object, and its <code>ca</code> field is dead weight on the client.</li>
-    <li><strong>Routing is by submode, not mode.</strong>
-      <code>getEditorSubmode()</code> peeks the stack; the
-      <code>KeymapHandler</code> array is only the per-submode fallback that
-      turns arbitrary characters into commands.</li>
-    <li><strong>Every keystroke produces a snapshot, even a no-op.</strong> The
-      client never predicts the next state; it is a pure function of the last
-      payload.</li>
-    <li><strong><code>modelWasChanged</code> is relayed by the browser,</strong>
-      because <code>send</code> picks one of two local handlers once the bridge
-      has registered a consumer for the outbound registration.</li>
-    <li><strong>The renderer is stateless and has its own
-      <code>canvasWidth</code>,</strong> computed differently from the server's.
-      Wrap agreement between the two is a coincidence to verify, not a
-      contract.</li>
+    <li><code>viewportWasChanged</code> declares cell dimensions; <code>viewWasChanged</code> carries a complete, bounded viewport.</li>
+    <li><code>View</code> projects a record; <code>Viewport</code> lays out the rows; <code>ModelWasChangedVerticle</code> publishes.</li>
+    <li>Rows carry absolute starts and text; clients do not re-wrap, infer editor state, or apply deltas.</li>
+    <li>The browser remains the canvas/SockJS path; the Rust terminal is a second renderer on the loopback WebSocket bus-envelope route.</li>
+    <li>Viewport updates request a full repaint; published view updates reach every attached renderer.</li>
   </ul>
 
   <hr class="divider">
-
   <h2 id="next-steps">11. What Comes Next</h2>
+  <p><a href="0010-variables-registers-and-global-state.html">Lesson 10</a> opens the global variable map behind editor state. Those variables remain server-side; the renderer protocol carries only the projected fields needed to paint.</p>
+  <p class="source-ref">Related: <a href="../reference/view-protocol-map.html">View &amp; Bus Protocol Map</a> · <a href="../reference/variable-map.html">Global Variable Map</a> · <a href="../terminal/README.md">Terminal client</a></p>
 
-  <p>
-    <a href="0010-variables-registers-and-global-state.html">Lesson 10</a> is the last piece of state you have
-    seen on the wire but not yet opened: the global variable map behind
-    <code>emc.getCA()</code>, <code>getSpan()</code>, and
-    <code>getCursorQuantum()</code>. Variables are how the payload's values are
-    stored, typed, and recalled — and <code>nl</code> is already one of them.
-  </p>
-
-  <div class="callout">
-    <strong>I am your teacher—ask me anything.</strong> Good follow-ups for this
-    lesson: "write a tiny second client that only listens to
-    <code>viewWasChanged</code> and prints the payload", "show me the payload
-    byte-for-byte for a <code>3s</code> span selection", "what happens if two
-    browser tabs are open?", or "add a fifth field to the snapshot and wire it to
-    the footer".
-  </div>
-
-  <div class="annotation">
-    <p>
-      <strong>Source files for this lesson:</strong>
-      <a href="../src/main/java/com/ple/visur/BusEvent.java">BusEvent.java</a>,
-      <a href="../src/main/java/com/ple/visur/MainVerticle.java">MainVerticle.java</a>,
-      <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>,
-      <a href="../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java">CanvasWasChangedVerticle.java</a>,
-      <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>,
-      <a href="../src/main/java/com/ple/visur/AbstractVisurVerticle.java">AbstractVisurVerticle.java</a>,
-      <a href="../src/main/java/com/ple/visur/View.java">View.java</a>,
-      <a href="../src/main/java/com/ple/visur/Keymap.java">Keymap.java</a>,
-      <a href="../src/main/java/com/ple/visur/KeymapMap.java">KeymapMap.java</a>,
-      <a href="../src/main/java/com/ple/visur/KeymapHandler.java">KeymapHandler.java</a>,
-      <a href="../src/main/java/com/ple/visur/KeyPressed.java">KeyPressed.java</a>,
-      <a href="../src/main/java/com/ple/visur/EditingModeHandler.java">EditingModeHandler.java</a>,
-      <a href="../src/main/java/com/ple/visur/InsertModeHandler.java">InsertModeHandler.java</a>,
-      <a href="../src/main/java/com/ple/visur/ReplaceModeHandler.java">ReplaceModeHandler.java</a>,
-      <a href="../src/main/java/com/ple/visur/SpanSubmodeHandler.java">SpanSubmodeHandler.java</a>,
-      <a href="../src/main/java/com/ple/visur/ChangeCursorQuantumHandler.java">ChangeCursorQuantumHandler.java</a>,
-      <a href="../src/main/java/com/ple/visur/ChangeScopeSubmodeHandler.java">ChangeScopeSubmodeHandler.java</a>,
-      <a href="../src/main/java/com/ple/visur/QuantumStartSubmodeHandler.java">QuantumStartSubmodeHandler.java</a>,
-      <a href="../src/main/java/com/ple/visur/QuantumEndSubmodeHandler.java">QuantumEndSubmodeHandler.java</a>,
-      <a href="../src/main/java/com/ple/visur/SearchForwardSubmodeHandler.java">SearchForwardSubmodeHandler.java</a>,
-      <a href="../src/main/java/com/ple/visur/SearchBackwardSubmodeHandler.java">SearchBackwardSubmodeHandler.java</a>,
-      <a href="../src/main/resources/static/visur.js">visur.js</a>,
-      <a href="../src/main/resources/static/visur.html">visur.html</a>,
-      <a href="../frontEnd/editingScreen.js">frontEnd/editingScreen.js</a> (prototype for comparison —
-      <a href="../frontEnd/editingScreen.html">editingScreen.html</a>),
-      <a href="../src/main/resources/static/browser_input_service-proxy.js">browser_input_service-proxy.js</a> (generated, unused),
-      <a href="../build.gradle.kts">build.gradle.kts</a>.
-    </p>
-  </div>
+  <div class="annotation"><p><strong>Source files for this lesson:</strong>
+    <a href="../src/main/java/com/ple/visur/BusEvent.java">BusEvent.java</a>,
+    <a href="../src/main/java/com/ple/visur/MainVerticle.java">MainVerticle.java</a>,
+    <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>,
+    <a href="../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java">ViewportWasChangedVerticle.java</a>,
+    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>,
+    <a href="../src/main/java/com/ple/visur/View.java">View.java</a>,
+    <a href="../src/main/java/com/ple/visur/Viewport.java">Viewport.java</a>,
+    <a href="../src/main/resources/static/visur.js">visur.js</a>,
+    <a href="../terminal/README.md">terminal/README.md</a>,
+    <a href="../terminal/src/protocol.rs">protocol.rs</a>,
+    <a href="../terminal/src/transport.rs">transport.rs</a>,
+    <a href="../terminal/src/screen.rs">screen.rs</a>,
+    <a href="../terminal/src/paint.rs">paint.rs</a>,
+    <a href="../terminal/src/lifecycle.rs">lifecycle.rs</a>,
+    <a href="../terminal/src/main.rs">main.rs</a>,
+    <a href="../visur">launcher</a>.</p></div>
 
   <div class="lesson-nav">
     <a href="0008-cursor-position-coordinates-and-display.html">← Lesson 8: Cursor Position</a>
     <a href="../reference/view-protocol-map.html">Reference: View &amp; Bus Protocol Map →</a>
   </div>
-
-  <script src="../assets/protocol-trace.js"></script>
   <script src="../assets/quiz.js"></script>
-
 </body>
 </html>

@@ -16,6 +16,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
     final String key = keyJson.getString("key");
     KeyPressed keyPressed = KeyPressed.from(key);
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
+    enterCommandStateIfRequested(emc, key);
     if(emc.getIsInCommandState()) {
       ServiceHolder.commandStateService.executeCommandState(keyPressed);
     } else {
@@ -30,6 +31,14 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
 
     bus.send(BusEvent.modelWasChanged.name(), null);
 
+  }
+
+  static void enterCommandStateIfRequested(EditorModelCoupler emc, String key) {
+    if(!emc.getIsInCommandState() && key.equals(";") && emc.getEditorSubmode() == EditorSubmode.navigate) {
+      emc.putIsInCommandState(true);
+      emc.putCommandStateContent("");
+      emc.putCommandCursor(0);
+    }
   }
 
 }

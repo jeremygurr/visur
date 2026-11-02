@@ -335,6 +335,35 @@ fn view(text: &str, full: bool) -> String {
   )
 }
 
+fn command_view(content: &str, full: bool) -> String {
+  view(content, full)
+    .replace("\"isInCommandState\":false", "\"isInCommandState\":true")
+    .replace("\"commandStateContent\":\"\"", &format!("\"commandStateContent\":\"{content}\""))
+    .replace("\"commandCursor\":0", &format!("\"commandCursor\":{}", content.len()))
+}
+
+#[test]
+fn semicolon_command_line_is_painted_and_escape_returns_to_navigation() {
+  let (port, sent) = fake_server(Fake::Script(vec![
+    view("", true),
+    command_view("", false),
+    command_view("x", false),
+    view("", false),
+  ]));
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+  assert!(terminal.wait_for(Duration::from_secs(5), |t| t.frames() >= 1), "initial view was not painted");
+
+  assert!(terminal.press(";").is_some(), "semicolon did not produce a view");
+  assert!(terminal.press("x").is_some(), "typed text did not produce a view");
+  assert!(terminal.screen().contains(";x"), "command row was not painted: {:?}", terminal.screen());
+  assert!(terminal.press("\x1b").is_some(), "Escape did not produce a view");
+
+  let messages = sent.lock().unwrap().join("\n");
+  assert!(messages.contains("\"key\":\";\""), "semicolon was not sent: {messages}");
+  assert!(messages.contains("\"key\":\"x\""), "text was not sent: {messages}");
+  assert!(messages.contains("\"key\":\"Escape\""), "Escape was not sent: {messages}");
+}
+
 #[test]
 fn a_keystroke_paints_the_row_it_changed_not_the_screen() {
   let (port, _sent) = fake_server(Fake::Script(vec![view("hello", true), view("hellp", false)]));

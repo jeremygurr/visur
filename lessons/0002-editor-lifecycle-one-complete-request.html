@@ -82,13 +82,13 @@
   │           │                       │
   │           ▼                       │
   │  6. ModelWasChangedVerticle       │
-  │       reads coupler ──► toJson()  │
-  │       bus.send("viewWasChanged")  │
+  │       View.of → Viewport rows     │
+  │       publish viewWasChanged      │
   └───────────────────────────────────┘
      │
      │  eb.on("viewWasChanged", ...)
      ▼
-  drawCanvas() ──► repaint text, cursor, mode
+  drawView() ──► repaint rows, cursor, mode
     </pre>
     <figcaption>Figure 1: One complete request. The network is crossed twice—once
  to send the key, once to receive the view. Steps 2–4 are the heart of the
@@ -98,11 +98,11 @@
 
   <p>
     The five classes you must know to read this loop are:
-    <a href="../../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle</a>,
-    <a href="../../src/main/java/com/ple/visur/Keymap.java">Keymap</a>,
-    <a href="../../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService</a>,
-    <a href="../../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler</a>, and
-    <a href="../../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle</a>.
+    <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle</a>,
+    <a href="../src/main/java/com/ple/visur/Keymap.java">Keymap</a>,
+    <a href="../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService</a>,
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler</a>, and
+    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle</a>.
     Everything else is supporting cast.
   </p>
 
@@ -113,7 +113,7 @@
   <p>
     The loop only works because all three verticles read and write
     <strong>one shared state object</strong>—the
-    <a href="../../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler</a>
+    <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler</a>
     (<code>EditorModelCoupler.java</code>, line 14). It is constructed once, in
     <code>ServiceHolder</code>, and every verticle reaches it through the static
     field <code>ServiceHolder.editorModelCoupler</code>.
@@ -176,7 +176,7 @@ LocalMap&lt;EditorModelKey, Object&gt; editorModel   // EditorModelCoupler.java:
   <p>
     The <code>LocalMap</code> is untyped at the value end, but the key end is
     strongly typed by the
-    <a href="../../src/main/java/com/ple/visur/EditorModelKey.java">EditorModelKey</a>
+    <a href="../src/main/java/com/ple/visur/EditorModelKey.java">EditorModelKey</a>
     enum:
   </p>
 
@@ -218,7 +218,7 @@ public enum EditorModelKey {
   <h2 id="holder">3. ServiceHolder: The Registry</h2>
 
   <p>
-    If the coupler is the state, <a href="../../src/main/java/com/ple/visur/ServiceHolder.java">ServiceHolder</a>
+    If the coupler is the state, <a href="../src/main/java/com/ple/visur/ServiceHolder.java">ServiceHolder</a>
     is the <strong>registry of behavior</strong>. Its constructor runs once,
     during <code>MainVerticle.start()</code>, and assigns every service to a
     <code>public static</code> field:
@@ -256,7 +256,7 @@ ServiceHolder.init(sharedData)
   <h2 id="init">4. InitializerService: One-Time Setup</h2>
 
   <p>
-    <a href="../../src/main/java/com/ple/visur/InitializerService.java">InitializerService</a>
+    <a href="../src/main/java/com/ple/visur/InitializerService.java">InitializerService</a>
     is where the editor is born. Its constructor calls
     <code>initializeEditorModel()</code> (<code>InitializerService.java:28</code>),
     which populates the coupler in a fixed order:
@@ -310,7 +310,7 @@ emc.putKeymapMap(keymapMap);          // line 224
   <h2 id="ecs">5. EditorContentService: The Read/Write Helper</h2>
 
   <p>
-    <a href="../../src/main/java/CursorPositionDC/EditorContentService.java">EditorContentService</a>
+    <a href="../src/main/java/CursorPositionDC/EditorContentService.java">EditorContentService</a>
     (note: it lives in the <code>CursorPositionDC</code> package, not
     <code>com.ple.visur</code>) is the only class that touches the raw
     <code>LocalMap</code> besides the coupler. It is <strong>stateless</strong>—every
@@ -334,7 +334,7 @@ emc.putKeymapMap(keymapMap);          // line 224
     <li><code>updateNextLineIndices(...)</code>—recompute <code>nl</code> from the
       text (<code>EditorContentService.java:86</code>).</li>
     <li><code>getCanvasWidth/getCanvasHeight</code>—viewport dimensions, written by
-      <code>CanvasWasChangedVerticle</code>.</li>
+      <code>ViewportWasChangedVerticle</code>.</li>
   </ul>
 
   <div class="callout">
@@ -358,7 +358,7 @@ emc.putKeymapMap(keymapMap);          // line 224
 
   <p>
     The browser attaches one global listener
-    (<a href="../../src/main/resources/static/visur.js">visur.js</a>, line 132)
+    (<a href="../src/main/resources/static/visur.js">visur.js</a>, line 132)
     and forwards the raw key string:
   </p>
 
@@ -383,7 +383,7 @@ document.addEventListener('keydown', (event) => {
 
   <p>
     This is the branch point for all input
-    (<a href="../../src/main/java/com/ple/visur/KeyWasPressedVerticle.java#L14-33">KeyWasPressedVerticle.java:14–33</a>):
+    (<a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java#L14-33">KeyWasPressedVerticle.java:14–33</a>):
   </p>
 
   <figure>
@@ -419,7 +419,7 @@ public void handle(Message event) {
   <p>
     <code>emc.getEditorSubmode()</code> peeks the top of the submode stack;
     <code>keymapMap.get(navigate)</code> returns the <code>navigate</code>
-    <a href="../../src/main/java/com/ple/visur/Keymap.java">Keymap</a>. Then
+    <a href="../src/main/java/com/ple/visur/Keymap.java">Keymap</a>. Then
     <code>keymap.get(KeyPressed.from("j"))</code> returns the
     <code>VisurCommand</code> that was compiled from
     <code>"0 1 relativeMove"</code> back in
@@ -438,7 +438,7 @@ public void handle(Message event) {
 
   <p>
     A <code>VisurCommand</code> is a list of <code>Operator</code>s plus a
-    parallel list of per-operator info. <a href="../../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService.execute()</a>
+    parallel list of per-operator info. <a href="../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService.execute()</a>
     walks them in order and calls <code>Operator.execute(opInfo)</code> on each:
   </p>
 
@@ -465,7 +465,7 @@ public void execute(VisurCommand command) {
   <p>
     The operator pops its operands, asks the current quantum for the new absolute
     cursor position, and writes the result back into the coupler
-    (<a href="../../src/main/java/com/ple/visur/RelativeMoveOp.java">RelativeMoveOp.java</a>):
+    (<a href="../src/main/java/com/ple/visur/RelativeMoveOp.java">RelativeMoveOp.java</a>):
   </p>
 
   <figure>
@@ -512,41 +512,25 @@ public void execute(Object opInfo) {
   <h3 id="step-view">Step 6 — <code>ModelWasChangedVerticle</code> builds the View</h3>
 
   <p>
-    <a href="../../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L18-46">ModelWasChangedVerticle</a>
+    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L18-46">ModelWasChangedVerticle</a>
     reads the coupler and serializes a snapshot:
   </p>
 
   <figure>
     <pre class="diagram">
 public void handleChange(Message&lt;Object&gt; event) {
-  view.ca = emc.getCA();
-  view.editorContent = emc.getEditorContent();
-  vertx.eventBus().send(BusEvent.viewWasChanged.name(), toJson());
+  boolean full = isFull(event.body());
+  JsonObject payload = View.of(emc, full).render();
+  vertx.eventBus().publish(BusEvent.viewWasChanged.name(), payload);
 }
 
-public JsonObject toJson() {
-  output.put("ca", view.ca);
-  output.put("editorContent", view.editorContent);
-  output.put("span", emc.getSpan());
-  output.put("canvasStart", emc.getCanvasStart());
-  output.put("canvasEnd", emc.getCanvasEnd());
-  output.put("cursorQuantumStart", emc.getCursorQuantumStart());
-  output.put("cursorQuantumEnd", emc.getCursorQuantumEnd());
-  output.put("editorMode", emc.getEditorMode());
-  output.put("editorSubmode", emc.getEditorSubmode());
-  output.put("cursorQuantum", emc.getCursorQuantum().getName());
-  output.put("scopeQuantum", emc.getScopeQuantum().getName());
-  output.put("isAtQuantumStart", emc.getIsAtQuantumStart());
-  output.put("isInCommandState", emc.getIsInCommandState());
-  output.put("commandStateContent", emc.getCommandStateContent());
-  output.put("commandCursor", emc.getCommandCursor());
-  ...
-}
+// View.of projects editor state and asks Viewport for bounded rows.
+// The rendered payload has 17 fields, including row origins, cursorRow,
+// cursorCol, and an always-present searchTarget.
     </pre>
-    <figcaption><code>View</code> itself is deliberately tiny—just
- <code>ca</code> and <code>editorContent</code> (<a href="../../src/main/java/com/ple/visur/View.java">View.java</a>).
- The JSON is the real contract with the browser; the fields above are exactly the
- vocabulary the frontend understands.</figcaption>
+    <figcaption><code>View</code> is the record that projects and serializes
+ the payload; <code>Viewport</code> lays out bounded rows. The shared contract
+ serves both the browser canvas and the terminal renderer.</figcaption>
   </figure>
 
   <h3 id="step-render">Step 7 — Browser redraws</h3>
@@ -554,7 +538,7 @@ public JsonObject toJson() {
   <p>
     The browser registered a handler for <code>viewWasChanged</code> on connect
     (<code>visur.js:49</code>). It copies every field into local variables, clears
-    the canvas, and calls <code>drawCanvas()</code>—repainting the text, the
+    canvas, and calls <code>drawView()</code>—repainting the rows, the
     cursor, and the mode/submode footer.
   </p>
 
@@ -570,13 +554,12 @@ public JsonObject toJson() {
   <h3 id="startup-path">Aside: the loop also runs at startup</h3>
 
   <p>
-    The same two verticles bootstrap the first paint. On connect the browser sends
-    <code>canvasWasChanged</code>; <a href="../../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java">CanvasWasChangedVerticle</a>
-    stores the viewport dimensions and then sends <code>modelWasChanged</code>
-    itself—so the first <code>View</code> is produced by exactly the same path a
-    keystroke uses. The browser also registers a handler on
-    <code>modelWasChanged</code> (<code>visur.js:116</code>) and echoes the event
-    back, which is how the frontend can request a fresh View on demand.
+    A client declares <code>viewportWasChanged</code> with cell-valued
+    <code>cols</code> and <code>rows</code>. <a href="../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java">ViewportWasChangedVerticle</a>
+    stores the viewport and triggers <code>modelWasChanged</code> with
+    <code>full:true</code>; the model verticle publishes the first complete view.
+    The browser uses SockJS at <code>/eventbus</code>; the Rust terminal uses
+    plain JSON WebSocket at <code>/ws</code>. There is no browser relay.
   </p>
 
   <hr class="divider">
@@ -614,26 +597,26 @@ public JsonObject toJson() {
         "explain": "EditorModelKey is an enum, so state slots are compile-checked names even though the map values are Object."
       },
       {
-        "q": "Which component builds the JSON sent to the browser?",
+        "q": "Which component projects the complete JSON view payload?",
         "options": [
-          "The ModelWasChangedVerticle view builder",
+          "View.of with Viewport layout, published by ModelWasChangedVerticle",
           "The KeyWasPressedVerticle input handler",
-          "The CanvasWasChangedVerticle size manager",
+          "The ViewportWasChangedVerticle size manager",
           "The MainVerticle startup orchestrator"
         ],
         "answer": 0,
-        "explain": "ModelWasChangedVerticle reads the coupler and its toJson() method produces the viewWasChanged payload."
+        "explain": "View.of projects editor state, Viewport lays out rows, and ModelWasChangedVerticle publishes the complete view to each renderer."
       },
       {
         "q": "What does KeyWasPressedVerticle send at the very end?",
         "options": [
           "A modelWasChanged event bus message",
           "A viewWasChanged event bus message",
-          "A canvasWasChanged event bus message",
+          "A viewportWasChanged event bus message",
           "A keyWasPressed event bus message"
         ],
         "answer": 0,
-        "explain": "It always sends modelWasChanged (with a null body), which triggers the view-building verticle."
+        "explain": "It triggers modelWasChanged (with a null body), which causes ModelWasChangedVerticle to publish a complete view."
       },
       {
         "q": "Which service is stateless and takes the LocalMap as a parameter?",
@@ -671,8 +654,8 @@ public JsonObject toJson() {
   </p>
 
   <ol>
-    <li><a href="../../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>—the whole input-to-state path is one method.</li>
-    <li><a href="../../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>—the whole state-to-view path is one method plus <code>toJson()</code>.</li>
+    <li><a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>—the whole input-to-state path is one method.</li>
+    <li><a href="../src/main/java/com/ple/visur/View.java">View.java</a> and <a href="../src/main/java/com/ple/visur/Viewport.java">Viewport.java</a>—the state-to-view projection and layout; <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a> publishes the result.</li>
   </ol>
 
   <p>
@@ -734,22 +717,22 @@ public JsonObject toJson() {
   <div class="annotation">
     <p>
       <strong>Source files for this lesson:</strong>
-      <a href="../../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler.java</a>,
-      <a href="../../src/main/java/com/ple/visur/EditorModelKey.java">EditorModelKey.java</a>,
-      <a href="../../src/main/java/com/ple/visur/ServiceHolder.java">ServiceHolder.java</a>,
-      <a href="../../src/main/java/com/ple/visur/InitializerService.java">InitializerService.java</a>,
-      <a href="../../src/main/java/CursorPositionDC/EditorContentService.java">EditorContentService.java</a>,
-      <a href="../../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>,
-      <a href="../../src/main/java/com/ple/visur/Keymap.java">Keymap.java</a>,
-      <a href="../../src/main/java/com/ple/visur/KeymapMap.java">KeymapMap.java</a>,
-      <a href="../../src/main/java/com/ple/visur/KeyPressed.java">KeyPressed.java</a>,
-      <a href="../../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService.java</a>,
-      <a href="../../src/main/java/com/ple/visur/RelativeMoveOp.java">RelativeMoveOp.java</a>,
-      <a href="../../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>,
-      <a href="../../src/main/java/com/ple/visur/CanvasWasChangedVerticle.java">CanvasWasChangedVerticle.java</a>,
-      <a href="../../src/main/java/com/ple/visur/View.java">View.java</a>,
-      <a href="../../src/main/java/com/ple/visur/BusEvent.java">BusEvent.java</a>,
-      <a href="../../src/main/resources/static/visur.js">visur.js</a>.
+      <a href="../src/main/java/com/ple/visur/EditorModelCoupler.java">EditorModelCoupler.java</a>,
+      <a href="../src/main/java/com/ple/visur/EditorModelKey.java">EditorModelKey.java</a>,
+      <a href="../src/main/java/com/ple/visur/ServiceHolder.java">ServiceHolder.java</a>,
+      <a href="../src/main/java/com/ple/visur/InitializerService.java">InitializerService.java</a>,
+      <a href="../src/main/java/CursorPositionDC/EditorContentService.java">EditorContentService.java</a>,
+      <a href="../src/main/java/com/ple/visur/KeyWasPressedVerticle.java">KeyWasPressedVerticle.java</a>,
+      <a href="../src/main/java/com/ple/visur/Keymap.java">Keymap.java</a>,
+      <a href="../src/main/java/com/ple/visur/KeymapMap.java">KeymapMap.java</a>,
+      <a href="../src/main/java/com/ple/visur/KeyPressed.java">KeyPressed.java</a>,
+      <a href="../src/main/java/com/ple/visur/CommandExecutionService.java">CommandExecutionService.java</a>,
+      <a href="../src/main/java/com/ple/visur/RelativeMoveOp.java">RelativeMoveOp.java</a>,
+      <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a>,
+      <a href="../src/main/java/com/ple/visur/ViewportWasChangedVerticle.java">ViewportWasChangedVerticle.java</a>,
+      <a href="../src/main/java/com/ple/visur/View.java">View.java</a>,
+      <a href="../src/main/java/com/ple/visur/BusEvent.java">BusEvent.java</a>,
+      <a href="../src/main/resources/static/visur.js">visur.js</a>.
     </p>
   </div>
 

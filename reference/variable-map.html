@@ -86,7 +86,7 @@ VisurVar (interface)
         <td><code>BrickVisurVar</code></td>
         <td><code>Integer</code> line</td>
         <td><code>emc.putCY</code></td>
-        <td><code>getCY</code>; <code>CanvasWasChangedVerticle</code></td>
+        <td><code>getCY</code>; <code>LineQuantum</code></td>
       </tr>
       <tr>
         <td><code>cursorQuantum</code></td>
@@ -206,26 +206,22 @@ Escape  (InitializerService.java:334, :364 — identical in insert and replace)
     </figcaption>
   </figure>
 
-  <h2 id="snapshot">What Reaches the Browser</h2>
+  <h2 id="snapshot">What Reaches the Renderers</h2>
 
+  <p>The map itself never crosses the wire. <code>View.of</code> projects values into the shared, complete 17-field viewport payload; <code>Viewport</code> lays out document text as bounded rows. Neither renderer receives <code>ca</code>, <code>editorContent</code>, or the <code>VariableMap</code>.</p>
   <table>
-    <thead>
-      <tr><th>Snapshot field</th><th>Variable</th><th><code>toJson()</code> line</th></tr>
-    </thead>
+    <thead><tr><th>Payload fields</th><th>Variable/model source</th><th>Projection / use</th></tr></thead>
     <tbody>
-      <tr><td><code>ca</code></td><td><code>ca</code> (via <code>View</code>)</td><td>27 — unused by the client</td></tr>
-      <tr><td><code>span</code></td><td><code>span</code></td><td>29</td></tr>
-      <tr><td><code>cursorQuantum</code></td><td><code>cursorQuantum.getName()</code></td><td>36</td></tr>
-      <tr><td><code>scopeQuantum</code></td><td><code>scopeQuantum.getName()</code></td><td>37</td></tr>
-      <tr><td><code>searchTarget</code> <span class="annotation">(conditional)</span></td><td>execution-data stack peek</td><td>49</td></tr>
+      <tr><td><code>span</code></td><td><code>span</code></td><td><code>View.of</code> / selection presentation</td></tr>
+      <tr><td><code>cursorQuantum</code></td><td><code>cursorQuantum.getName()</code></td><td><code>View.of</code> / status line</td></tr>
+      <tr><td><code>scopeQuantum</code></td><td><code>scopeQuantum.getName()</code></td><td><code>View.of</code> / search status</td></tr>
+      <tr><td><code>rows</code></td><td>editor content + viewport dimensions</td><td><code>Viewport.rows</code>; each row has <code>start</code> and <code>text</code></td></tr>
+      <tr><td><code>cursorRow</code>, <code>cursorCol</code></td><td><code>ca</code>, quantum bounds and laid-out rows</td><td>server-projected cursor cell</td></tr>
+      <tr><td><code>searchTarget</code></td><td>search prompt from editor model</td><td>Always present; empty outside search submodes</td></tr>
     </tbody>
   </table>
-
-  <p class="source-ref">
-    <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java#L24-52">ModelWasChangedVerticle.toJson():24–52</a> ·
-    <a href="../reference/view-protocol-map.html">Reference: View &amp; Bus Protocol Map</a>.
-    The map itself never crosses the wire.
-  </p>
+  <p>Other payload fields are <code>full</code>, <code>origin</code>, <code>cursorQuantumStart</code>, <code>cursorQuantumEnd</code>, <code>isAtQuantumStart</code>, <code>editorMode</code>, <code>editorSubmode</code>, <code>isInCommandState</code>, <code>commandStateContent</code>, and <code>commandCursor</code>. See the complete field table in the <a href="view-protocol-map.html#snapshot">View &amp; Bus Protocol Map</a>.</p>
+  <p class="source-ref"><a href="../src/main/java/com/ple/visur/View.java">View.of/render</a> · <a href="../src/main/java/com/ple/visur/Viewport.java">Viewport.java</a> · <a href="../src/main/java/com/ple/visur/ModelWasChangedVerticle.java">ModelWasChangedVerticle.java</a> · <a href="view-protocol-map.html">View &amp; Bus Protocol Map</a></p>
 
   <h2 id="gotchas">Gotchas Worth Remembering</h2>
 

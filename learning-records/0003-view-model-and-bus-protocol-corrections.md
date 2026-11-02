@@ -42,6 +42,18 @@ re-introduce the old framing.
 
 **Status:** active.
 
+## Follow-up correction: viewport protocol and terminal renderer
+
+The later renderer build supersedes the old wire-format and transport descriptions above. Keep the historical observations as records of the earlier implementation, but use the shipped contract below for current lessons and references.
+
+- **Transport:** the browser still uses the SockJS bridge at `/eventbus`; the terminal uses plain JSON WebSocket at loopback `/ws`, with `{"address": ..., "body": ...}` envelopes. There is no SockJS-only client path.
+- **Payload:** `View` and pure `Viewport` now produce a complete viewport-bounded `viewWasChanged` message. The `rows` array is already wrapped and carries absolute starts; cursor row/column are server-computed. The old `editorContent`, `ca`, and `canvasEnd` fields are absent.
+- **Damage model:** a complete view remains the protocol contract; terminal paint optimization is separate. The terminal compares its previous and next cell grids and emits changed row runs, while `full: true`, first paint, and geometry changes force a repaint. Do not conflate terminal output damage with a protocol delta.
+- **Viewport address:** the inbound name is `viewportWasChanged`; `canvasWasChanged` and `CanvasWasChangedVerticle` have been replaced by `ViewportWasChangedVerticle`. A viewport declaration triggers a full view update.
+- **Exit path:** terminal-local `ZZ` and `ZQ` detach, while `ZD` asks the launcher/server to quit; process outcomes distinguish detach (`0`), quit (`3`), and lost server (`4`). Nothing in the editor's command-state service is the terminal quit binding.
+
+Evidence: [[renderer-delivery spec](../docs/wayfinder/renderer-delivery/spec.md)] and its measured implementation verdicts in [[terminal-build conformance](../docs/wayfinder/terminal-build/conformance.md)]. The running implementation is in [[View.java](../src/main/java/com/ple/visur/View.java)], [[Viewport.java](../src/main/java/com/ple/visur/Viewport.java)], [[MainVerticle.java](../src/main/java/com/ple/visur/MainVerticle.java)], and [[terminal README](../terminal/README.md)].
+
 **Evidence:** source review behind
 [`lessons/0009-view-model-and-frontend-communication.html`](../lessons/0009-view-model-and-frontend-communication.html)
 and its companion
