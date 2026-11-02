@@ -1,7 +1,9 @@
 // Visur's terminal client. One process, one thread, one loop, and no editor state: it paints the viewport the
 // server sends and forwards keys. See docs/wayfinder/renderer-delivery/spec.md §5 and the component design.
 
+mod caps;
 mod keys;
+mod lifecycle;
 mod paint;
 mod protocol;
 mod screen;
@@ -11,12 +13,14 @@ mod zseq;
 use crossterm::event::{self, Event};
 use crossterm::terminal;
 use std::io::Write;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use zseq::{Effect, Pending};
 
 /// `visur` exits 0 to detach (leave the server running) and this code to quit (stop the one it started).
-/// The launcher reads it; the difference is meaningless until there is a launcher (ticket 08).
+/// The launcher reads it.
 const QUIT: i32 = 3;
+/// The server hung up under us. Any non-zero code tells the launcher to stop a server it started; this one says why.
+const SERVER_GONE: i32 = 4;
 
 fn main() {
   let mut socket = match transport::connect() {
@@ -34,12 +38,19 @@ fn main() {
   terminal::enable_raw_mode().expect("raw mode");
   let mut out = std::io::stdout();
   out.write_all(b"\x1b[?1049h").ok(); // alternate screen: this client owns the whole terminal
-
-  let code = run(&mut socket, &mut out, cols, rows);
-
-  out.write_all(b"\x1b[0m\x1b[?25h\x1b[?1049l").ok();
+  out.write_all(caps::PUSH.as_bytes()).ok(); // unambiguous `Esc`, where the terminal understands it
   out.flush().ok();
-  terminal::disable_raw_mode().ok();
+
+  // Every way out, including a panic, hands the terminal back through this guard (spec §5.5).
+  let mut restore = lifecycle::Restore::new(std::io::stdout());
+
+  let sync_output = probe_sync_output();
+  let (cols, rows) = redeclare_if_resized(&mut socket, cols, rows);
+
+  let code = run(&mut socket, &mut out, cols, rows, sync_output == caps::Sync::Supported);
+
+  // `process::exit` skips destructors, so the guard has to be spent by hand on the way out.
+  restore.now();
   std::process::exit(code);
 }
 
@@ -49,32 +60,93 @@ fn size() -> (usize, usize) {
     .unwrap_or((100, 30))
 }
 
+/// How long the terminal gets to answer the capability probe before the client assumes nothing.
+const CAPS_TIMEOUT: Duration = Duration::from_millis(60);
+
+/// Ask whether the terminal has synchronized output (`DECRQM`), and wait briefly for the answer.
+///
+/// The answer is not a key event, so crossterm's reader would swallow it: this reads fd 0 directly, before the loop
+/// starts and while nothing else is reading. shortcut: bytes typed inside the probe window are consumed along with the
+/// answer; upgrade by handing the leftovers to crossterm's parser once its buffer is reachable.
+fn probe_sync_output() -> caps::Sync {
+  let mut out = std::io::stdout();
+  let _ = out.write_all(caps::PROBE.as_bytes());
+  let _ = out.flush();
+
+  let deadline = Instant::now() + CAPS_TIMEOUT;
+  let mut reply: Vec<u8> = Vec::new();
+  let mut buffer = [0u8; 64];
+  while Instant::now() < deadline {
+    let mut polled = libc::pollfd { fd: libc::STDIN_FILENO, events: libc::POLLIN, revents: 0 };
+    if unsafe { libc::poll(&mut polled, 1, 5) } <= 0 {
+      continue;
+    }
+    let count = unsafe { libc::read(libc::STDIN_FILENO, buffer.as_mut_ptr().cast(), buffer.len()) };
+    if count <= 0 {
+      continue;
+    }
+    reply.extend_from_slice(&buffer[..count as usize]);
+    if reply.windows(2).any(|pair| pair == b"$y") {
+      break; // the answer is in; no need to wait out the rest of the window
+    }
+  }
+  caps::sync_output(&String::from_utf8_lossy(&reply))
+}
+
+/// Close the probe window's blind spot: crossterm installs its `SIGWINCH` handler on the first poll, which happens after
+/// the probe, so a resize during those milliseconds is a signal nobody was listening for. The size is the source of
+/// truth, so ask it.
+fn redeclare_if_resized(socket: &mut transport::Socket, cols: usize, rows: usize) -> (usize, usize) {
+  let now = size();
+  if now != (cols, rows) {
+    transport::declare(socket, now.0, now.1.saturating_sub(1));
+  }
+  now
+}
+
 /// The loop: take the newest view, take the keys, paint what changed. Nothing here interprets the document.
-fn run(socket: &mut transport::Socket, out: &mut impl Write, cols: usize, rows: usize) -> i32 {
+fn run(socket: &mut transport::Socket, out: &mut impl Write, mut cols: usize, mut rows: usize, sync: bool) -> i32 {
   let mut view = protocol::ViewUpdate::default();
   let mut painted = false;
   let mut pending = Pending::None;
 
   loop {
     match take_view(socket) {
-      Some(newer) => {
+      // The socket is gone: there is no server left to paint for, so the terminal goes back to the shell now rather
+      // than spinning on a dead socket until somebody kills the client.
+      Taken::Gone => return SERVER_GONE,
+      Taken::Views(Some(newer)) => {
         view = newer;
         painted = false;
       }
-      None => {}
+      Taken::Views(None) => {}
     }
 
     if event::poll(Duration::ZERO).unwrap_or(false) {
       // Exactly one read per poll: reading twice here would swallow every other keystroke.
       if let Ok(event) = event::read() {
-        if let Step::Finish(effect) = act(socket, &mut pending, event) {
+        if let Event::Resize(new_cols, new_rows) = event {
+          // The rows already painted are the wrong shape now. Declare the new one: a declaration always earns a
+          // `full: true` answer, so the server resends rather than the client guessing at the old rows.
+          cols = new_cols as usize;
+          rows = new_rows as usize;
+          transport::declare(socket, cols, rows.saturating_sub(1));
+          painted = false;
+        } else if let Step::Finish(effect) = act(socket, &mut pending, event) {
           return finish(effect);
         }
       }
     }
 
     if !painted {
+      // One write per frame, and synchronized output when the terminal has it: a half-painted screen is what tearing
+      // looks like (spec §5.5).
       let frame = paint::full(&screen::compose(&view, cols, rows));
+      let frame = if sync {
+        format!("\x1b[?2026h{frame}\x1b[?2026l")
+      } else {
+        frame
+      };
       out.write_all(frame.as_bytes()).ok();
       out.flush().ok();
       painted = true;
@@ -116,8 +188,15 @@ fn finish(effect: Effect) -> i32 {
   }
 }
 
-/// The newest view waiting on the socket, if any: a stale frame is worth skipping, not painting.
-fn take_view(socket: &mut transport::Socket) -> Option<protocol::ViewUpdate> {
+/// What one drain of the socket produced.
+enum Taken {
+  /// Whatever views were waiting; the newest of them, if any.
+  Views(Option<protocol::ViewUpdate>),
+  /// The server hung up. Not the same as "nothing waiting": one is idle, the other is over.
+  Gone,
+}
+
+fn take_view(socket: &mut transport::Socket) -> Taken {
   let mut newest = None;
   loop {
     match transport::next(socket) {
@@ -126,8 +205,8 @@ fn take_view(socket: &mut transport::Socket) -> Option<protocol::ViewUpdate> {
           newest = Some(view);
         }
       }
-      transport::Incoming::Idle => return newest,
-      transport::Incoming::Closed => return newest,
+      transport::Incoming::Idle => return Taken::Views(newest),
+      transport::Incoming::Closed => return Taken::Gone,
     }
   }
 }

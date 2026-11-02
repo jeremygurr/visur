@@ -13,7 +13,7 @@
 
 use std::fs::File;
 use std::io::{Read, Write};
-use std::os::unix::io::{FromRawFd, RawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
 use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -47,12 +47,18 @@ struct Terminal {
 
 impl Terminal {
   fn spawn() -> Terminal {
+    Terminal::spawn_with(&[])
+  }
+
+  /// `env` overrides the child's environment; VISUR_WS is how a test aims the client at a fake server.
+  fn spawn_with(env: &[(&str, String)]) -> Terminal {
     let (master, slave) = open_pty();
     // VISUR_WRAPPER lets the same check drive ./visur instead of the client, which is how the launcher's
     // cold-start path gets tested: same keys, same assertions, one more process in between.
     let program =
       std::env::var("VISUR_WRAPPER").unwrap_or_else(|_| env!("CARGO_BIN_EXE_visur-term").to_string());
     let child = Command::new(program)
+      .envs(env.iter().map(|(key, value)| (*key, value.as_str())))
       .stdin(Stdio::from(dup(slave)))
       .stdout(Stdio::from(dup(slave)))
       .stderr(Stdio::from(dup(slave)))
@@ -120,6 +126,26 @@ impl Terminal {
     let _ = self.keys.flush();
   }
 
+  /// How many rows the last complete frame addressed: the height the client actually painted at.
+  fn frame_rows(&self) -> usize {
+    let raw = self.raw();
+    let Some(end) = raw.rfind(FRAME_END) else { return 0 };
+    let before = &raw[..end];
+    let start = before.rfind(FRAME_END).map_or(0, |at| at + FRAME_END.len());
+    let mut rows = 0;
+    for (at, _) in raw[start..end].match_indices("\x1b[") {
+      let rest = &raw[start + at + 2..];
+      let digits = rest.chars().take_while(|c| c.is_ascii_digit()).collect::<String>();
+      if digits.is_empty() || !rest[digits.len()..].starts_with(';') {
+        continue;
+      }
+      if let Ok(row) = digits.parse::<usize>() {
+        rows = rows.max(row);
+      }
+    }
+    rows
+  }
+
   /// Send a key and return how long the resulting frame took, in milliseconds.
   fn press(&mut self, bytes: &str) -> Option<f64> {
     let before = self.frames();
@@ -149,16 +175,29 @@ impl Terminal {
     self.wait_for(Duration::from_secs(5), |terminal| terminal.screen().contains(text))
   }
 
+  /// Resize the terminal the way a window manager does, and tell the client, which is not this pty's session leader
+  /// and so does not receive the ioctl's own SIGWINCH.
+  fn resize(&mut self, cols: u16, rows: u16) {
+    let size = libc::winsize { ws_row: rows, ws_col: cols, ws_xpixel: 0, ws_ypixel: 0 };
+    let set = unsafe { libc::ioctl(self.keys.as_raw_fd(), libc::TIOCSWINSZ, &size) };
+    assert_eq!(set, 0, "TIOCSWINSZ: {}", std::io::Error::last_os_error());
+    unsafe { libc::kill(self.child.id() as i32, libc::SIGWINCH) };
+  }
+
   /// Wait for the client to leave, but never forever: a client that will not exit is a failure, not a hang.
-  fn quit(mut self) -> ExitStatus {
-    let deadline = Instant::now() + Duration::from_secs(5);
+  fn wait_exit(&mut self, timeout: Duration) -> ExitStatus {
+    let deadline = Instant::now() + timeout;
     while Instant::now() < deadline {
       if let Some(status) = self.child.try_wait().expect("waiting for the client") {
         return status;
       }
       std::thread::sleep(Duration::from_millis(20));
     }
-    panic!("the client did not exit within 5s; screen: {:?}", self.screen())
+    panic!("the client did not exit within {timeout:?}; screen: {:?}", self.screen())
+  }
+
+  fn quit(mut self) -> ExitStatus {
+    self.wait_exit(Duration::from_secs(5))
   }
 }
 
@@ -198,6 +237,161 @@ fn strip(bytes: &str) -> String {
 
 fn server_is_up() -> bool {
   std::net::TcpStream::connect(("127.0.0.1", 8888)).is_ok()
+}
+
+/// What a fake server does once the handshake is done.
+enum Fake {
+  /// Hang up at once: the server died under a client that was already attached.
+  HangUp,
+  /// Stay and record what the client sends.
+  Listen,
+}
+
+/// A WebSocket server on an ephemeral port that returns `(port, frames the client sent)`. Not the real server: these
+/// checks are about what the client does on its own, so they need no JVM and no `VISUR_E2E`.
+fn fake_server(behaviour: Fake) -> (u16, Arc<Mutex<Vec<String>>>) {
+  let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("bind a fake server");
+  let port = listener.local_addr().unwrap().port();
+  let frames = Arc::new(Mutex::new(Vec::new()));
+  let sink = Arc::clone(&frames);
+  std::thread::spawn(move || {
+    let Ok((stream, _)) = listener.accept() else { return };
+    let Ok(mut socket) = tungstenite::accept(stream) else { return };
+    if matches!(behaviour, Fake::HangUp) {
+      let _ = socket.close(None);
+      return;
+    }
+    while let Ok(message) = socket.read() {
+      if let tungstenite::Message::Text(text) = message {
+        sink.lock().unwrap().push(text.to_string());
+      }
+    }
+  });
+  (port, frames)
+}
+
+/// Endpoint for a fake server, in the form the client takes from VISUR_WS.
+fn ws_to(port: u16) -> String {
+  format!("ws://127.0.0.1:{port}/ws")
+}
+
+#[test]
+fn a_resize_is_declared_again_so_the_server_resends_the_view() {
+  let (port, sent) = fake_server(Fake::Listen);
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+
+  assert!(
+    terminal.wait_for(Duration::from_secs(5), |_| declared(&sent, COLS as usize, ROWS as usize - 1)),
+    "the client did not declare its viewport at attach: {:?}",
+    sent.lock().unwrap()
+  );
+
+  terminal.resize(120, 40);
+
+  // Content rows, not terminal rows: the last row is the client's own mode line.
+  assert!(
+    terminal.wait_for(Duration::from_secs(5), |_| declared(&sent, 120, 39)),
+    "a resize must be declared again: {:?}",
+    sent.lock().unwrap()
+  );
+
+  // The rows painted before the resize are the wrong shape now, and a stale screen is exactly what leaves old text in
+  // rows the new height does not cover. The next frame must address every row of the new grid.
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.frame_rows() == 40),
+    "after resizing to 40 rows the client painted {} rows",
+    terminal.frame_rows()
+  );
+  let (row, col) = terminal.cursor().expect("a cursor position after the resize");
+  assert!(row <= 40, "the cursor is outside the 40-row grid at row {row}");
+  assert!(col <= 120, "the cursor is outside the 120-column grid at column {col}");
+}
+
+#[test]
+fn the_client_probes_synchronized_output_instead_of_assuming_it() {
+  let (port, _) = fake_server(Fake::Listen);
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.raw().contains("\x1b[?2026$p")),
+    "the client must ask whether the terminal has synchronized output: {:?}",
+    terminal.raw()
+  );
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.frames() > 0),
+    "the client did not paint: {:?}",
+    terminal.raw()
+  );
+  assert!(
+    !terminal.raw().contains("\x1b[?2026h"),
+    "nothing answered the probe, so the client must not use synchronized output"
+  );
+  assert!(
+    terminal.raw().contains("\x1b[>1u"),
+    "kitty's unambiguous-escape push belongs at attach: {:?}",
+    terminal.raw()
+  );
+
+  terminal.send("Z");
+  terminal.send("Q");
+  let status = terminal.wait_exit(Duration::from_secs(5));
+  assert_eq!(status.code(), Some(0), "ZQ detaches");
+  let raw = terminal.raw();
+  let popped = raw.rfind("\x1b[<u").expect("the keyboard flags pushed at attach must be popped on the way out");
+  let left = raw.rfind("\x1b[?1049l").expect("the alternate screen must be left");
+  assert!(popped < left, "pop the flags before leaving the alternate screen, per spec §5.5");
+}
+
+#[test]
+fn synchronized_output_wraps_frames_when_the_terminal_says_yes() {
+  let (port, _) = fake_server(Fake::Listen);
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.raw().contains("\x1b[?2026$p")),
+    "the probe must come before any frame, or there is nothing to gate"
+  );
+  terminal.send("\x1b[?2026;1$y"); // the terminal answering "set"
+
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.raw().contains("\x1b[?2026h")),
+    "an answered probe must wrap the frame in synchronized output: {:?}",
+    terminal.raw()
+  );
+}
+
+/// Did the client send a viewport declaration of exactly this size?
+fn declared(frames: &Arc<Mutex<Vec<String>>>, cols: usize, rows: usize) -> bool {
+  frames.lock().unwrap().iter().any(|frame| {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(frame) else { return false };
+    value["address"] == "viewportWasChanged"
+      && value["body"]["cols"] == cols
+      && value["body"]["rows"] == rows
+  })
+}
+
+#[test]
+fn the_client_leaves_and_restores_the_terminal_when_the_server_dies() {
+  let (port, _) = fake_server(Fake::HangUp);
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+
+  // The socket is already closed, so nothing will ever arrive: the client has to notice, not wait for a view.
+  let status = terminal.wait_exit(Duration::from_secs(3));
+  assert!(
+    !matches!(status.code(), Some(0) | Some(3)),
+    "a client whose server vanished must not report detach or quit: {status:?}"
+  );
+
+  // Restored, in order: the cursor back on, then the alternate screen gone, which hands the shell back.
+  let raw = terminal.raw();
+  let shown = raw.rfind("\x1b[?25h").expect("the cursor was never made visible again");
+  let left = raw.rfind("\x1b[?1049l").expect("the alternate screen was never left");
+  assert!(shown < left, "the cursor must be restored before the alternate screen is left");
+  assert!(
+    raw.len() - left < 64,
+    "nothing should be painted after the terminal is handed back: {:?}",
+    &raw[left..]
+  );
 }
 
 #[test]

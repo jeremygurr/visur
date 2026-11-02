@@ -5,8 +5,8 @@ edition = "2024"
 
 [dependencies]
 crossterm = "0.29.0"
+# for poll(2) and read(2) on fd 0: the capability answer is not a key event, so crossterm would eat it
+libc = "0.2"
 serde_json = "1.0.154"
 tungstenite = "0.30.0"
 
-[dev-dependencies]
-libc = "0.2"

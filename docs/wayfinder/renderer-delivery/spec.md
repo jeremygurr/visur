@@ -263,6 +263,10 @@ Nothing else is meaningful: a longer string misses every keymap and is silently 
 - **Alternate screen (`?1049`)** on start, off on exit. This also removes the terminal's scrollback from the design: document scrolling is the app's job (§5.8).
 - **`?2026` synchronized output**, *probed* with `DECRQM` (`CSI ? 2026 $ p`), never assumed, degrading silently. Terminal.app must be assumed to lack it.
 - **Restore is an ordered sequence, not RAII** — crossterm does not restore on drop. A `panic::set_hook` plus a `Drop` guard must run `?2026l → ?25h → disable paste → pop keyboard flags → ?1049l → disable_raw_mode()`.
+  **Corrected 2026-11-01 (ticket 07):** no `panic::set_hook` is needed. A `Drop` guard runs while the stack unwinds, which is the requirement; the hook was only ever a way to get there, and a hook that writes to a terminal mid-panic competes with the default one. The guard is idempotent so `main` can spend it before `process::exit`, which skips destructors. Paste is still unimplemented (P3), so its step is absent rather than skipped.
+- **The capability answer cannot be read through crossterm.** `DECRQM`'s reply is not a key event, so crossterm's reader swallows it. The client reads fd 0 directly, before its first `poll`, with a 60 ms budget — and that window has two costs, both measured in ticket 07:
+  - bytes typed inside the window are consumed with the answer (`shortcut` in `main.rs`);
+  - **`SIGWINCH` is not yet being watched**, because crossterm installs its handler on the first `poll`, so a resize during the window is a signal nobody receives. The client therefore re-reads the terminal size after the probe and declares again if it moved.
 - **One `write(2)` per frame** to fd 1, bypassing `std::io::Stdout`'s line buffering.
 - Cursor style: block (inverse video) for `span == 1`, bar for `span == 0`.
 
@@ -307,7 +311,7 @@ Canvas keeps what the terminal cannot express, and the spec does not try to unif
 `ZZ`/`ZQ`/`ZD` is the *terminal's* binding, not a Visur command: raw mode makes `Ctrl-C` a byte, and **nothing in Visur quits** — `CommandStateService.exitCommandState` only leaves the command line. A `:q` equivalent waits for P4. Decided by the user 2026-11-01, replacing the earlier `Ctrl-C`/`Ctrl-Q` proposal, because in a shell those read as "kill this command".
 
 - **`ZZ`** saves and detaches, **`ZQ`** detaches, **`ZD`** quits. *Detach* leaves the server running; *quit* asks for it to stop. `ZZ`'s save has nothing to save until file I/O exists (P5), so today it equals `ZQ` with intent — bound now so it starts working the day saving does.
-- The distinction reaches the launcher as the **exit code**: `0` detach, `3` quit ([ticket 08](../terminal-build/issues/08-launcher.md)).
+- The distinction reaches the launcher as the **exit code**: `0` detach, `3` quit, `4` the server went away ([ticket 08](../terminal-build/issues/08-launcher.md)). `4` is not a decision the client made: any non-zero code tells the launcher to stop a server it started, and `4` says why the terminal came back.
 - Consequence, recorded rather than hidden: `Ctrl-C` is dropped by the chord rule like `Ctrl-d`, so a wedged client is stopped with `SIGTERM` from outside, not from the keyboard.
 
 ---

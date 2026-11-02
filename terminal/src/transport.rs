@@ -22,7 +22,9 @@ pub enum Incoming {
 }
 
 pub fn connect() -> Result<Socket, tungstenite::Error> {
-  let (mut socket, _) = connect_ws(URL)?;
+  // VISUR_WS points the client at another endpoint, which is what lets a test stand a fake server in for the real one.
+  let url = std::env::var("VISUR_WS").unwrap_or_else(|_| URL.to_string());
+  let (mut socket, _) = connect_ws(url)?;
   if let MaybeTlsStream::Plain(stream) = socket.get_mut() {
     let _ = stream.set_nodelay(true); // a keystroke is one small frame; do not wait to fill a segment
     let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
