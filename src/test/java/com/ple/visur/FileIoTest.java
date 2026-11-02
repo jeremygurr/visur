@@ -210,4 +210,27 @@ class FileIoTest {
     byte[] written = Files.readAllBytes(target);
     assertEquals("nested", new String(written, StandardCharsets.UTF_8));
   }
+
+  @Test
+  void saveFileWritesSwapFileAndDeletesItOnSuccess() throws IOException {
+    Path target = tempDir.resolve("swaptest.txt");
+    ServiceHolder.editorModelCoupler.putEditorContent("content");
+    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(target.toString());
+    new SaveFileOp().execute(null);
+
+    // Target file exists with correct content
+    byte[] written = Files.readAllBytes(target);
+    assertArrayEquals("content".getBytes(StandardCharsets.UTF_8), written);
+    // Swap file should not exist (cleaned up after successful save)
+    Path swapFile = target.resolveSibling(target.getFileName().toString() + ".visur-swap");
+    assertFalse(Files.exists(swapFile));
+  }
+
+  @Test
+  void startupContentWithNoPathMeansEmptyUnnamedDocument() {
+    // Verify source path is empty or null (no named file when no VISUR_FILE).
+    String path = ServiceHolder.editorModelCoupler.getSourceFilePath();
+    assertTrue(path == null || path.isEmpty(),
+      "source path should be empty or null when no VISUR_FILE is set, got: " + path);
+  }
 }

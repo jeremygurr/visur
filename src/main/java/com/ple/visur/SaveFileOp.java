@@ -43,6 +43,10 @@ public class SaveFileOp implements Operator {
       if (parent != null) {
         Files.createDirectories(parent);
       }
+      // Write swap file (.visur-swap) for crash recovery.
+      Path swapPath = target.resolveSibling(target.getFileName().toString() + ".visur-swap");
+      Files.write(swapPath, content.getBytes(StandardCharsets.UTF_8),
+        StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
       // Atomic write: temp file + rename
       tempFile = Files.createTempFile(parent, "visur-", ".tmp");
       // Write content to temp file
@@ -54,6 +58,8 @@ public class SaveFileOp implements Operator {
       }
       // Atomic rename to target (replaces existing)
       Files.move(tempFile, target, StandardCopyOption.REPLACE_EXISTING);
+      // Clean up swap file after successful save.
+      try { Files.delete(swapPath); } catch (IOException ignored) {}
       // Update remembered source path
       emc.setSourceFilePath(filePath);
     } catch (IOException e) {
