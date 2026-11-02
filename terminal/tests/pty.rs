@@ -18,8 +18,14 @@ use std::process::{Child, Command, ExitStatus, Stdio};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-const COLS: u16 = 100;
-const ROWS: u16 = 30;
+/// The window the checks drive. Overridable so the conformance sweep can measure a second viewport size.
+fn cols() -> u16 {
+  std::env::var("VISUR_PTY_COLS").ok().and_then(|value| value.parse().ok()).unwrap_or(100)
+}
+
+fn rows() -> u16 {
+  std::env::var("VISUR_PTY_ROWS").ok().and_then(|value| value.parse().ok()).unwrap_or(30)
+}
 
 /// Every frame ends with the cursor sequence, which makes it the frame separator.
 const FRAME_END: &str = "\x1b[?25h";
@@ -32,7 +38,7 @@ fn dup(fd: RawFd) -> File {
 fn open_pty() -> (RawFd, RawFd) {
   let mut master: RawFd = -1;
   let mut slave: RawFd = -1;
-  let mut size = libc::winsize { ws_row: ROWS, ws_col: COLS, ws_xpixel: 0, ws_ypixel: 0 };
+  let mut size = libc::winsize { ws_row: rows(), ws_col: cols(), ws_xpixel: 0, ws_ypixel: 0 };
   let opened =
     unsafe { libc::openpty(&mut master, &mut slave, std::ptr::null_mut(), std::ptr::null_mut(), &mut size) };
   assert_eq!(opened, 0, "openpty: {}", std::io::Error::last_os_error());
@@ -100,8 +106,8 @@ impl Terminal {
   /// there. Reading only the last frame was right while every frame was a full repaint, and became wrong the moment
   /// the client learned to send damage.
   fn screen(&self) -> String {
-    const WIDTH: usize = 260;
-    const HEIGHT: usize = 80;
+    const WIDTH: usize = 320;
+    const HEIGHT: usize = 90;
     let mut cells = vec![vec![' '; WIDTH]; HEIGHT];
     let (mut row, mut col) = (0, 0);
     let raw = self.raw();
@@ -365,7 +371,7 @@ fn a_resize_is_declared_again_so_the_server_resends_the_view() {
   let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
 
   assert!(
-    terminal.wait_for(Duration::from_secs(5), |_| declared(&sent, COLS as usize, ROWS as usize - 1)),
+    terminal.wait_for(Duration::from_secs(5), |_| declared(&sent, cols() as usize, rows() as usize - 1)),
     "the client did not declare its viewport at attach: {:?}",
     sent.lock().unwrap()
   );
@@ -478,6 +484,46 @@ fn the_client_leaves_and_restores_the_terminal_when_the_server_dies() {
   );
 }
 
+/// The case the conformance ticket names as untried: a resize arrives while a search submode is live. The submode is
+/// editor state on the server and the geometry is the client's, so the two have to survive each other.
+#[test]
+fn a_resize_during_a_search_submode_keeps_the_search_and_repaints() {
+  if std::env::var("VISUR_E2E").is_err() {
+    eprintln!("skipped: set VISUR_E2E=1 with a server running to run the resize-during-search check");
+    return;
+  }
+  let mut terminal = Terminal::spawn();
+  assert!(
+    terminal.wait_for(Duration::from_secs(5), |t| t.screen().chars().filter(|c| *c != ' ').count() > 500),
+    "the first paint did not show a document"
+  );
+
+  // `f` starts a forward search; the submode is what the mode line names.
+  terminal.press("\u{1b}");
+  terminal.press("f");
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.screen().contains("(f)")),
+    "the search submode never appeared: {:?}",
+    terminal.screen()
+  );
+
+  terminal.resize(120, 40);
+
+  // Still searching, and painted at the new height: 40 rows addressed, mode line on the last of them.
+  assert!(
+    terminal.wait_for(Duration::from_secs(5), |t| t.screen().contains("(f)") && t.frame_rows() == 40),
+    "the search was lost by the resize, or the screen was not repainted at 40 rows: rows={} {:?}",
+    terminal.frame_rows(),
+    terminal.screen()
+  );
+  let (row, col) = terminal.cursor().expect("a cursor position after the resize");
+  assert!(row <= 40 && col <= 120, "the cursor left the resized grid at {row},{col}");
+
+  terminal.send("Z");
+  terminal.send("Q");
+  assert_eq!(terminal.quit().code(), Some(0), "ZQ should detach");
+}
+
 #[test]
 fn the_client_paints_edits_searches_and_detaches() {
   if std::env::var("VISUR_E2E").is_err() {
@@ -541,7 +587,7 @@ fn the_client_paints_edits_searches_and_detaches() {
   terminal.press("\r");
   terminal.press("\x1b");
   let (row, _) = terminal.cursor().expect("a cursor position");
-  assert!(row < ROWS as usize, "the cursor left the grid at row {row}");
+  assert!(row < rows() as usize, "the cursor left the grid at row {row}");
 
   // Span and search reach the mode line, which is how a terminal user sees editor state at all.
   terminal.press("s");

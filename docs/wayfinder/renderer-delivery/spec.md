@@ -15,7 +15,7 @@ An implementer should be able to build from this without asking a question. If o
 | Goal | Bar | Why |
 |---|---|---|
 | Canvas updates stop scaling with document size | **bounded**, not vim parity | measured: paint is already 1.6–2.4 ms and viewport-bounded; only the payload scales |
-| Visur opens from a terminal | **vim parity, ~1–2 ms** keystroke → last cell | reachable: a spike hit 2.6–4.4 ms with a naive renderer over the existing bus |
+| Visur opens from a terminal | **vim parity, ~1–2 ms** keystroke → last cell | reachable: a spike hit 2.6–4.4 ms with a naive renderer over the existing bus. **Measured 2026-11-02: 2.33–2.41 ms**, ~0.3 ms above the tendency and inside the 16 ms bar ([conformance](../terminal-build/conformance.md)) |
 
 The measured baseline ([ticket 01](issues/01-baseline-measurements.md)): payload ≈ 6.5 KB and round trip 17.5 ms at the current 8 KB document; payload ≈ 5.29 MB and 52–122 ms at 5 MB; paint 1.6 ms at 1454×900 and 2.4 ms at 2546×1440, **flat across buffer sizes**. Payload costs ~10 ms/MB.
 
@@ -182,6 +182,8 @@ There is **no `ContentView` interface**, and that is a decision with a stated re
 
 Keystroke → last painted pixel **≤ 16 ms at 5 MB**, since paint is ~2 ms and the payload is now viewport-bounded. Today's 5 MB figure is 52–122 ms; the change should land near the 8 KB figure of 32 ms, most of which is the SockJS floor and compositor wait rather than Visur's work.
 
+**Measured 2026-11-02** ([conformance](../terminal-build/conformance.md) §1.2), in a real window at 100 KB / 1 MB / 5 MB: **15.0–15.8 ms**, flat across document size. Split in-page, the send→reply segment *is* the number at **14.8–15.5 ms** and the whole paint is **0.1–0.2 ms**, so the guess above was right: 98% of the budget is the bridge's frame, and what is left is Visur. The bar is met with about a millisecond to spare, and that margin belongs to Chrome's frame period rather than to this code. A headless window reports 51 ms against the same server — that is frame throttling, so any canvas number taken headless is measuring the browser.
+
 ---
 
 ## 5. The terminal client
@@ -206,6 +208,10 @@ Keystroke → last painted pixel **≤ 16 ms at 5 MB**, since paint is ~2 ms and
 Server: ~10 lines in `MainVerticle` via Vert.x core's `HttpServerRequest.toWebSocket(...)` (verified present in vertx-core 4.4.4; `vertx-web` 4.4.4 has no `WebSocketHandler`). Handler responsibilities: on connect, register interest in `viewWasChanged`; on message, parse and dispatch to the inbound addresses; on `close`, unregister.
 
 Client: any WebSocket implementation (the spike used `tungstenite`). Use WS ping/pong, **not** SockJS's heartbeat.
+  **Corrected 2026-11-02:** the client sends no pings and the ping requirement is withdrawn. Over loopback there is no
+  network to keep alive, and the event that matters — the server going away — arrives as a closed socket, which the
+  client already turns into exit code `4` ([ticket 07](../terminal-build/issues/07-client-lifecycle.md)). A ping would
+  add a timer and a false-negative mode ("the server is slow") to a transport with no latency to hide.
 
 Bound to `127.0.0.1`. No auth, no TLS, no remote attach.
 
