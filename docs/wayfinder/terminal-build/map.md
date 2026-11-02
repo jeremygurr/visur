@@ -22,6 +22,7 @@ Reaching the destination means: the protocol in [the spec](../renderer-delivery/
 
 <!-- one line per closed ticket: gist, then link to the ticket holding the detail -->
 
+- [The `visur` launcher](issues/08-launcher.md): one command — probe the app's own URL, start a server if there is none (fat jar when current, else `./gradlew run`), stop only what it started, and honour `0` detach vs `3` quit. 12 bash checks plus a cold machine run of the real client in 1.35 s. Found that the fat jar had never been runnable (a `Main-Verticle` manifest typo).
 - [Terminal client skeleton](issues/05-client-skeleton.md): the client exists — `terminal/`, 28 unit tests at four pure seams plus a Rust pty test that types keys and reads the screen back, so no second language is needed to verify it. **3.45–3.74 ms** median keystroke → paint (5.7 ms against a just-started server, which is JVM warm-up). Found a spec bug (`SHIFT` arrives set on uppercase, so dropping modifiers made `Z` and every uppercase binding unreachable) and a server bug (`viewWasChanged` was `send`-ed, so a second renderer silently stole half the views; now published).
 
 - [Make large documents loadable](issues/01-benchmark-content.md): `VISUR_CONTENT_BYTES` + `SizedContent`; verified at 6 KB, 1 MB and 5 MB with the browser rendering each.

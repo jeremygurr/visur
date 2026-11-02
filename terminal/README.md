@@ -19,7 +19,8 @@ ticket in [terminal-build](../docs/wayfinder/terminal-build/map.md).
 
 ## Running it
 
-It needs a server; there is no launcher yet ([ticket 08](../docs/wayfinder/terminal-build/issues/08-launcher.md)):
+From the repo root, [`./visur`](../visur) starts a server if none is running and connects the client to it; that is
+the command to use. To run the pieces by hand:
 
 ```bash
 ./gradlew run                     # the server, in another shell

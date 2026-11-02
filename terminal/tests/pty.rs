@@ -48,7 +48,11 @@ struct Terminal {
 impl Terminal {
   fn spawn() -> Terminal {
     let (master, slave) = open_pty();
-    let child = Command::new(env!("CARGO_BIN_EXE_visur-term"))
+    // VISUR_WRAPPER lets the same check drive ./visur instead of the client, which is how the launcher's
+    // cold-start path gets tested: same keys, same assertions, one more process in between.
+    let program =
+      std::env::var("VISUR_WRAPPER").unwrap_or_else(|_| env!("CARGO_BIN_EXE_visur-term").to_string());
+    let child = Command::new(program)
       .stdin(Stdio::from(dup(slave)))
       .stdout(Stdio::from(dup(slave)))
       .stderr(Stdio::from(dup(slave)))
@@ -202,7 +206,10 @@ fn the_client_paints_edits_searches_and_detaches() {
     eprintln!("skipped: set VISUR_E2E=1 with a server running to run the end-to-end check");
     return;
   }
-  assert!(server_is_up(), "no server on 127.0.0.1:8888 — start one with ./gradlew run");
+  // The launcher is the thing that starts a server, so the precondition only applies when driving the client alone.
+  if std::env::var("VISUR_WRAPPER").is_err() {
+    assert!(server_is_up(), "no server on 127.0.0.1:8888 — start one with ./gradlew run");
+  }
 
   let mut terminal = Terminal::spawn();
 

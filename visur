@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+# visur — one command to use Visur.
+#
+# Uses the server already listening on :8888. If there is none it starts one and owns it, and a server it started is
+# stopped again when the client exits — unless the client detached (ZZ or ZQ, exit code 0), which asks for the server
+# to stay. A server that was already running is never ours to stop.
+#
+# `./gradlew run` stays the way to start the server on its own; this script is the way to use Visur.
+#
+# VISUR_SERVER overrides how the server is started (a command line), VISUR_CLIENT overrides the client, and VISUR_LOG
+# says where the server's output goes. The overrides exist so the lifecycle below can be tested without a terminal.
+set -uo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PORT=8888
+CLIENT="${VISUR_CLIENT:-$ROOT/terminal/target/release/visur-term}"
+LOG="${VISUR_LOG:-${TMPDIR:-/tmp}/visur-server.log}"
+
+owned="" # the process we started, empty when the server was already running
+
+# Is Visur answering? The app's own URL, not just an open port: something else could be on 8888, and the verticles
+# only exist once the server can answer.
+probe() { curl -sf -o /dev/null --max-time 1 "http://127.0.0.1:$PORT/static/visur.html"; }
+
+stop_owned() {
+  [ -n "$owned" ] || return 0
+  kill "$owned" 2>/dev/null
+  # Gradle forks the JVM, so the port is the reliable handle on the process to end.
+  local pids
+  pids="$(lsof -ti "tcp:$PORT" 2>/dev/null)"
+  [ -n "$pids" ] && kill $pids 2>/dev/null
+  owned=""
+}
+trap stop_owned EXIT
+
+build_client() {
+  [ -n "${VISUR_CLIENT:-}" ] && return 0 # a substituted client needs no build
+  [ -x "$CLIENT" ] || echo "building the terminal client" >&2
+  ( cd "$ROOT/terminal" && cargo build --release --quiet ) || {
+    echo "could not build the terminal client in $ROOT/terminal" >&2
+    exit 1
+  }
+}
+
+# A fat jar needs no Gradle daemon and no compile check, so it starts in about a second; it is only used when it is
+# newer than every source file, so a stale jar can never serve yesterday's editor.
+start_server() {
+  if [ -n "${VISUR_SERVER:-}" ]; then
+    sh -c "$VISUR_SERVER" >"$LOG" 2>&1 &
+    owned=$!
+    return
+  fi
+  local jar
+  jar="$(ls -1 "$ROOT"/build/libs/*-fat.jar 2>/dev/null | head -1)"
+  if [ -n "$jar" ] && [ -z "$(find "$ROOT/src" -newer "$jar" -print -quit)" ]; then
+    java -jar "$jar" >"$LOG" 2>&1 &
+  else
+    ( cd "$ROOT" && ./gradlew run -q >"$LOG" 2>&1 ) &
+  fi
+  owned=$!
+}
+
+wait_for_server() {
+  for _ in $(seq 1 120); do
+    probe && return 0
+    kill -0 "$owned" 2>/dev/null || return 1 # the server died while we waited
+    sleep 0.5
+  done
+  return 1
+}
+
+build_client
+
+if probe; then
+  echo "using the server already on :$PORT"
+else
+  echo "no server on :$PORT — starting one (log: $LOG)"
+  start_server
+  if ! wait_for_server; then
+    echo "the server did not come up. Last lines of $LOG:" >&2
+    tail -20 "$LOG" >&2
+    exit 1
+  fi
+  echo "server ready"
+fi
+
+"$CLIENT"
+status=$?
+
+if [ -n "$owned" ] && [ "$status" -eq 0 ]; then
+  # Detached: the client asked for the server to stay, so hand it over rather than stopping it.
+  echo "server left running on :$PORT"
+  owned=""
+fi
+exit "$status"

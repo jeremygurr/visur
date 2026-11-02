@@ -78,7 +78,9 @@ java {
 tasks.withType<ShadowJar> {
   archiveClassifier.set("fat")
   manifest {
-    attributes(mapOf("MainVerticle-Verticle" to mainName))
+    // "Main-Verticle" is the attribute io.vertx.core.Launcher reads, which is what makes `java -jar` alone start the
+    // server. It was written as "MainVerticle-Verticle", so the jar printed its usage instead of starting.
+    attributes(mapOf("Main-Verticle" to mainName))
   }
   mergeServiceFiles()
 }

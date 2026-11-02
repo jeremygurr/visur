@@ -279,7 +279,15 @@ Canvas keeps what the terminal cannot express, and the spec does not try to unif
   before the bus consumers existed — a `send` to an address with no consumer is dropped silently. The server now
   opens its port only after the verticles are deployed, so one declaration is enough and the 300 ms resend is
   gone. A client that connects too early gets a refused connection, which is visible and retryable.
-- Packaging (prebuilt fat jar vs `./gradlew run`) is the launcher's choice; no binary is committed.
+- **Packaging: the fat jar, when it is current.** The launcher prefers `build/libs/visur-*-fat.jar` (`java -jar`, no
+  Gradle daemon, no compile check — about a second), and falls back to `./gradlew run` when the jar is missing or
+  older than anything under `src/`, so a stale jar can never serve yesterday's editor. No binary is committed.
+- **Exit codes carry detach vs quit.** `0` detach — leave the server running, even one the launcher started; anything
+  else stops a server it started. A server it merely found is never its to stop. Implemented in the client (§5.9)
+  and honoured by the launcher.
+- **Readiness is the app's own URL.** The launcher probes `GET /static/visur.html`, not an open port, so something
+  else squatting on 8888 is not mistaken for Visur.
+- See [the launcher](../../../visur) and [its tests](../../../tests/launcher.sh).
 
 ### 5.8 Scrolling
 
