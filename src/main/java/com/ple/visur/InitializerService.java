@@ -350,10 +350,6 @@ public class InitializerService {
     quantumEndKeymap = initializeQuantumEndKeymap(quantumEndKeymap);
     keymapMap.put(EditorSubmode.quantumEnd, quantumEndKeymap);
 
-    Keymap spanKeymap = Keymap.make("span");
-    spanKeymap = initializeSpanKeymap(spanKeymap);
-    keymapMap.put(EditorSubmode.span, spanKeymap);
-
     Keymap searchForwardKeymap = Keymap.make("searchForward");
     searchForwardKeymap = initializeSearchForwardKeymap(searchForwardKeymap);
     keymapMap.put(EditorSubmode.searchForward, searchForwardKeymap);
@@ -403,7 +399,7 @@ public class InitializerService {
       scs.compile("\"quantumEnd\" pushSubmode")
     );
     keymap.put(KeyPressed.from("s"),
-      scs.compile("\"span\" pushSubmode")
+      scs.compile("setSpan") // the count, if any, was typed before it: "12 s"
     );
     keymap.put(KeyPressed.from("i"),
       scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> 0 setSpan \"character\" quantumStart \"insert\" changeMode \"character\" changeCursorQuantum")
@@ -455,13 +451,6 @@ public class InitializerService {
     handlers[0] = QuantumEndSubmodeHandler.make();
     quantumEndKeymap.putHandlers(handlers);
     return quantumEndKeymap;
-  }
-
-  private Keymap initializeSpanKeymap(Keymap spanKeymap) {
-    final KeymapHandler[] handlers = new KeymapHandler[1];
-    handlers[0] = SpanSubmodeHandler.make();
-    spanKeymap.putHandlers(handlers);
-    return spanKeymap;
   }
 
   private Keymap initializeSearchForwardKeymap(Keymap searchForwardKeymap) {

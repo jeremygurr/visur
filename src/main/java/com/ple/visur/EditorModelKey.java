@@ -34,4 +34,5 @@ public enum EditorModelKey {
   canvasStart,
   fy,
   sourceFilePath,
+  pendingCount,
 }

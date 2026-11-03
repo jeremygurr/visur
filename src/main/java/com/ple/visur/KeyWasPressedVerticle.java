@@ -19,28 +19,26 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
     final String key = keyJson.getString("key");
     KeyPressed keyPressed = KeyPressed.from(key);
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    if (emc.getIsInCommandState()) {
-      pendingDocumentStart = false;
-    } else {
-      boolean navigating = emc.getEditorSubmode() == EditorSubmode.navigate;
-      if (pendingDocumentStart) {
-        pendingDocumentStart = false;
-        if (navigating && key.equals("g")) {
-          DocumentJumpOp.jumpToStart();
-          bus.send(BusEvent.modelWasChanged.name(), null);
-          return;
-        }
+    try {
+      if (!documentJumpConsumed(emc, key)) {
+        press(emc, keyPressed, key);
       }
-      if (navigating && key.equals("g")) {
-        pendingDocumentStart = true;
-        bus.send(BusEvent.modelWasChanged.name(), null);
-        return;
-      }
-      if (navigating && key.equals("G")) {
-        DocumentJumpOp.jumpToEnd();
-        bus.send(BusEvent.modelWasChanged.name(), null);
-        return;
-      }
+    } finally {
+      // every keypress but a digit ends whatever count was pending, whether or not it matched a binding
+      CountPrefix.retireUnlessDigit(emc, key);
+    }
+    bus.send(BusEvent.modelWasChanged.name(), null);
+  }
+
+  /**
+   * One keypress: the count typed in front of it, then the current submode's keymap, then the command it compiles to.
+   *
+   * <p>Static and side-effect-free of the bus so a test can drive a key without a verticle context, which is what
+   * {@link CountPrefixTest} needs to show {@code 12 s} reaching the model.
+   */
+  static void press(EditorModelCoupler emc, KeyPressed keyPressed, String key) {
+    if(CountPrefix.record(emc, key)) {
+      return; // a digit in navigate mode is the count for the next key, not a command of its own
     }
     enterCommandStateIfRequested(emc, key);
     if(emc.getIsInCommandState()) {
@@ -54,14 +52,37 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
         ces.execute(currentCommand);
       }
     }
+  }
 
-    bus.send(BusEvent.modelWasChanged.name(), null);
-
+  /** The two-key jump to the start of the document, and its one-key twin. True once the keypress belongs to them. */
+  private boolean documentJumpConsumed(EditorModelCoupler emc, String key) {
+    if (emc.getIsInCommandState()) {
+      pendingDocumentStart = false;
+      return false;
+    }
+    boolean navigating = emc.getEditorSubmode() == EditorSubmode.navigate;
+    if (pendingDocumentStart) {
+      pendingDocumentStart = false;
+      if (navigating && key.equals("g")) {
+        DocumentJumpOp.jumpToStart();
+        return true;
+      }
+    }
+    if (navigating && key.equals("g")) {
+      pendingDocumentStart = true;
+      return true;
+    }
+    if (navigating && key.equals("G")) {
+      DocumentJumpOp.jumpToEnd();
+      return true;
+    }
+    return false;
   }
 
   private void handlePaste(Message event) {
     pendingDocumentStart = false;
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
+    emc.clearPendingCount(); // typed text arrives without a keypress, so it retires a pending count the way one would
     JsonObject body = jsonBody(event);
     String text = body.getString("text", "");
     if (!emc.getIsInCommandState() && emc.getEditorSubmode() == EditorSubmode.navigate) {

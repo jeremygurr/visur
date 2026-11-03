@@ -5,7 +5,6 @@ public enum EditorSubmode {
   insert,
   quantumStart,
   quantumEnd,
-  span,
   replace,
   searchForward,
   searchBackward,

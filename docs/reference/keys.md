@@ -27,7 +27,8 @@ Quantum keys are shared by every command that takes one:
 | `j` / `k` | move one quantum down / up | `j` one line down |
 | `ArrowLeft` / `ArrowRight` / `ArrowDown` / `ArrowUp` | same as `h` `l` `j` `k` | — |
 | `q` / `w` / `e` / `r` | change the **cursor quantum**, re-deriving the selection around the cursor | `w` then `l` walks by words |
-| `s` then a digit `0`–`9` | set **span** to that many quanta. The digit comes *after* `s`, which caps it at nine until [the count prefix](../wayfinder/span-and-count/issues/05-count-prefix.md) replaces this form. `0` collapses the selection | `s 3` select three quanta; `s 0` collapse the selection |
+| `0`–`9` before any key | the **count** for the key that follows; digits accumulate, so `1` then `2` is twelve. Any key that is not a digit retires it, whether or not that key did anything. Only `s` takes a count so far | `12 s` twelve quanta |
+| `s` | set **span** to the pending count — one with no count typed. `0 s` collapses the selection | `3 s` three quanta; `s` one; `0 s` none |
 | `[` then `q`/`w`/`e`/`r` | jump to the **start** of that quantum | `[ w` start of the current word; `[ r` start of the document |
 | `]` then `q`/`w`/`e`/`r` | jump to the **end** of that quantum | `] e` last character of the current line; `] r` end of the document |
 | `/` then `q`/`w`/`e`/`r` | change the **scope quantum** — the fence search looks inside — and return to navigate | `/ r f foo` search the whole document for `foo` instead of only this line |
@@ -37,8 +38,8 @@ Quantum keys are shared by every command that takes one:
 | `i` | insert at the **start** of the selection; switches to insert mode | `i` |
 | `a` | insert at the **end** of the selection; switches to insert mode | `a` |
 | `o` | enter **replace** mode at the cursor | `o` |
-| `d` | delete the selection when there is one, then re-derive the bounds at the same span | `s 1 d` delete the quantum under the cursor |
-| `y` | copy the selection to the yank register | `s 1 y` |
+| `d` | delete the selection when there is one, then re-derive the bounds at the same span | `s d` delete the quantum under the cursor |
+| `y` | copy the selection to the yank register | `s y` |
 | `p` | paste the yank register at the cursor | `p` |
 | `g` `g` | jump to the start of the document (two-key) | `gg` |
 | `G` | jump to the start of the last non-empty line | `G` |
@@ -105,9 +106,6 @@ Intercepted by the terminal before the server sees them:
 Decisions recorded in [the span-and-count map](../wayfinder/span-and-count/map.md) change the following. Until
 those tickets land, the table above is the truth:
 
-- **The count moves in front of the key** (`3 s` selects three quanta), replacing the digit-after-`s` form and the
-  ceiling of nine it carries. Span itself already reaches above 1 — that landed with
-  [04](../wayfinder/span-and-count/issues/04-setspanop-no-clamp.md). ([05](../wayfinder/span-and-count/issues/05-count-prefix.md))
 - **`[` and `]` move exactly one quantum per press**; a count in front of them (`3 ]`) moves three.
   ([06](../wayfinder/span-and-count/issues/06-count-on-jumps-and-movement.md))
 - **A count prefixes movement too** — `3 l` is three quanta right, `2 j` is two lines down. A count of `0` does not

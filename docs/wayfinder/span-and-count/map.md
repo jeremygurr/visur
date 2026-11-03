@@ -78,6 +78,11 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   clamps at the content end, so `s 3` selects three quanta today. `d` and `y` needed no change — neither wrote span —
   and the `tempSpan` stash across insert mode turns out to be magnitude-blind. Two input gaps left for
   [05](issues/05-count-prefix.md): nine is the ceiling, and bare `s` still does nothing rather than selecting one.
+- [Count prefix](issues/05-count-prefix.md): digits go before the key, so `12 s` selects twelve quanta, and the
+  `s`-then-digit submode is deleted. It is not a `KeymapHandler`, as this ticket planned — the keymap only consults
+  handlers on a miss, so a handler could not clear the count for the bound keys; it is a static either side of the
+  keypress in the verticle instead. **A pending count is still invisible** — the state is in the model, and
+  [10](issues/10-mode-line-scope.md) puts it on the mode line.
 - [Terminal block cursor at `span > 0`](issues/08-terminal-block-cursor.md): the terminal chose its cursor shape with
   the value that used to be the only nonzero one, so it shipped a bar over a three-cell highlight. Landed with 04
   rather than after it. Its amendment turned out to be five documents, not one: the conformance row and four places in
@@ -91,7 +96,7 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 | [02](issues/02-span-per-quantum.md) | Span > 1 in each quantum's bounds | 01 |
 | [03](issues/03-overflow-order.md) | Overflow counts in document order | 02 |
 | ~~04~~ [closed](issues/04-setspanop-no-clamp.md) | `SetSpanOp` stops clamping; span survives `d` and `y` | 02 |
-| [05](issues/05-count-prefix.md) | Count prefix in navigate mode; delete the `s`-then-digit submode | — |
+| ~~05~~ [closed](issues/05-count-prefix.md) | Count prefix in navigate mode; delete the `s`-then-digit submode | — |
 | [06](issues/06-count-on-jumps-and-movement.md) | Count reaches `[` `]` and movement | 05, 07 |
 | [07](issues/07-frame-at-span-one.md) | Frame chosen structurally at span 1; rename the `Quantum.java` locals | — |
 | ~~08~~ [closed](issues/08-terminal-block-cursor.md) | Terminal block cursor at `span > 0` | — |

@@ -63,7 +63,7 @@ and its nine `initialize*Keymap` methods) and every handler:
 | `navigate` | `h` `l` `j` `k` `ArrowLeft` `ArrowRight` `ArrowDown` `ArrowUp` `[` `]` `s` `i` `a` `o` `d` `f` `F` `n` `N` `/` |
 | `insert` | `Escape` `ArrowLeft` `ArrowRight` `ArrowUp` `ArrowDown` `Backspace` `Enter` |
 | `replace` | `Escape` `ArrowLeft` `ArrowRight` `ArrowUp` `ArrowDown` `Backspace` |
-| `quantumStart`, `quantumEnd`, `span`, `searchForward`, `searchBackward`, `changeScope` | none — handler-only |
+| `quantumStart`, `quantumEnd`, `searchForward`, `searchBackward`, `changeScope` | none — handler-only |
 
 **Handler vocabulary (the fall-through on a keymap miss)**
 
@@ -73,7 +73,7 @@ and its nine `initialize*Keymap` methods) and every handler:
 | [ReplaceModeHandler](../../../../src/main/java/com/ple/visur/ReplaceModeHandler.java) | any `length() == 1`, plus `Enter` | `replaceChar` / `0 1 relativeMove` |
 | [ChangeCursorQuantumHandler](../../../../src/main/java/com/ple/visur/ChangeCursorQuantumHandler.java) | keys in `KeyToQuantumName` = `q` `w` `e` `r` | `"<quantum>" changeCursorQuantum` (note `e` = **line**, not vim's end-of-word) |
 | [QuantumStartSubmodeHandler](../../../../src/main/java/com/ple/visur/QuantumStartSubmodeHandler.java) / [QuantumEndSubmodeHandler](../../../../src/main/java/com/ple/visur/QuantumEndSubmodeHandler.java) | `q` `w` `e` `r`, then `removeSubmode` regardless | `quantumStart` / `quantumEnd` |
-| [SpanSubmodeHandler](../../../../src/main/java/com/ple/visur/SpanSubmodeHandler.java) | one digit `0`–`9`, then `removeSubmode` regardless | `<n> setSpan` |
+| [CountPrefix](../../../../src/main/java/com/ple/visur/CountPrefix.java) — not a keymap handler: it runs in [KeyWasPressedVerticle](../../../../src/main/java/com/ple/visur/KeyWasPressedVerticle.java) *before* the keymap, which is how it sees a digit that no keymap would match | one digit `0`–`9` in navigate mode | accumulates the count for the next key: `12 s` is twelve quanta |
 | [SearchForwardSubmodeHandler](../../../../src/main/java/com/ple/visur/SearchForwardSubmodeHandler.java) / [SearchBackwardSubmodeHandler](../../../../src/main/java/com/ple/visur/SearchBackwardSubmodeHandler.java) | any `length() == 1` (appended to the search target), `Enter`, `Escape`, `Backspace` | search / submit / abandon / rub out |
 | [ChangeScopeSubmodeHandler](../../../../src/main/java/com/ple/visur/ChangeScopeSubmodeHandler.java) | `q` `w` `e` `r`, then `pushSubmode` regardless | `changeScope` |
 | [CommandStateService](../../../../src/main/java/com/ple/visur/CommandStateService.java) (not a keymap) | `Escape`, `Enter`, `ArrowLeft`, `ArrowRight`, `Backspace`, any `length() == 1` | abort / compile+execute / move cursor / rub out / insert char |

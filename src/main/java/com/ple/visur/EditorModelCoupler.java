@@ -445,4 +445,21 @@ public class EditorModelCoupler {
       editorModel.put(sourceFilePath, path);
     }
   }
+
+  /**
+   * The count typed in front of a key ({@code 12 s}), or null when none is pending. Absence is a state of its own, so
+   * that a count of zero can mean zero rather than "no count".
+   */
+  public Integer getPendingCount() {
+    Object val = editorModel.get(pendingCount);
+    return val == null ? null : (Integer) val;
+  }
+
+  public void putPendingCount(int count) {
+    editorModel.put(pendingCount, count);
+  }
+
+  public void clearPendingCount() {
+    editorModel.remove(pendingCount);
+  }
 }

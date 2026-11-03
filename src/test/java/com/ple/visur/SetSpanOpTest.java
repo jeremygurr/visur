@@ -88,6 +88,38 @@ class SetSpanOpTest {
   }
 
   @Test
+  void thePendingCountBecomesTheSpan() {
+    emc.putPendingCount(12);
+    new SetSpanOp().execute(null);
+    assertEquals(12, emc.getSpan());
+    assertEquals(12, selectedWidth());
+  }
+
+  @Test
+  void noPendingCountMeansOneQuantum() {
+    new SetSpanOp().execute(null);
+    assertEquals(1, emc.getSpan());
+  }
+
+  @Test
+  void aPendingCountOfZeroCollapsesTheSelection() {
+    requestSpan(3);
+    emc.putPendingCount(0);
+    new SetSpanOp().execute(null);
+    assertEquals(0, emc.getSpan());
+    assertEquals(0, selectedWidth());
+  }
+
+  @Test
+  void abindingThatNamesTheSpanIgnoresThePendingCount() {
+    // i, a and o enter insert mode with "0 setSpan" compiled into the binding, which outranks a stray count
+    emc.putPendingCount(5);
+    emc.putOnExecutionDataStack(0);
+    new SetSpanOp().execute(null);
+    assertEquals(0, emc.getSpan());
+  }
+
+  @Test
   void deletingLeavesAWindowThatWideBehind() {
     requestSpan(3);
     new DeleteCursorQuantumOp().execute(null);
