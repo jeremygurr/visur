@@ -136,7 +136,7 @@ decision** — the spec asks for something the build deliberately does not do, w
 | §5.5 `?2026` probed with `DECRQM`, never assumed, degrading silently | met | [caps.rs](../../../terminal/src/caps.rs); pty tests for both answers |
 | §5.5 Ordered restore, on panic and normal exit | met | [lifecycle.rs](../../../terminal/src/lifecycle.rs); order asserted; panic path proven at the guard seam, not end-to-end |
 | §5.5 One `write(2)` per frame to fd 1 | met (by construction) | `ManuallyDrop<File>` on fd 1; no machine check counts syscalls |
-| §5.5 Block cursor for `span == 1`, bar for `span == 0` | met | `DECSCUSR` in [paint.rs](../../../terminal/src/paint.rs) |
+| §5.5 Block cursor for `span > 0`, bar for `span == 0` | met | `DECSCUSR` in [paint.rs](../../../terminal/src/paint.rs). This row read `span == 1` while that was the only nonzero span; [span-and-count 08](../span-and-count/issues/08-terminal-block-cursor.md) rewrote it for a span that can be any count |
 | §5.5 Frames are damage, row runs, never rectangles | met | §1.1 of [ticket 06](issues/06-client-damage.md): 26 B per keystroke vs 3,234 B |
 | §5.6 Keeps what the canvas cannot express, and vice versa | met (by decision) | the terminal has no font/metric code; the canvas has no diff |
 | §5.7 `./gradlew run` starts the server | met | unchanged |

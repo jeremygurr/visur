@@ -19,7 +19,7 @@ pub struct Grid {
   cells: Vec<Cell>,
   /// Where to put the terminal's cursor, as a zero-based (row, column) inside the grid.
   pub cursor: (usize, usize),
-  /// A one-cell span is drawn as a block, a zero-cell span as a bar (spec §5.5).
+  /// A span covering anything is drawn as a block, a zero-cell span as a bar (spec §5.5).
   pub cursor_block: bool,
 }
 
@@ -111,7 +111,7 @@ pub fn compose(view: &ViewUpdate, cols: usize, rows: usize) -> Grid {
   let row = (view.cursor_row.max(0) as usize).min(content_rows.saturating_sub(1));
   let col = (view.cursor_col.max(0) as usize).min(cols.saturating_sub(1));
   grid.cursor = (row, col);
-  grid.cursor_block = view.span == 1;
+  grid.cursor_block = view.span > 0;
   grid
 }
 
@@ -167,10 +167,12 @@ mod tests {
   }
 
   #[test]
-  fn the_cursor_is_a_block_for_a_span_of_one_and_a_bar_below_that() {
+  fn the_cursor_is_a_block_whenever_anything_is_selected_and_a_bar_below_that() {
     let mut v = view(&[(0, "abcdef")]);
     v.span = 1;
     assert!(compose(&v, 10, 4).cursor_block);
+    v.span = 3;
+    assert!(compose(&v, 10, 4).cursor_block, "a wide selection is still one cursor");
     v.span = 0;
     assert!(!compose(&v, 10, 4).cursor_block);
   }

@@ -163,9 +163,11 @@ mod tests {
   }
 
   #[test]
-  fn a_zero_span_asks_for_a_bar_cursor_and_a_one_span_for_a_block() {
+  fn a_zero_span_asks_for_a_bar_cursor_and_any_span_above_it_for_a_block() {
     let mut view = styled();
     assert!(full(&compose(&view, 6, 2)).contains("\x1b[1 q"), "block for span 1");
+    view.span = 2;
+    assert!(full(&compose(&view, 6, 2)).contains("\x1b[1 q"), "a span wider than one is still a block");
     view.span = 0;
     assert!(full(&compose(&view, 6, 2)).contains("\x1b[5 q"), "bar for span 0");
   }

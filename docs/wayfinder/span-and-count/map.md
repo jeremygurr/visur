@@ -78,6 +78,10 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   clamps at the content end, so `s 3` selects three quanta today. `d` and `y` needed no change — neither wrote span —
   and the `tempSpan` stash across insert mode turns out to be magnitude-blind. Two input gaps left for
   [05](issues/05-count-prefix.md): nine is the ceiling, and bare `s` still does nothing rather than selecting one.
+- [Terminal block cursor at `span > 0`](issues/08-terminal-block-cursor.md): the terminal chose its cursor shape with
+  the value that used to be the only nonzero one, so it shipped a bar over a three-cell highlight. Landed with 04
+  rather than after it. Its amendment turned out to be five documents, not one: the conformance row and four places in
+  the spec that read "0 or 1 today".
 
 ## Tickets
 
@@ -90,7 +94,7 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 | [05](issues/05-count-prefix.md) | Count prefix in navigate mode; delete the `s`-then-digit submode | — |
 | [06](issues/06-count-on-jumps-and-movement.md) | Count reaches `[` `]` and movement | 05, 07 |
 | [07](issues/07-frame-at-span-one.md) | Frame chosen structurally at span 1; rename the `Quantum.java` locals | — |
-| [08](issues/08-terminal-block-cursor.md) | Terminal block cursor at `span > 0` | — |
+| ~~08~~ [closed](issues/08-terminal-block-cursor.md) | Terminal block cursor at `span > 0` | — |
 | [09](issues/09-remove-gg-and-capg.md) | Remove `gg` / `G` / `DocumentJumpOp` | — |
 | [10](issues/10-mode-line-scope.md) | Mode line always shows scope next to span | — |
 | [11](issues/11-fence-auto-promotion.md) | Fence auto-promotion, transient | 02, 07 |

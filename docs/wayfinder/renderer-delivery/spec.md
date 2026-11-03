@@ -42,7 +42,7 @@ Every `viewWasChanged` message is a **complete description of what a renderer sh
     { "start": 1200, "text": "…" }, //  start: int, absolute char index of text[0]
     { "start": 1293, "text": "…" }  //  text:  string, no "\n" may appear in it
   ],
-  "span": 1,                        // int.   0 or 1 today
+  "span": 1,                        // int.   quanta selected; 0 is none
   "cursorQuantumStart": 1240,       // int.   absolute char index
   "cursorQuantumEnd": 1241,         // int.   absolute char index
   "cursorRow": 3,                   // int.   index INTO rows — not a document row
@@ -274,7 +274,7 @@ Nothing else is meaningful: a longer string misses every keymap and is silently 
   - bytes typed inside the window are consumed with the answer (`shortcut` in `main.rs`);
   - **`SIGWINCH` is not yet being watched**, because crossterm installs its handler on the first `poll`, so a resize during the window is a signal nobody receives. The client therefore re-reads the terminal size after the probe and declares again if it moved.
 - **One `write(2)` per frame** to fd 1, bypassing `std::io::Stdout`'s line buffering.
-- Cursor style: block (inverse video) for `span == 1`, bar for `span == 0`.
+- Cursor style: block (inverse video) for any `span` above 0, bar for `span == 0`.
 - **Frames are damage, not screens** (§5.3 components 5–6): a frame carries the rows that changed, as row runs, and ends with the cursor. Measured 2026-11-01 (ticket 06): a keystroke is 26 bytes against 3,234 for a full repaint at 100×30, and keystroke → paint through the real server fell from 5.91 ms to ~3.6 ms. A full repaint is neither the fallback nor the average case: it is `full: true`, the first frame of a session, and a geometry change.
 
 ### 5.6 What the terminal cannot have, deliberately
@@ -309,7 +309,7 @@ Canvas keeps what the terminal cannot express, and the spec does not try to unif
 
 ### 5.9 Parity
 
-**Must** — paint rows and cursor (block for `span` 1, bar for `span` 0) from `cursorRow`/`cursorCol`; mode line with mode/submode/quantum/span; command-state line when `isInCommandState`; `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`+digit; search (`f`/`F`/`n`/`N`/`/` and typing the target); `SIGWINCH` → `viewportWasChanged` → full repaint; `?2026` probe; alt screen, raw mode, ordered restore on panic **and** normal exit; **`ZZ` save-and-detach, `ZQ` detach, `ZD` quit**.
+**Must** — paint rows and cursor (block for any `span` above 0, bar for `span` 0) from `cursorRow`/`cursorCol`; mode line with mode/submode/quantum/span; command-state line when `isInCommandState`; `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`+digit; search (`f`/`F`/`n`/`N`/`/` and typing the target); `SIGWINCH` → `viewportWasChanged` → full repaint; `?2026` probe; alt screen, raw mode, ordered restore on panic **and** normal exit; **`ZZ` save-and-detach, `ZQ` detach, `ZD` quit**.
 
 **Should** — kitty `DISAMBIGUATE_ESCAPE_CODES` push; `?2026` on every frame; overscan/local scroll; page-scroll without moving the cursor; truecolor once `VisurColor` is wired up.
 
@@ -358,7 +358,7 @@ Each step is independently shippable; steps 2 and 3 pair so clients update once.
 - **A GUI client.** The protocol is renderer-neutral, which is what makes one possible; building it is not this spec.
 - **Mouse, images, panes, tabs** in the terminal client.
 - **Any plugin system.**
-- **Visur feature gaps** found while charting: no quit, span clamped to 0/1, no copy/paste, no document-jump keys, no search-and-replace, no file I/O. These are the next effort's workload and its **benchmark set** — they are the operations that will expose the payload on large documents.
+- **Visur feature gaps** found while charting: no quit, no copy/paste, no document-jump keys, no search-and-replace, no file I/O, of which only span has since closed ([span-and-count 04](../span-and-count/issues/04-setspanop-no-clamp.md)). These are the next effort's workload and its **benchmark set** — they are the operations that will expose the payload on large documents.
 
 ---
 
