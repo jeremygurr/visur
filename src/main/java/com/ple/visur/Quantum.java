@@ -13,12 +13,12 @@ public abstract class Quantum implements Shareable {
   void quantumStart() {
     int actualSpan = emc.getSpan();
     int spanMinimumOne = Math.max(actualSpan, 1);
-    Quantum[] scopeAndCursorQuantums = getScopeAndCursorQuantums(spanMinimumOne);
-    Quantum scopeQuantum = scopeAndCursorQuantums[0];
-    Quantum cursorQuantum = scopeAndCursorQuantums[1];
+    Quantum[] frameAndCursorQuantums = getFrameAndCursorQuantums();
+    Quantum frameQuantum = frameAndCursorQuantums[0];
+    Quantum cursorQuantum = frameAndCursorQuantums[1];
     int ca = emc.getCA();
-    int[] scopeBounds = scopeQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
-    ca = scopeBounds[0];
+    int[] frameBounds = frameQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
+    ca = frameBounds[0];
     emc.putCA(ca);
     emc.putVirtualCX(emc.getCX());
     int[] newCursorBounds = cursorQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
@@ -33,12 +33,12 @@ public abstract class Quantum implements Shareable {
   void quantumEnd() {
     int actualSpan = emc.getSpan();
     int spanMinimumOne = Math.max(actualSpan, 1);
-    Quantum[] scopeAndCursorQuantums = getScopeAndCursorQuantums(spanMinimumOne);
-    Quantum scopeQuantum = scopeAndCursorQuantums[0];
-    Quantum cursorQuantum = scopeAndCursorQuantums[1];
+    Quantum[] frameAndCursorQuantums = getFrameAndCursorQuantums();
+    Quantum frameQuantum = frameAndCursorQuantums[0];
+    Quantum cursorQuantum = frameAndCursorQuantums[1];
     int ca = emc.getCA();
-    int[] scopeBounds = scopeQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
-    ca = actualSpan > 0 ? scopeBounds[1] - 1 : scopeBounds[1];
+    int[] frameBounds = frameQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
+    ca = actualSpan > 0 ? frameBounds[1] - 1 : frameBounds[1];
     emc.putCA(ca);
     emc.putVirtualCX(emc.getCX());
     int[] newCursorBounds = cursorQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
@@ -53,23 +53,36 @@ public abstract class Quantum implements Shareable {
     }
   }
 
-  private Quantum[] getScopeAndCursorQuantums(int spanMinimumOne) {
+  /**
+   * The two quanta a jump works between: the frame, which the jump walks to the edge of, and the cursor quantum,
+   * which is then selected inside it. The operand quantum comes off the execution data stack — it is the quantum key
+   * typed after {@code [} or {@code ]}.
+   *
+   * <p>They are ranked at span 1, not at the span currently selected. Which quantum is coarser is a fact about nesting
+   * (a character is inside a word is inside a line); measuring the two at the live span only approximates that, and the
+   * approximation ties where both grow one character per span — across blank lines, where a character and a step over a
+   * blank line each measure one character. A tie hands the frame to the operand, so {@code ] w} would leave the cursor
+   * in a different quantum depending on how much the selection happened to cover.
+   *
+   * <p>This is not the model's {@code scopeQuantum}, which is the fence a search is confined to.
+   */
+  private Quantum[] getFrameAndCursorQuantums() {
     ExecutionDataStack eds = emc.getExecutionDataStack();
     String otherQuantumName = (String)eds.pop();
     QuantumNameToQuantum quantumNameToQuantum = emc.getQuantumNameToQuantum();
     Quantum otherQuantum = quantumNameToQuantum.get(otherQuantumName);
-    int distanceOfCurrentQuantumBounds = getQuantumBoundsLengthAtSpan(spanMinimumOne);
-    int distanceOfOtherQuantumBounds = otherQuantum.getQuantumBoundsLengthAtSpan(spanMinimumOne);
-    Quantum scopeQuantum;
+    int rankingOfCurrentQuantum = getQuantumBoundsLengthAtSpan(1);
+    int rankingOfOtherQuantum = otherQuantum.getQuantumBoundsLengthAtSpan(1);
+    Quantum frameQuantum;
     Quantum cursorQuantum;
-    if(distanceOfCurrentQuantumBounds > distanceOfOtherQuantumBounds) {
-      scopeQuantum = this;
+    if(rankingOfCurrentQuantum > rankingOfOtherQuantum) {
+      frameQuantum = this;
       cursorQuantum = otherQuantum;
     } else {
-      scopeQuantum = otherQuantum;
+      frameQuantum = otherQuantum;
       cursorQuantum = this;
     }
-    return new Quantum[]{scopeQuantum, cursorQuantum};
+    return new Quantum[]{frameQuantum, cursorQuantum};
   }
 
   int getQuantumBoundsLengthAtSpan(int span) {

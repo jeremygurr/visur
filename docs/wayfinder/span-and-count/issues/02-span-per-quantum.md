@@ -52,7 +52,11 @@ caused by the walk to the next bound not stopping when the cursor is not on a ma
   "nothing selected".
 - **In whitespace-only content, a span above 1 selects the whitespace.** `" "` at index 0 with span 3 gives `{0, 1}`:
   the loop fails to find a quantum end, then `getNextBound` advances to the end of the content and that gets reported
-  as the selection.
+  as the selection. Measured in [ticket 07](07-frame-at-span-one.md)'s terms: `getNextBound` on a non-matching character
+  returns `bound + 1`, so across a run of whitespace the word window grows **one character per span** — which is why a
+  word window can never out-measure a line window over the same text, and why the ranking example in ticket 07 had to
+  be found elsewhere. Fixing the walk to reach the next match makes "twenty words" mean twenty words across blank
+  lines, and is worth deciding alongside that.
 
 Settling either means deciding what the word quantum *is* when the cursor sits between words, which is a question for
 the cursor-quantum model rather than for this ticket's arithmetic — worth checking against how `[` and `]` already
