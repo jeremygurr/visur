@@ -21,7 +21,7 @@ public class RegexQuantum extends Quantum {
   /**
    * The quantum bounds for the live model: reads the content and cursor line, delegates the arithmetic to
    * {@link #boundsFor}, then snaps the cursor to the start of what was selected. Zeroing the span when the range
-   * collapses used to happen here too; that rule is {@link SpanCollapse}'s now, in the operators that own the span.
+   * collapses used to happen here too; nothing zeroes it now, because only {@code s} writes the span.
    */
   @Override
   public int[] getBoundaries(int realCA, ArrayList<Integer> newlineIndices, int span, boolean includeTail) {

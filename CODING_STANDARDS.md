@@ -8,6 +8,12 @@ Conventions this codebase follows that the code itself does not force. Tooling a
 
 Writes that scroll use the `AndScroll` variant; the plain variant is for restoring a position the renderer already knows.
 
+One key owns each piece of state, and the operators that read it leave it alone. `s` writes span and nothing else does:
+`RelativeMoveOp`, `ChangeCursorQuantumOp` and `DeleteCursorQuantumOp` recompute the *range* at the span already in the
+model. They used to share a `SpanCollapse` that also zeroed the span whenever that range came back empty, which made a
+blank line a trap door at the word quantum — a range derived from span zero is always empty, so once the span fell to
+zero nothing re-derived a selection. A number the user typed outlives the content it was typed against.
+
 ## Pure arithmetic goes in a static
 
 A computation that needs no model state becomes a `static` method taking everything it reads as parameters. It is then testable without bootting a verticle, which is how `Viewport`, `SizedContent` and each quantum's `boundsFor` are tested.
@@ -18,7 +24,7 @@ Keep sibling statics on one shape so a caller can pass any of them the same argu
 
 Compute in the static, apply the write in the caller, and mark it `// legacy side effect: <what it does>` when the write is not what the caller came for. Keeping the write visible is what makes it removable later — `DocumentQuantum` parking the cursor at the document start is one, `RegexQuantum` snapping the cursor to the quantum start is another.
 
-A rule repeated in three places becomes one method. `"a collapsed range leaves no span"` lives in `SpanCollapse.zeroIfNothingSelected`, called from the four operators that recompute bounds; `InsertNewlineOp` skips it because inserting cannot shrink what is selectable.
+A rule repeated in three places becomes one method. `"digits typed before a key are that key's count"` lives in [`CountPrefix`](src/main/java/com/ple/visur/CountPrefix.java), called from the one place every keypress passes through — [`KeyWasPressedVerticle`](src/main/java/com/ple/visur/KeyWasPressedVerticle.java) — because a `KeymapHandler` is only consulted when a key has no binding, and a count that survives the wrong key is a bug twice removed.
 
 ## Operators
 

@@ -63,14 +63,19 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 - **`gg` and `G` are deleted**, in favour of `[ r` and `] r`. Accepted loss: `G` reached the *start of the last
   non-empty line*, `] r` reaches the *last character*.
 - **Renderers read `span > 0`, never `span == 1`,** and the mode line always shows span *and* scope.
+- **Only `s` writes the span.** The operators that recompute a range — move, change quantum, delete — leave the number
+  alone. Added 2026-11-03 after the collapse rule was found to be a trap door: at the word quantum a blank line yields
+  an empty range, the shared `SpanCollapse` (now deleted) took the span to zero with it, and a range derived from span
+  zero is always empty, so the selection could never come back. A number the user typed outlives the content it was
+  typed against; `0 s` is the only way to ask for no selection.
 
 ## Decisions so far
 
 <!-- one line per closed ticket: gist, then link to the ticket holding the detail -->
 
 - [Pure bound seam](issues/01-bound-seam-and-tests.md): every quantum's bounds are a static function of
-  `(content, nl, ca, cy, span)`, 42 tests at that seam, and "a collapsed range leaves no span" is one method called
-  from four operators instead of three hand-written copies. Two findings: span 0 on the character quantum used to mean
+  `(content, nl, ca, cy, span)`, 42 tests at that seam, and "a collapsed range leaves no span" was one method called
+  from four operators instead of three hand-written copies — that method is since deleted, see the rule above. Two findings: span 0 on the character quantum used to mean
   a one-character selection, which quietly moved where `p` inserts and where `n` starts searching (both now agree with
   the drawn caret); and at span 0 `] r` lands at the *start* of the document, because the document quantum parks the
   cursor there — [ticket 09](issues/09-remove-gg-and-capg.md) owns that.

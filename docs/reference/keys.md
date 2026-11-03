@@ -8,7 +8,8 @@ Two words carry most of the design:
 - **Quantum** — a unit of text. Four exist: `character`, `word`, `line`, `document`. The *cursor quantum* is the
   unit you move and select in; the *scope quantum* is the fence a search is allowed to look inside.
 - **Span** — how many quanta the selection covers. `span = 0` means no selection (a thin bar cursor); any
-  positive span highlights `[cursorQuantumStart, cursorQuantumEnd)` and draws a block cursor.
+  positive span highlights `[cursorQuantumStart, cursorQuantumEnd)` and draws a block cursor. Only `s` writes it, so
+  moving onto a blank line at the word quantum selects nothing and *keeps* the number; moving back selects again.
 
 Quantum keys are shared by every command that takes one:
 

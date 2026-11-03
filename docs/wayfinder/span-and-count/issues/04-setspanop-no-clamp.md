@@ -61,8 +61,9 @@ Five of the seven fail against the old clamp, so they test the ticket rather tha
 Two of the ticket's bullets needed no code, and are now covered by tests instead of by argument:
 
 - `d` keeps the count because it never wrote span — it recomputes bounds at the span already in the model, and
-  [`SpanCollapse`](../../../../src/main/java/com/ple/visur/SpanCollapse.java) is the only thing that can zero it.
-  `y` reads the range and writes nothing.
+  `SpanCollapse` was the only thing that could zero it. `y` reads the range and writes nothing. (`SpanCollapse` is
+  since deleted: it zeroed the span on an empty range, which was the wrong rule. `d` keeping the count is now the
+  whole story.)
 - The `tempSpan` stash is [`AssignmentOp`](../../../../src/main/java/com/ple/visur/AssignmentOp.java), which copies
   `getVal()` — an `Integer` — with no view of its magnitude.
 

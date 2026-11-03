@@ -21,7 +21,6 @@ public class RelativeMoveOp implements Operator {
     } else {
       newBounds = cursorQuantum.getBoundaries(newCA, newlineIndices, emc.getSpan(), false);
     }
-    SpanCollapse.zeroIfNothingSelected(emc, newBounds);
     emc.putCursorQuantumStartAndScroll(newBounds[0]);
     emc.putCursorQuantumEndAndScroll(newBounds[1]);
   }

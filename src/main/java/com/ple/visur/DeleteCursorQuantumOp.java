@@ -28,7 +28,6 @@ public class DeleteCursorQuantumOp implements Operator {
       int[] bounds = cursorQuantum.getBoundaries(ca, nl, span, false);
       emc.putCursorQuantumStartAndScroll(bounds[0]);
       emc.putCursorQuantumEndAndScroll(bounds[1]);
-      SpanCollapse.zeroIfNothingSelected(emc, bounds); // deleting the last selectable text leaves no span behind
     }
   }
 

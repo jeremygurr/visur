@@ -8,12 +8,10 @@ public class SetSpanOp implements Operator {
     int[] bounds = emc.getCursorQuantum().getBoundaries(emc.getCA(), emc.getNextLineIndices(), spanToSet, false);
     emc.putCursorQuantumStartAndScroll(bounds[0]);
     emc.putCursorQuantumEndAndScroll(bounds[1]);
-    if(spanToSet == 0 || SpanCollapse.zeroIfNothingSelected(emc, bounds)) {
-      emc.putSpan(0);
-    } else {
-      // the requested span is what the model keeps, even when the range clamped short of it at the content end
-      emc.putSpan(spanToSet);
-    }
+    // The number the key was given, kept even where the range clamped short of it or collapsed entirely. Nothing else
+    // writes the span: a move derives its range from the span, so a span of zero derives nothing, and a selection
+    // that fell to zero because there was no unit of the quantum here could never come back.
+    emc.putSpan(spanToSet);
   }
 
   /**

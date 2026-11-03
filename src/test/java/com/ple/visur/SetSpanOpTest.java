@@ -80,10 +80,12 @@ class SetSpanOpTest {
   }
 
   @Test
-  void nothingToSelectLeavesNoSpan() {
+  void nothingLeftToSelectKeepsTheNumberAndSelectsNothing() {
+    // the span is the number the key was given, the range is what the content allows. Zeroing the span here used to
+    // look harmless and was a trap door: a move derives its range from the span, so span zero derives nothing.
     emc.putCA(CONTENT.length()); // at the end of the content there is nothing left to select
     requestSpan(3);
-    assertEquals(0, emc.getSpan());
+    assertEquals(3, emc.getSpan());
     assertEquals(0, selectedWidth());
   }
 
@@ -139,12 +141,12 @@ class SetSpanOpTest {
   }
 
   @Test
-  void deletingTheLastSelectableTextLeavesNoSpan() {
+  void deletingTheLastTextKeepsTheSpanAndSelectsNothing() {
     emc.putEditorContent("ab\n");
     emc.putCA(0);
     requestSpan(3); // wider than the content, so the whole thing is selected
     new DeleteCursorQuantumOp().execute(null);
-    assertEquals(0, emc.getSpan());
     assertEquals(0, selectedWidth());
+    assertEquals(3, emc.getSpan(), "delete takes the span down no further than a move does");
   }
 }

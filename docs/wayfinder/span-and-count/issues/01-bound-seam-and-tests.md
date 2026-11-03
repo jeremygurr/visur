@@ -69,11 +69,14 @@ them silently. Full suite: 81 tests, green.
 
 ### The collapse rule is one method now
 
-[`SpanCollapse.zeroIfNothingSelected`](../../../../src/main/java/com/ple/visur/SpanCollapse.java) is the single spelling
+`SpanCollapse.zeroIfNothingSelected` is the single spelling
 of "a collapsed range leaves no span". It is called from `SetSpanOp`, `ChangeCursorQuantumOp`,
 `DeleteCursorQuantumOp` and `RelativeMoveOp`. `InsertNewlineOp` deliberately does not call it: inserting cannot
 reduce what is selectable, and collapsing there would drop a live span when pressing `i` then Enter on an empty
 document.
+
+*Later, and worth recording here: consolidating the rule made the next bug findable rather than invisible, but the rule
+itself was wrong. Nothing but `s` should write the span — see the map's decision on span writers.*
 
 ### Two writes stayed where they were
 
