@@ -18,10 +18,10 @@ public class RelativeMoveOp implements Operator {
     int[] newBounds;
     if(newCA == 0 && editorContent.length() == 0) {
       newBounds = new int[]{newCA, newCA};
-      emc.putSpan(0);
     } else {
       newBounds = cursorQuantum.getBoundaries(newCA, newlineIndices, emc.getSpan(), false);
     }
+    SpanCollapse.zeroIfNothingSelected(emc, newBounds);
     emc.putCursorQuantumStartAndScroll(newBounds[0]);
     emc.putCursorQuantumEndAndScroll(newBounds[1]);
   }

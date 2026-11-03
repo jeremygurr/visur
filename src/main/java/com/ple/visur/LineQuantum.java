@@ -8,18 +8,37 @@ public class LineQuantum extends Quantum {
 
   @Override
   public int[] getBoundaries(int ca, ArrayList<Integer> nl, int span, boolean includeTail) {
+    return boundsFor(emc.getEditorContent(), nl, ca, emc.getCY(), span);
+  }
+
+  /**
+   * The selection for a span of {@code span} lines starting at the cursor's line, as {@code [start, end)}.
+   *
+   * <p>The end is the end of the {@code cy + span - 1}'th line, so a span reaches into the following lines rather
+   * than clipping at the current one, and clamps at the end of the content. A line's own newline belongs to that
+   * line, except that a content not ending in a newline has no phantom character to include.
+   */
+  static int[] boundsFor(String content, ArrayList<Integer> nl, int ca, int cy, int span) {
     int[] bounds = new int[]{ca, ca};
-    int cy = emc.getCY();
-    bounds[0] = cy > 0 ? nl.get(cy - 1) : 0;;
+    bounds[0] = cy > 0 ? nl.get(cy - 1) : 0;
     if(span > 0) {
-      bounds[1] = cy == nl.size() - 1 ? nl.get(cy) : nl.get(cy) - 1;;
-    } else if(isInMiddleOfQuantum(ca)) {
+      bounds[1] = lineEnd(nl, Math.min(cy + span - 1, nl.size() - 1));
+    } else if(isInMiddleOfQuantum(content, ca)) {
       bounds[1] = bounds[0];
     } else {
       bounds[0] = ca;
       bounds[1] = ca;
     }
     return bounds;
+  }
+
+  /**
+   * The index just past the last character of line {@code line}. Only the phantom line after a trailing newline has
+   * no character of its own, so its end is its own start.
+   */
+  private static int lineEnd(ArrayList<Integer> nl, int line) {
+    boolean lastLineHasNoNewlineOfItsOwn = line == nl.size() - 1;
+    return lastLineHasNoNewlineOfItsOwn ? nl.get(line) : nl.get(line) - 1;
   }
 
   @Override
@@ -80,8 +99,8 @@ public class LineQuantum extends Quantum {
     return emc.getCA();
   }
 
-  private boolean isInMiddleOfQuantum(int bound) {
-    String editorContent = emc.getEditorContent();
+  /** Whether {@code bound} sits inside a line rather than at its start. */
+  private static boolean isInMiddleOfQuantum(String editorContent, int bound) {
     if(bound > 0 && bound < editorContent.length()) {
       boolean matchExistsBefore = editorContent.charAt(bound - 1) != '\n';
       boolean matchExistsAfter = editorContent.charAt(bound) != '\n';

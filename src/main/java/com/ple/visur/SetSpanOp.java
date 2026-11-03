@@ -11,9 +11,9 @@ public class SetSpanOp implements Operator {
     int[] bounds = emc.getCursorQuantum().getBoundaries(emc.getCA(), emc.getNextLineIndices(), spanToSet, false);
     emc.putCursorQuantumStartAndScroll(bounds[0]);
     emc.putCursorQuantumEndAndScroll(bounds[1]);
-    if(bounds[0] == bounds[1] || spanToSet == 0) {
+    if(spanToSet == 0) {
       emc.putSpan(0);
-    } else {
+    } else if(!SpanCollapse.zeroIfNothingSelected(emc, bounds)) {
       emc.putSpan(1);
     }
   }

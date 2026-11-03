@@ -6,12 +6,29 @@ public class CharacterQuantum extends Quantum {
   EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
   @Override
   public int[] getBoundaries(int ca, ArrayList<Integer> nextLineIndices, int span, boolean includeTail) {
-    int lastNewlineIndex = nextLineIndices.get(nextLineIndices.size() - 1);
-    if(ca < lastNewlineIndex) {
-      return new int[]{ca, ca + 1};
-    } else {
+    return boundsFor(emc.getEditorContent(), nextLineIndices, ca, emc.getCY(), span);
+  }
+
+  /**
+   * The selection for a span of characters starting at {@code ca}, as {@code [start, end)}.
+   *
+   * <p>Span N covers N characters. The selection runs across line breaks — wrapping is a display concern, and
+   * {@code nl}'s last entry is the end of the content, not the end of a line — and clamps there. At or past the end
+   * of the content there is nothing to select, so the range collapses.
+   *
+   * @param content not read; {@code nl}'s last entry is the end of the content. It is part of the signature so all
+   *                four quanta's seam takes the same arguments
+   * @param cy      not read, for the same reason
+   */
+  static int[] boundsFor(String content, ArrayList<Integer> nl, int ca, int cy, int span) {
+    int contentEnd = nl.get(nl.size() - 1);
+    if (ca >= contentEnd) {
       return new int[]{ca, ca};
     }
+    if (span <= 0) {
+      return new int[]{ca, ca};
+    }
+    return new int[]{ca, Math.min(ca + span, contentEnd)};
   }
 
   @Override

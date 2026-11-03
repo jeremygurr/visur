@@ -19,44 +19,49 @@ public class RegexQuantum extends Quantum {
   }
 
   /**
-   * make var firstCharMatches
-   * if start < editorContent.length() - 1
-     * set firstMatchIsChar = Matcher.matches(firstCharInContent)
-   * else
-     * firstMatchIsChar = false
-   * bounds[0] = getLeftBound
-   * bounds[1] = getRightBound
-   * if bounds[0] == bounds[1], set span = 0
-   * @param newlineIndices
-   * @param includeTail
-   * @return
+   * The quantum bounds for the live model: reads the content and cursor line, delegates the arithmetic to
+   * {@link #boundsFor}, then snaps the cursor to the start of what was selected. Zeroing the span when the range
+   * collapses used to happen here too; that rule is {@link SpanCollapse}'s now, in the operators that own the span.
    */
   @Override
   public int[] getBoundaries(int realCA, ArrayList<Integer> newlineIndices, int span, boolean includeTail) {
-    int[] bounds = new int[2];
-    int leftBound = realCA;
-    int rightBound = leftBound;
-    if(span > 0) {
-      leftBound = getQuantumStart(leftBound);
-    } else if(isInMiddleOfQuantum(leftBound)) {
-      leftBound = getPrevBound(leftBound);
-    }
-    int spansRemaining = span;
-    while(spansRemaining > 0) {
-      rightBound = getQuantumEnd(rightBound);
-      spansRemaining--;
-      if(spansRemaining > 0) {
-        rightBound = getNextBound(rightBound);
-      }
-    }
-    emc.putCA(leftBound);
-    bounds[0] = leftBound;
-    bounds[1] = rightBound;
+    int[] bounds = boundsFor(pattern, emc.getEditorContent(), newlineIndices, realCA, emc.getCY(), span);
+    emc.putCA(bounds[0]); // legacy side effect: the cursor snaps to the start of the quantum it selected
     return bounds;
   }
 
-  private boolean isInMiddleOfQuantum(int bound) {
-    String editorContent = emc.getEditorContent();
+  /**
+   * The selection for a span of {@code span} quanta starting at {@code ca}, as {@code [start, end)}.
+   *
+   * <p>Each unit is one match of {@code pattern}, and the range is contiguous, so the text between two selected
+   * words — the whitespace, or a line break — is inside the selection rather than skipped. Once the content runs
+   * out the range clamps there; the requested span is not reduced, only the range is.
+   *
+   * @param nl not read: a quantum's extent is set by its pattern, not by the line structure. Part of the signature so
+   *           all four quanta's seam takes the same arguments.
+   * @param cy not read, for the same reason
+   */
+  static int[] boundsFor(Pattern pattern, String editorContent, ArrayList<Integer> nl, int ca, int cy, int span) {
+    int leftBound = ca;
+    int rightBound = leftBound;
+    if(span > 0) {
+      leftBound = quantumStart(pattern, editorContent, leftBound);
+    } else if(isInMiddleOfQuantum(pattern, editorContent, leftBound)) {
+      leftBound = getPrevBound(pattern, editorContent, leftBound);
+    }
+    int spansRemaining = span;
+    while(spansRemaining > 0) {
+      rightBound = quantumEnd(pattern, editorContent, rightBound);
+      spansRemaining--;
+      if(spansRemaining > 0) {
+        rightBound = getNextBound(pattern, editorContent, rightBound);
+      }
+    }
+    return new int[]{leftBound, rightBound};
+  }
+
+  /** Whether {@code bound} sits inside a quantum rather than at one of its edges. */
+  private static boolean isInMiddleOfQuantum(Pattern pattern, String editorContent, int bound) {
     if(bound > 0 && bound < editorContent.length()) {
       Matcher prevMatcher = pattern.matcher(editorContent.substring(bound - 1, bound));
       Matcher nextMatcher = pattern.matcher(editorContent.substring(bound, bound + 1));
@@ -68,13 +73,13 @@ public class RegexQuantum extends Quantum {
     }
   }
 
-  private int getQuantumStart(int start) {
+  /** Walks back to the first index that still matches, which is where the quantum under {@code start} begins. */
+  private static int quantumStart(Pattern pattern, String editorContent, int start) {
     int leftBound = start;
     boolean endFound = false;
     while(!endFound) {
       if(leftBound > 0) {
-        String strToMatch = emc.getStrToMatch(false, leftBound);
-        Matcher matcher = pattern.matcher(strToMatch);
+        Matcher matcher = pattern.matcher(editorContent.substring(leftBound - 1, leftBound));
         if (matcher.matches()) {
           leftBound--;
         } else {
@@ -87,14 +92,13 @@ public class RegexQuantum extends Quantum {
     return leftBound;
   }
 
-  private int getQuantumEnd(int start) {
-    String editorContent = emc.getEditorContent();
+  /** Walks forward to the first index past the quantum that starts at or contains {@code start}. */
+  private static int quantumEnd(Pattern pattern, String editorContent, int start) {
     int rightBound = start;
     boolean endFound = false;
     while(!endFound) {
       if(rightBound < editorContent.length()) {
-        String strToMatch = emc.getStrToMatch(true, rightBound);
-        Matcher matcher = pattern.matcher(strToMatch);
+        Matcher matcher = pattern.matcher(editorContent.substring(rightBound, rightBound + 1));
         if (matcher.matches()) {
           rightBound++;
         } else {
@@ -127,7 +131,7 @@ public class RegexQuantum extends Quantum {
     int spansRemaining = span;
     int incrementer = mv.dx > 0 ? 1 : -1;
     while(mv.dx != 0) {
-      destination = mv.dx > 0 ? getNextBound(destination) : getPrevBound(destination);
+      destination = mv.dx > 0 ? getNextBound(pattern, editorContent, destination) : getPrevBound(pattern, editorContent, destination);
       if(span > 0 && isAtBeginningOfQuantum(destination)) {
         spansRemaining--;
       }
@@ -135,7 +139,7 @@ public class RegexQuantum extends Quantum {
         destination = mv.dx > 0 ? getNextQuantumStart(destination) : getPrevQuantumStart(destination);
         spansRemaining--;
         if(spansRemaining > 0) {
-          destination = mv.dx > 0 ? getNextBound(destination) : getPrevBound(destination);
+          destination = mv.dx > 0 ? getNextBound(pattern, editorContent, destination) : getPrevBound(pattern, editorContent, destination);
         }
       }
       emc.putCA(destination);
@@ -221,8 +225,7 @@ public class RegexQuantum extends Quantum {
        * invalidBoundFound = false
    * @return bound
    */
-  public int getNextBound(int bound) {
-    String editorContent = emc.getEditorContent();
+  static int getNextBound(Pattern pattern, String editorContent, int bound) {
     boolean nonmatchFound = bound >= editorContent.length() - 1;
     boolean firstWasMatch = false;
     if(bound < editorContent.length()) {
@@ -250,8 +253,7 @@ public class RegexQuantum extends Quantum {
   /** it's the same idea as getNextBound, but it searches backwards
    * @return
    */
-  public int getPrevBound(int bound) {
-    String editorContent = emc.getEditorContent();
+  static int getPrevBound(Pattern pattern, String editorContent, int bound) {
     boolean invalidBoundFound = bound == 0;
     boolean firstWasMatch = false;
     if(bound > 0) {
