@@ -12,8 +12,13 @@ public class RelativeMoveOp implements Operator {
     int dy = (int)eds.pop();
     int dx = (int)eds.pop();
     Quantum cursorQuantum = emc.getCursorQuantum();
-    MovementVector movementVector = new MovementVector(dx, dy);
-    int newCA = cursorQuantum.move(editorContent, newlineIndices, movementVector);
+    // The count decides how far; a quantum's move spends the vector it is handed, so it is called once per unit
+    // rather than taught about counts. A count of zero is a movement that does not happen.
+    int units = CountPrefix.countOrOne(emc);
+    int newCA = emc.getCA();
+    for (int unit = 0; unit < units; unit++) {
+      newCA = cursorQuantum.move(editorContent, newlineIndices, new MovementVector(dx, dy));
+    }
     emc.putCA(newCA);
     int[] newBounds;
     if(newCA == 0 && editorContent.length() == 0) {

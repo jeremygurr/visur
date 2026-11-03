@@ -84,6 +84,12 @@ stack and the count otherwise. A binding that names the span outranks a stray co
 `3 i` should mean; the precedence is one comment at
 [`SetSpanOp.spanRequested`](../../../../src/main/java/com/ple/visur/SetSpanOp.java).
 
+### Amended by [ticket 06](06-count-on-jumps-and-movement.md)
+
+"Every keypress but a digit ends the count" needed a boundary the same ticket's `3 ] w` requires: `]` matches a binding,
+so it was retiring the count before the quantum key arrived. The rule is now that a count dies with the first keypress
+that leaves you back in navigate mode, which lets it outlive a two-key command and still refuses digits inside a submode.
+
 ### What is not done
 
 **A pending count is invisible.** The mode line is [ticket 10](10-mode-line-scope.md)'s, and it will add the field to

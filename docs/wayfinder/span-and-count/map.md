@@ -88,6 +88,12 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   handlers on a miss, so a handler could not clear the count for the bound keys; it is a static either side of the
   keypress in the verticle instead. **A pending count is still invisible** — the state is in the model, and
   [10](issues/10-mode-line-scope.md) puts it on the mode line.
+- [Count reaches movement and jumps](issues/06-count-on-jumps-and-movement.md): `3 l` is three quanta, `2 j` two lines,
+  `0 l` nowhere, and `]` walks count quanta while the span only decides how wide the selection lands. Two decisions
+  beyond the ticket: **a count outlives the keypress that opens a submode**, because `] w` is one command and `]` was
+  eating the count; and **`0 ]` is `]`**, since a jump's arithmetic cannot express zero units. Scaling the movement
+  vector, as this ticket sketched, does nothing — the character quantum reads only its sign — so the count loops the
+  call instead.
 - [Frame ranked at span 1](issues/07-frame-at-span-one.md): `] w` leaves the cursor in the same quantum whatever the
   span, and the locals in `Quantum.java` say *frame* — the search fence keeps the name *scope*. Found on the way: the
   word quantum's walk advances **one character per remaining span** across whitespace, so twenty words can never
@@ -108,7 +114,7 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 | [03](issues/03-overflow-order.md) | Overflow counts in document order | 02 |
 | ~~04~~ [closed](issues/04-setspanop-no-clamp.md) | `SetSpanOp` stops clamping; span survives `d` and `y` | 02 |
 | ~~05~~ [closed](issues/05-count-prefix.md) | Count prefix in navigate mode; delete the `s`-then-digit submode | — |
-| [06](issues/06-count-on-jumps-and-movement.md) | Count reaches `[` `]` and movement | 05, 07 |
+| ~~06~~ [closed](issues/06-count-on-jumps-and-movement.md) | Count reaches `[` `]` and movement | 05, 07 |
 | ~~07~~ [closed](issues/07-frame-at-span-one.md) | Frame chosen structurally at span 1; rename the `Quantum.java` locals | — |
 | ~~08~~ [closed](issues/08-terminal-block-cursor.md) | Terminal block cursor at `span > 0` | — |
 | [09](issues/09-remove-gg-and-capg.md) | Remove `gg` / `G` / `DocumentJumpOp` | — |

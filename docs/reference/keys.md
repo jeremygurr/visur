@@ -27,14 +27,14 @@ Quantum keys are shared by every command that takes one:
 
 | key | does | example |
 |---|---|---|
-| `h` / `l` | move one quantum left / right | `l` one character right; with `w` as the cursor quantum, one word |
-| `j` / `k` | move one quantum down / up | `j` one line down |
+| `h` / `l` | move one quantum left / right, or `count` of them | `l` one character right; `3 l` three; with `w` as the cursor quantum, words |
+| `j` / `k` | move one quantum down / up, or `count` of them | `j` one line down; `2 j` two lines, same column |
 | `ArrowLeft` / `ArrowRight` / `ArrowDown` / `ArrowUp` | same as `h` `l` `j` `k` | — |
 | `q` / `w` / `e` / `r` | change the **cursor quantum**, re-deriving the selection around the cursor | `w` then `l` walks by words |
-| `0`–`9` before any key | the **count** for the key that follows; digits accumulate, so `1` then `2` is twelve. Any key that is not a digit retires it, whether or not that key did anything. Only `s` takes a count so far | `12 s` twelve quanta |
+| `0`–`9` before any key | the **count** for the key that follows; digits accumulate, so `1` then `2` is twelve. It is spent by the command it belongs to — including a two-key command — and any other key drops it. `0` means none: `0 l` does not move, `0 s` selects nothing | `12 s` twelve quanta; `3 ] w` three words |
 | `s` | set **span** to the pending count — one with no count typed. `0 s` collapses the selection | `3 s` three quanta; `s` one; `0 s` none |
-| `[` then `q`/`w`/`e`/`r` | jump to the **start** of that quantum | `[ w` start of the current word; `[ r` start of the document |
-| `]` then `q`/`w`/`e`/`r` | jump to the **end** of that quantum | `] e` last character of the current line; `] r` end of the document |
+| `[` then `q`/`w`/`e`/`r` | jump to the **start** of that quantum — one quantum per press, whatever the span | `[ w` start of the current word; `[ r` start of the document |
+| `]` then `q`/`w`/`e`/`r` | jump to the **end** of that quantum, `count` of them | `] e` last character of the current line; `3 ] e` of the third line |
 | `/` then `q`/`w`/`e`/`r` | change the **scope quantum** — the fence search looks inside — and return to navigate | `/ r f foo` search the whole document for `foo` instead of only this line |
 | `f` + text + `Enter` | search **forward** for a literal string, inside the scope fence | `f` `bar` `Enter` |
 | `F` + text + `Enter` | search **backward** for a literal string, inside the scope fence | `F` `bar` `Enter` |
@@ -110,10 +110,6 @@ Intercepted by the terminal before the server sees them:
 Decisions recorded in [the span-and-count map](../wayfinder/span-and-count/map.md) change the following. Until
 those tickets land, the table above is the truth:
 
-- **`[` and `]` move exactly one quantum per press**; a count in front of them (`3 ]`) moves three.
-  ([06](../wayfinder/span-and-count/issues/06-count-on-jumps-and-movement.md))
-- **A count prefixes movement too** — `3 l` is three quanta right, `2 j` is two lines down. A count of `0` does not
-  move. ([06](../wayfinder/span-and-count/issues/06-count-on-jumps-and-movement.md))
 - **A count multiplies the span on operators**: `3 d` with a 3-word span deletes nine words, bounded by the scope
   fence. With no selection, `d` and `y` still do nothing. ([12](../wayfinder/span-and-count/issues/12-count-on-operators.md))
 - **`d` also yanks** what it removes, so `p` can put it back. It overwrites the register. `3 p` pastes three copies.

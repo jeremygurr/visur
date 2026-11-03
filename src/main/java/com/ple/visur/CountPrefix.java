@@ -29,11 +29,21 @@ public class CountPrefix {
    * Retires the pending count once the keypress after it has run. The key that the count belonged to still needs to
    * read it, which is why this happens after execution rather than when the key is looked up — and why every key
    * clears it, not just Escape.
+   *
+   * <p>A count belongs to a key <em>sequence</em>, and a sequence is still in flight while a submode is open: the
+   * count in {@code 3 ] w} is typed three keypresses before the jump, so {@code ]} must not consume it.
    */
   static void retireUnlessDigit(EditorModelCoupler emc, String key) {
-    if (!isDigit(key)) {
+    boolean sequenceStillInFlight = emc.getEditorSubmode() != EditorSubmode.navigate;
+    if (!isDigit(key) && !sequenceStillInFlight) {
       emc.clearPendingCount();
     }
+  }
+
+  /** What a key sees when no count was typed: one. Zero is a count, not the absence of one. */
+  static int countOrOne(EditorModelCoupler emc) {
+    Integer pending = emc.getPendingCount();
+    return pending == null ? 1 : pending;
   }
 
   private static boolean isDigit(String key) {

@@ -10,6 +10,12 @@ public abstract class Quantum implements Shareable {
   abstract String getName();
   EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
 
+  /**
+   * The jump {@code [} performs: walk back to the start of the frame, then select the cursor quantum's span from there.
+   *
+   * <p>No count is read here, unlike {@link #quantumEnd}: a quantum's start edge is the same index whatever the span, so
+   * walking back N of them is arithmetic the bound functions do not have yet. {@code 3[} is one quantum back.
+   */
   void quantumStart() {
     int actualSpan = emc.getSpan();
     int spanMinimumOne = Math.max(actualSpan, 1);
@@ -30,14 +36,23 @@ public abstract class Quantum implements Shareable {
     setSmallestQuantum(cursorQuantum);
   }
 
+  /**
+   * The jump {@code ]} performs: walk to the end of the frame, then select the cursor quantum's span from there.
+   *
+   * <p>How far the jump goes is the count, not the span — one quantum per press, {@code 3]} three — while how wide the
+   * selection lands is the span. They used to be the same number, so selecting more text moved the cursor further for
+   * the same two keys.
+   */
   void quantumEnd() {
     int actualSpan = emc.getSpan();
     int spanMinimumOne = Math.max(actualSpan, 1);
+    // A jump has to land somewhere, so 0] is ] rather than a cursor off the end of the frame.
+    int jumpUnits = Math.max(CountPrefix.countOrOne(emc), 1);
     Quantum[] frameAndCursorQuantums = getFrameAndCursorQuantums();
     Quantum frameQuantum = frameAndCursorQuantums[0];
     Quantum cursorQuantum = frameAndCursorQuantums[1];
     int ca = emc.getCA();
-    int[] frameBounds = frameQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
+    int[] frameBounds = frameQuantum.getBoundaries(ca, emc.getNextLineIndices(), jumpUnits, false);
     ca = actualSpan > 0 ? frameBounds[1] - 1 : frameBounds[1];
     emc.putCA(ca);
     emc.putVirtualCX(emc.getCX());
