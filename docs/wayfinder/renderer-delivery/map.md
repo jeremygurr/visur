@@ -60,9 +60,8 @@ Nothing left. Every question that was fog has been settled by a ticket — the r
 
 Work consciously ruled out of this effort. Never graduates; returns only if the destination is redrawn.
 
-- **Visur feature gaps and stress cases surfaced by the renderer work** — all app features, not renderer ones, and all deferred to the effort that builds this spec:
+- **Visur feature gaps and stress cases surfaced by the renderer work** — all app features, not renderer ones, and all deferred to the effort that builds this spec. Span is no longer one of them: as of [span-and-count ticket 04](../span-and-count/issues/04-setspanop-no-clamp.md) `SetSpanOp` keeps the number it was given, so `s 3` selects three quanta.
   - **No quit.** No quit/exit operator exists; `CommandStateService.exitCommandState` only leaves the `;` line. A client must bind quitting, but there is nothing to bind it to yet.
-  - **Span is binary.** `s` + digit is the key ([`SetSpanOp`](../../../src/main/java/com/ple/visur/SetSpanOp.java) clamps to 0/1), so a multi-quantum span cannot be expressed.
   - **No copy/paste**, and no paste message in the protocol (only bracketed paste at the terminal).
   - **No document-jump keys** — no `gg`/`G` equivalent, so top↔bottom is unreachable in one key.
   - **No search-and-replace** — search (`f`/`F`/`n`/`N`) exists; substitution does not, and replace mode is overwrite-typing.

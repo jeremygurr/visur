@@ -27,7 +27,7 @@ Quantum keys are shared by every command that takes one:
 | `j` / `k` | move one quantum down / up | `j` one line down |
 | `ArrowLeft` / `ArrowRight` / `ArrowDown` / `ArrowUp` | same as `h` `l` `j` `k` | — |
 | `q` / `w` / `e` / `r` | change the **cursor quantum**, re-deriving the selection around the cursor | `w` then `l` walks by words |
-| `s` then a digit `0`–`9` | set **span** to that many quanta. The digit comes *after* `s`, and only `0` or `1` survives today: the value is clamped | `s 1` select the quantum under the cursor; `s 0` collapse the selection |
+| `s` then a digit `0`–`9` | set **span** to that many quanta. The digit comes *after* `s`, which caps it at nine until [the count prefix](../wayfinder/span-and-count/issues/05-count-prefix.md) replaces this form. `0` collapses the selection | `s 3` select three quanta; `s 0` collapse the selection |
 | `[` then `q`/`w`/`e`/`r` | jump to the **start** of that quantum | `[ w` start of the current word; `[ r` start of the document |
 | `]` then `q`/`w`/`e`/`r` | jump to the **end** of that quantum | `] e` last character of the current line; `] r` end of the document |
 | `/` then `q`/`w`/`e`/`r` | change the **scope quantum** — the fence search looks inside — and return to navigate | `/ r f foo` search the whole document for `foo` instead of only this line |
@@ -105,8 +105,9 @@ Intercepted by the terminal before the server sees them:
 Decisions recorded in [the span-and-count map](../wayfinder/span-and-count/map.md) change the following. Until
 those tickets land, the table above is the truth:
 
-- **Span takes a count, typed before the key** (`3 s` selects three quanta) and reaches above 1. The digit-after-`s`
-  form goes away with it. ([05](../wayfinder/span-and-count/issues/05-count-prefix.md))
+- **The count moves in front of the key** (`3 s` selects three quanta), replacing the digit-after-`s` form and the
+  ceiling of nine it carries. Span itself already reaches above 1 — that landed with
+  [04](../wayfinder/span-and-count/issues/04-setspanop-no-clamp.md). ([05](../wayfinder/span-and-count/issues/05-count-prefix.md))
 - **`[` and `]` move exactly one quantum per press**; a count in front of them (`3 ]`) moves three.
   ([06](../wayfinder/span-and-count/issues/06-count-on-jumps-and-movement.md))
 - **A count prefixes movement too** — `3 l` is three quanta right, `2 j` is two lines down. A count of `0` does not

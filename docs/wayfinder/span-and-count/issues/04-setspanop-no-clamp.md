@@ -1,7 +1,8 @@
 # `SetSpanOp` stops clamping; span survives `d` and `y`
 
 Type: task
-Status: open
+Status: closed
+Closed: 2026-11-03
 Blocked by: 02
 
 ## Work
@@ -41,3 +42,32 @@ state change.
 - A test asserts that setting span to 7 leaves 7 in the model, and that setting it to 0 collapses the range.
 - Selecting 3, deleting, and moving the cursor shows a 3-unit window again rather than 1.
 - Neither map still claims the clamp exists.
+
+## Result
+
+Landed before [02](02-span-per-quantum.md) closed, since what it was waiting on was the quantum arithmetic, which came
+with [01](01-bound-seam-and-tests.md).
+
+The clamp is gone and the operator stores the number it was handed
+([`SetSpanOp`](../../../../src/main/java/com/ple/visur/SetSpanOp.java)); the range still clamps at the content end,
+but the model keeps the requested span rather than the width that survived
+([`aSpanWiderThanTheContentKeepsTheRequestedSpanAndSelectsWhatIsLeft`](../../../../src/test/java/com/ple/visur/SetSpanOpTest.java)
+names it). The debug print left with the clamp.
+
+Seven tests in [`SetSpanOpTest`](../../../../src/test/java/com/ple/visur/SetSpanOpTest.java), booted the way a session
+boots (`ServiceHolder.init` + `initializeEditorModel`) because the assertion is about what the model is left holding.
+Five of the seven fail against the old clamp, so they test the ticket rather than the operator's shape.
+
+Two of the ticket's bullets needed no code, and are now covered by tests instead of by argument:
+
+- `d` keeps the count because it never wrote span — it recomputes bounds at the span already in the model, and
+  [`SpanCollapse`](../../../../src/main/java/com/ple/visur/SpanCollapse.java) is the only thing that can zero it.
+  `y` reads the range and writes nothing.
+- The `tempSpan` stash is [`AssignmentOp`](../../../../src/main/java/com/ple/visur/AssignmentOp.java), which copies
+  `getVal()` — an `Integer` — with no view of its magnitude.
+
+**What this makes reachable from the keyboard**: `s 3` selects three characters, `s 5` five. The digit-after-`s`
+submode was already passing any digit to `setSpan`; the clamp was the only thing refusing. Nine is the ceiling until
+[ticket 05](05-count-prefix.md) replaces the form, along with two behaviors that ticket decides:
+**bare `s` still does nothing** (the submode leaves itself on a non-digit without calling `setSpan`, so it does not
+collapse to 1 as decided) and **`s 0` collapses**, which matches the decision.

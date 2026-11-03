@@ -53,5 +53,5 @@ Work consciously ruled out of this effort. Never graduates; returns only if the 
 
 - **Simultaneous attach / multi-user editing.** Next effort, and its first question is the shared-cursor-vs-independent-cursors conflict above.
 - **Session-scoped viewport state (P1)** and any per-subscriber delivery — only needed by the above.
-- **Every Visur feature gap** — no quit, span clamped to 0/1, no copy/paste, no document-jump keys, no search-and-replace, no file I/O. These are the multi-user/feature effort's workload and its benchmark set.
+- **Every Visur feature gap** — no quit, no copy/paste, no document-jump keys, no search-and-replace, no file I/O. These are the multi-user/feature effort's workload and its benchmark set. Span is no longer one of them: [span-and-count ticket 04](../span-and-count/issues/04-setspanop-no-clamp.md) let `SetSpanOp` keep the number it was given.
 - **Filesystem navigation, typed objects, remote attach, TLS/auth, a GUI client, mouse/panes/images in the terminal, any plugin system.**

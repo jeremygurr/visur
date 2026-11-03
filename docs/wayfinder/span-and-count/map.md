@@ -74,6 +74,10 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   a one-character selection, which quietly moved where `p` inserts and where `n` starts searching (both now agree with
   the drawn caret); and at span 0 `] r` lands at the *start* of the document, because the document quantum parks the
   cursor there — [ticket 09](issues/09-remove-gg-and-capg.md) owns that.
+- [`SetSpanOp` stops clamping](issues/04-setspanop-no-clamp.md): span keeps the number it was given and the range
+  clamps at the content end, so `s 3` selects three quanta today. `d` and `y` needed no change — neither wrote span —
+  and the `tempSpan` stash across insert mode turns out to be magnitude-blind. Two input gaps left for
+  [05](issues/05-count-prefix.md): nine is the ceiling, and bare `s` still does nothing rather than selecting one.
 
 ## Tickets
 
@@ -82,7 +86,7 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 | ~~01~~ [closed](issues/01-bound-seam-and-tests.md) | Pure bound seam + boundary tests | — |
 | [02](issues/02-span-per-quantum.md) | Span > 1 in each quantum's bounds | 01 |
 | [03](issues/03-overflow-order.md) | Overflow counts in document order | 02 |
-| [04](issues/04-setspanop-no-clamp.md) | `SetSpanOp` stops clamping; span survives `d` and `y` | 02 |
+| ~~04~~ [closed](issues/04-setspanop-no-clamp.md) | `SetSpanOp` stops clamping; span survives `d` and `y` | 02 |
 | [05](issues/05-count-prefix.md) | Count prefix in navigate mode; delete the `s`-then-digit submode | — |
 | [06](issues/06-count-on-jumps-and-movement.md) | Count reaches `[` `]` and movement | 05, 07 |
 | [07](issues/07-frame-at-span-one.md) | Frame chosen structurally at span 1; rename the `Quantum.java` locals | — |
