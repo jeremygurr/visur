@@ -6,7 +6,7 @@ Visur's selection is **larger than one thing**, and a command can be **repeated 
 
 Concretely: `3 s` selects three quanta of whatever the cursor quantum is, `] w` lands at the end of the next word
 rather than the third, `3 d` deletes nine words when the span is three words, the text it removed is pasteable with
-`p`, and the mode line tells you the size of the selection and the size of the fence it lives inside at all times.
+`p`, and the mode line tells you the size of the selection and the scope search is confined to at all times.
 
 This closes the oldest known feature gap in the repo: "**Span is binary.** … a multi-quantum span cannot be
 expressed" ([renderer-delivery/map.md](../renderer-delivery/map.md), [terminal-build/map.md](../terminal-build/map.md)).
@@ -22,10 +22,11 @@ expressed" ([renderer-delivery/map.md](../renderer-delivery/map.md), [terminal-b
   and the local `scopeQuantum` in [`Quantum.getScopeAndCursorQuantums`](../../../src/main/java/com/ple/visur/Quantum.java)
   (computed per `[`/`]` press by comparing two quanta's bound lengths) are unrelated objects that share a name. The
   local one becomes `frameQuantum`; the search fence keeps its name.
-- **`scope` gains a second job.** It was only a search fence. Here it also becomes the ceiling on operators — and
-  because a fence that is too small to contain a selection is useless, it grows to fit. That growth is
-  **transient**: it never writes `scopeQuantum`, because silently widening what `f` searches is a worse surprise
-  than a wide selection.
+- **`scope` keeps its one job.** It is the fence a search looks inside, and it is not a ceiling on `d` / `y` / `p`.
+  It was drafted as one, with a transient promotion that grew it to hold whatever was asked for; struck, because a
+  fence that grows to hold the extent it is meant to cap never caps anything, and every operator would end up limited
+  only by the end of the content — which the bound functions already enforce. See
+  [ticket 11](issues/11-fence-auto-promotion.md).
 - **The selection model is a window, not a rubber band.** A movement with span 3 and count 3 slides a three-unit
   window three units. It never grows the selection, and neither does `d` or `y` collapse it.
 - **Tests go through a pure seam, not the live editor.** `getBoundaries` reads `ServiceHolder.editorModelCoupler`
@@ -45,11 +46,11 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   only the selection clamps, and only at the end of the content. The reason is a feature, not an oversight:
   documents are expected to multiply, and "not enough" is then a temporary condition.
 - **Overflow continues in document order.** Units keep counting past a line break; nothing is clipped at a scope
-  boundary. This is the same observable behavior as fence auto-promotion, stated from the other side, and the
-  tickets say so once rather than twice.
-- **Fence promotion is by rank, and just enough to fit.** `character → word → line → document`, measured from where
-  the cursor actually is, not from the fence's worst case. A word never straddles a newline (`\S+`), so the ladder is
-  structurally sound; a `character` or `word` fence cannot hold a multi-unit selection at all and promotes at once.
+  boundary.
+- ~~**Fence promotion is by rank, and just enough to fit.** `character → word → line → document`, measured from where
+  the cursor actually is.~~ Struck with the fence's second job: selection and operators never consult the fence, so
+  there is nothing to promote it for. The ladder survives where it was always needed — ranking which of two quanta is
+  the frame for `[` / `]` ([ticket 07](issues/07-frame-at-span-one.md)).
 - **Counts precede the key**, vim-style: `12 s`, `3 ]`, `2 j`. The digit-after-`s` submode is deleted rather than
   kept as a synonym.
 - **A count is consumed by the first non-digit key** and does not survive it. `0` on movement is a no-op.
@@ -57,7 +58,8 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   this editor deletes only what it has shown you.
 - **`[` and `]` move one quantum per press**, with a count for more, and choose their frame **structurally at span
   1** so `] w` does not change meaning when the selection gets bigger.
-- **Movement ignores the fence.** Search, operators and paste respect it; `hjkl` do not.
+- **Only search respects the fence.** Movement, selection, `d` / `y` / `p` and paste do not; a selection that runs
+  past the fence keeps running, and the operator works on what was shown.
 - **`d` yanks.** The register is clobbered unconditionally — named registers are a separate idea.
 - **`gg` and `G` are deleted**, in favour of `[ r` and `] r`. Accepted loss: `G` reached the *start of the last
   non-empty line*, `] r` reaches the *last character*.
@@ -124,6 +126,12 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   typed, since a pending `0` means "none" to every command that reads a count. Order on the row is deliberate
   (quantum, fence, span, count) because the line clips at the right: below fifty columns the span is what falls off,
   and that is pinned rather than dressed up.
+- [The fence stays search's](issues/11-fence-auto-promotion.md): no promotion, no operator ceiling, and no code — the
+  operator path never read `scopeQuantum` in the first place, which is what made the drafted second job survivable to
+  drop. Pinned instead: a `line` fence stops a search at the line, the same search in a `document` fence reaches the
+  second line (the control that shows it was the fence), and a five-word selection with a `character` fence still runs
+  across the line break and deletes all of it. **The pair of search tests is the first test search has ever had**, and
+  the fence's one remaining job is now covered.
 
 ## Tickets
 
@@ -139,8 +147,8 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 | ~~08~~ [closed](issues/08-terminal-block-cursor.md) | Terminal block cursor at `span > 0` | — |
 | ~~09~~ [closed](issues/09-remove-gg-and-capg.md) | Remove `gg` / `G` / `DocumentJumpOp` | — |
 | ~~10~~ [closed](issues/10-mode-line-scope.md) | Mode line always shows scope next to span | — |
-| [11](issues/11-fence-auto-promotion.md) | Fence auto-promotion, transient | 02, 07 |
-| [12](issues/12-count-on-operators.md) | Count × span on `d` / `y` / `p`; `d` yanks | 05, 11 |
+| ~~11~~ [closed](issues/11-fence-auto-promotion.md) | Fence auto-promotion, transient | 02, 07 |
+| [12](issues/12-count-on-operators.md) | Count × span on `d` / `y` / `p`; `d` yanks | 05 |
 
 Read the graph this way: **01 → 02** is the spine (selection arithmetic), **05** is an independent spine (input), and
 **03, 04, 06, 11, 12** hang off whichever spine they need. **07, 08, 09, 10** touch nothing shared and can be taken in
@@ -151,7 +159,7 @@ any order, including first.
 - **Named registers.** `d` clobbering `y` is accepted for now, but the first user who yanks something, deletes, and
   wants the yank back has found the next ticket. Whether registers are a model var per name or a stack is unasked.
 - **Multi-document spans.** Every rule here is written to survive several documents (`no upper bound`, overflow
-  "in document order"), and the seam in ticket 01 is where the next rank would go, but the fence above `document`
+  "in document order"), and the seam in ticket 01 is where the next rank would go, but the rank above `document`
   does not exist yet and is not designed here.
 - **Undo.** `3 d` can now destroy nine units of text in one keystroke with no way back. Nothing in the repo has
   undo. This ticket set makes that gap bigger without closing it.

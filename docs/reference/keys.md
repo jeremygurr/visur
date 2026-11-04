@@ -114,9 +114,10 @@ Intercepted by the terminal before the server sees them:
 Decisions recorded in [the span-and-count map](../wayfinder/span-and-count/map.md) change the following. Until
 those tickets land, the table above is the truth:
 
-- **A count multiplies the span on operators**: `3 d` with a 3-word span deletes nine words, bounded by the scope
-  fence. With no selection, `d` and `y` still do nothing. ([12](../wayfinder/span-and-count/issues/12-count-on-operators.md))
+- **A count multiplies the span on operators**: `3 d` with a 3-word span deletes nine words, bounded only by the end
+  of the content. With no selection, `d` and `y` still do nothing.
+  ([12](../wayfinder/span-and-count/issues/12-count-on-operators.md))
 - **`d` also yanks** what it removes, so `p` can put it back. It overwrites the register. `3 p` pastes three copies.
   ([12](../wayfinder/span-and-count/issues/12-count-on-operators.md))
-- **The scope fence grows to fit** a selection or operator that needs more room than it has, stepping up
-  character → word → line → document. This never changes what `f` searches. ([11](../wayfinder/span-and-count/issues/11-fence-auto-promotion.md))
+- **The scope fence is search's only.** It never limits a selection or an operator: nine words selected across a line
+  break delete as nine words under a `line` fence. ([11](../wayfinder/span-and-count/issues/11-fence-auto-promotion.md))
