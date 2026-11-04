@@ -8,6 +8,10 @@ Concretely: `3 s` selects three quanta of whatever the cursor quantum is, `] w` 
 rather than the third, `3 d` deletes nine words when the span is three words, the text it removed is pasteable with
 `p`, and the mode line tells you the size of the selection and the scope search is confined to at all times.
 
+**All twelve tickets are closed** as of 2026-11-04. What is left is human: the canvas client has no test harness, and
+the terminal sweep at 80×24 and 132×43 is user-driven. One design question surfaced by
+[ticket 12](issues/12-count-on-operators.md) is deliberately unanswered — deleting N lines leaves one newline behind.
+
 This closes the oldest known feature gap in the repo: "**Span is binary.** … a multi-quantum span cannot be
 expressed" ([renderer-delivery/map.md](../renderer-delivery/map.md), [terminal-build/map.md](../terminal-build/map.md)).
 
@@ -132,6 +136,13 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   second line (the control that shows it was the fence), and a five-word selection with a `character` fence still runs
   across the line break and deletes all of it. **The pair of search tests is the first test search has ever had**, and
   the fence's one remaining job is now covered.
+- [The count multiplies the span on operators](issues/12-count-on-operators.md): one expression — count × span, in the
+  cursor quantum, from where the selection starts — read by `d`, `y` and `p`, with no count threaded through any
+  operator constructor. `d` puts what it removes into the register, so `p` can put the document back exactly as it was.
+  Zero needs no branch: `0 d` asks the bound functions for a span of nothing, which is already the empty range every
+  quantum answers, and the operators refuse empty ranges. Two things the ticket found: a fixture cannot write the span
+  without the range, because every real path writes the two together; and deleting lines leaves a newline behind,
+  which is the line quantum's end edge and not the count's doing.
 
 ## Tickets
 
@@ -148,7 +159,7 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 | ~~09~~ [closed](issues/09-remove-gg-and-capg.md) | Remove `gg` / `G` / `DocumentJumpOp` | — |
 | ~~10~~ [closed](issues/10-mode-line-scope.md) | Mode line always shows scope next to span | — |
 | ~~11~~ [closed](issues/11-fence-auto-promotion.md) | Fence auto-promotion, transient | 02, 07 |
-| [12](issues/12-count-on-operators.md) | Count × span on `d` / `y` / `p`; `d` yanks | 05 |
+| ~~12~~ [closed](issues/12-count-on-operators.md) | Count × span on `d` / `y` / `p`; `d` yanks | 05 |
 
 Read the graph this way: **01 → 02** is the spine (selection arithmetic), **05** is an independent spine (input), and
 **03, 04, 06, 11, 12** hang off whichever spine they need. **07, 08, 09, 10** touch nothing shared and can be taken in

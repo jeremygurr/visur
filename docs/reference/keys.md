@@ -1,7 +1,7 @@
 # Visur key reference
 
 Every key that does something in Visur today, what it is meant to do, and an example. Describes the editor
-as of 2026-11-03. When a key changes, this page changes with it.
+as of 2026-11-04. When a key changes, this page changes with it.
 
 Two words carry most of the design:
 
@@ -43,9 +43,9 @@ Quantum keys are shared by every command that takes one:
 | `i` | insert at the **start** of the selection; switches to insert mode | `i` |
 | `a` | insert at the **end** of the selection; switches to insert mode | `a` |
 | `o` | enter **replace** mode at the cursor | `o` |
-| `d` | delete the selection when there is one, then re-derive the bounds at the same span | `s d` delete the quantum under the cursor |
-| `y` | copy the selection to the yank register | `s y` |
-| `p` | paste the yank register at the cursor | `p` |
+| `d` | delete the selection, taken `count` times, then re-derive the bounds at the same span. What it removed goes to the yank register, so `p` puts it back. Nothing selected, or a count of zero, and nothing happens | `s d` delete the quantum under the cursor; `3 s` then `3 d` delete nine |
+| `y` | copy the selection, taken `count` times, to the yank register | `s y`; `2 s` then `3 y` copy six quanta |
+| `p` | paste the yank register at the cursor, `count` copies | `p`; `3 p` three copies |
 | `;` | open **command state**: type a raw command sentence and run it | `;` `"word" quantumStart` `Enter` |
 | `ZZ` | save the file | `ZZ` |
 
@@ -108,16 +108,3 @@ Intercepted by the terminal before the server sees them:
 | `ZD` | quit, stopping a server the launcher started |
 
 `Ctrl-C` is a byte in raw mode, not a signal, which is why quitting needs its own binding.
-
-## In flight
-
-Decisions recorded in [the span-and-count map](../wayfinder/span-and-count/map.md) change the following. Until
-those tickets land, the table above is the truth:
-
-- **A count multiplies the span on operators**: `3 d` with a 3-word span deletes nine words, bounded only by the end
-  of the content. With no selection, `d` and `y` still do nothing.
-  ([12](../wayfinder/span-and-count/issues/12-count-on-operators.md))
-- **`d` also yanks** what it removes, so `p` can put it back. It overwrites the register. `3 p` pastes three copies.
-  ([12](../wayfinder/span-and-count/issues/12-count-on-operators.md))
-- **The scope fence is search's only.** It never limits a selection or an operator: nine words selected across a line
-  break delete as nine words under a `line` fence. ([11](../wayfinder/span-and-count/issues/11-fence-auto-promotion.md))

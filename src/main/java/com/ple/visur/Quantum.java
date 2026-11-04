@@ -11,6 +11,22 @@ public abstract class Quantum implements Shareable {
   EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
 
   /**
+   * What one keystroke of an operator acts on: the selection's width, taken as many times as the count says. Three
+   * words selected and {@code 3 d} is nine words, because the count multiplies the span rather than replacing it.
+   *
+   * <p>Measured from where the selection starts, so an operator always includes what {@code s} showed, and the count
+   * never widens what is on screen. Only the end of the content caps it: the scope fence belongs to search and is not
+   * consulted here.
+   *
+   * <p>A count of zero needs no branch. It asks these bound functions for a span of nothing, which is the empty range
+   * every quantum already answers with, and the operators refuse to act on an empty range.
+   */
+  int[] operatorExtent() {
+    int units = CountPrefix.countOrOne(emc) * emc.getSpan();
+    return getBoundaries(emc.getCursorQuantumStart(), emc.getNextLineIndices(), units, false);
+  }
+
+  /**
    * The jump {@code [} performs: walk back to the start of the frame, then select the cursor quantum's span from there.
    *
    * <p>No count is read here, unlike {@link #quantumEnd}: a quantum's start edge is the same index whatever the span, so

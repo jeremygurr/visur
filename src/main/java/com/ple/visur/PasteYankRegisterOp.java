@@ -6,7 +6,9 @@ public class PasteYankRegisterOp implements Operator {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     VisurVar register = emc.getGlobalVar("yankRegister");
     if (register == null) return;
-    int insertionPoint = emc.getCursorQuantumEnd();
-    TextInsertion.insertAt(emc, (String) register.getVal(), insertionPoint);
+    String value = (String) register.getVal();
+    // 3 p is three copies. One insertion of three copies lands the same text as three insertions at successive
+    // positions, without the cursor having to be re-seated twice.
+    TextInsertion.insertAt(emc, value.repeat(CountPrefix.countOrOne(emc)), emc.getCursorQuantumEnd());
   }
 }

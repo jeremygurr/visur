@@ -30,6 +30,8 @@ A rule repeated in three places becomes one method. `"digits typed before a key 
 
 `Operator.execute(Object opInfo)`, one behavior each, compiled from a key sequence. Operands arrive on `ExecutionDataStack` — a LIFO the operator pops, in reverse of the order they were pushed. Presence-only operands are read as `stack.size() > 0 && stack.pop() instanceof LiteralNumberOp`.
 
+An operator acting on more than the selection asks the cursor quantum for `operatorExtent()` — pending count times span, measured from `cursorQuantumStart` — instead of reading the count itself, so the multiplication exists once and no operator takes a `count` parameter. An extent that names no text means the operator does not happen, and leaves the yank register holding what it held.
+
 New code belongs in `com.ple.visur`. `CursorPositionDC` and `DataClass` are the model's plumbing and rarely change.
 
 ## Keys and submodes
