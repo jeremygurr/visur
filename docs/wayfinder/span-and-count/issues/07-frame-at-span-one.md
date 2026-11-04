@@ -64,3 +64,16 @@ frame, and selects the requested twenty words from there.
 Ranking at span 1 removes the flip for any pair whose span-1 order is strict. A pair that ties at span 1 — a blank line
 against a blank line, where neither measures anything — still frames by the operand, at every span, which is at least
 consistent.
+
+### Amended by [ticket 02](02-span-per-quantum.md), in both directions
+
+The walk was settled, so the example this ticket actually described is now reachable: twenty words past a run of blank
+lines out-measure the twenty lines that stop at it. That is tested as
+`twentyWordsOutMeasureTwentyLinesAndTheLineStillFrames`, and it is the case that fails when the ranking goes back to
+the live span.
+
+The mechanism this Result measured is gone with it. A word that is not under the cursor now measures *nothing* rather
+than one character per remaining span, so `] w` from a blank line ranks twenty characters against nothing: the frame
+still does not flip, but because the character quantum out-measures an absent word, not because two measurements agreed
+at one span and tied at another. The blank-line tests stay as pins of the frame decision with that said in their
+comments; they no longer pin the ranking.

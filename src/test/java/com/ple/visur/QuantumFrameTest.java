@@ -12,11 +12,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  *
  * <p>{@code ] w} ranks the cursor quantum against the operand quantum and treats the longer one as the frame: the jump
  * walks to the frame's end and selects the other quantum there. Ranking by measured length is a proxy for nesting, and
- * it holds while the two are measured at span 1. Measured at the live span it can come out the other way — the two
- * then measure equal across a run of blank lines, and an equal ranking hands the frame to the operand.
+ * it holds while the two are measured at span 1. Measured at the live span it can come out the other way — twenty words
+ * past a run of blank lines out-measure the twenty lines that stop at it — and the same two keys then leave the cursor
+ * in a different quantum depending on the size of the selection, which is what {@code s} must not be able to change.
  *
- * <p>So the same two keys leave the cursor in a different quantum depending on the size of the selection, which is
- * what {@code s} must not be able to change.
+ * <p>The blank-line tests below pin the frame decision for a quantum that is <em>not there</em>, which is a different
+ * rule: a word on a blank line measures nothing at any span, so the character quantum frames however wide the selection
+ * is. {@link #twentyWordsOutMeasureTwentyLinesAndTheLineStillFrames()} is the one that fails if the ranking goes back
+ * to the live span.
  */
 class QuantumFrameTest {
   private static final String A_LINE_OF_WORDS = "alpha beta gamma delta\n"; // 0..22
@@ -65,7 +68,7 @@ class QuantumFrameTest {
 
   @Test
   void jumpingToEndOfAWordAtSpanTwentyLeavesYouInTheWordQuantum() {
-    jumpToEndOfWord(20); // twenty characters and twenty steps across blank lines measure the same
+    jumpToEndOfWord(20); // twenty characters still measure more than a word that is not here
     assertEquals("word", emc.getCursorQuantum().getName());
   }
 
@@ -87,5 +90,31 @@ class QuantumFrameTest {
     emc.putSpan(span);
     emc.putOnExecutionDataStack("word");
     character.quantumStart();
+  }
+
+  /**
+   * The inversion this ticket was written about, which only became reachable once the word walk crossed a gap in one
+   * step rather than one character per remaining span — see
+   * {@link WordQuantumBoundsTest#aSpanOfWordsCrossesAWideGap()}. Twenty words do out-measure twenty short lines: the
+   * words run on into the paragraph past the blank run while the lines stop at it.
+   *
+   * <p>Ranked at the live span that hands the frame to the word quantum at span 20 and {@code ] e} leaves you in the
+   * line quantum; ranked at span 1 the line is the frame because a line contains a word, which is the fact the proxy
+   * was only ever trying to measure.
+   */
+  @Test
+  void twentyWordsOutMeasureTwentyLinesAndTheLineStillFrames() {
+    emc.putEditorContent("alpha beta\n" + "\n".repeat(19)
+      + "one two three four five six seven eight nine ten eleven twelve thirteen\n");
+    emc.putCX(0);
+    emc.putCY(0);
+    emc.putVirtualCX(0);
+    emc.putFY(0);
+    emc.putCA(0);
+    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.putSpan(20);
+    emc.putOnExecutionDataStack("line");
+    emc.getQuantumNameToQuantum().get("word").quantumEnd(); // the keystroke ] e, with words as the cursor quantum
+    assertEquals("word", emc.getCursorQuantum().getName());
   }
 }

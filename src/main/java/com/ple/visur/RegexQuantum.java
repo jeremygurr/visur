@@ -34,14 +34,22 @@ public class RegexQuantum extends Quantum {
    * The selection for a span of {@code span} quanta starting at {@code ca}, as {@code [start, end)}.
    *
    * <p>Each unit is one match of {@code pattern}, and the range is contiguous, so the text between two selected
-   * words — the whitespace, or a line break — is inside the selection rather than skipped. Once the content runs
-   * out the range clamps there; the requested span is not reduced, only the range is.
+   * words — the whitespace, or a line break — is inside the selection rather than skipped. A span that runs out of
+   * quanta stops at the end of the last one rather than taking the trailing whitespace with it, and the requested span
+   * is never reduced.
+   *
+   * <p>With no quantum under the cursor there is nothing to span, so the range is empty — the answer a cursor on an
+   * indent or between two words gives is the answer it gives on a blank line. The span itself survives: only {@code s}
+   * writes that.
    *
    * @param nl not read: a quantum's extent is set by its pattern, not by the line structure. Part of the signature so
    *           all four quanta's seam takes the same arguments.
    * @param cy not read, for the same reason
    */
   static int[] boundsFor(Pattern pattern, String editorContent, ArrayList<Integer> nl, int ca, int cy, int span) {
+    if(span > 0 && !matchesAt(pattern, editorContent, ca)) {
+      return new int[]{ca, ca};
+    }
     int leftBound = ca;
     int rightBound = leftBound;
     if(span > 0) {
@@ -210,44 +218,40 @@ public class RegexQuantum extends Quantum {
     return prevStart;
   }
 
-  /** searches for the first bound that cursor could move to if span == 0
-   * set bound var equal to caBVV's val
-   * set while loop condition initial value = bound >= editorContent.length - 1,
-     * (the above is to ensure that editorContent.substring(bound, bound + 1) will be valid)
-   * set firstWasMatch var = false
-     * (the above is because if the first is not a match, we don't want to search for the next nonmatch)
-   * if bound < editorContent.length, we set firstWasMatch var to equal matcher.matches(firstCharInEC)
-   * increment bound
-   * loop while !invalidBoundFound && firstWasMatch
-     * if(matcher.matches(nextCharInEC))
-       * bound++
-     * else
-       * invalidBoundFound = false
-   * @return bound
+  /**
+   * The end of the quantum at {@code bound}, or — when {@code bound} is in the whitespace after a quantum — the start
+   * of the next one.
+   *
+   * <p>It used to step one character when called on whitespace, which is invisible across a single space and wrong
+   * across every wider gap: "three words" from {@code "one   two   three"} selected {@code "one  "}, one word and two
+   * characters, because each remaining span bought one character of whitespace. It also capped how far a word range
+   * could ever reach, since it grew one character per span across a blank run — see
+   * <a href="../../../../../docs/wayfinder/span-and-count/issues/07-frame-at-span-one.md">ticket 07</a>.
+   *
+   * <p>Returns {@code bound} when nothing matches ahead: a walk that runs out of quanta stops rather than advancing
+   * past the last one.
    */
   static int getNextBound(Pattern pattern, String editorContent, int bound) {
-    boolean nonmatchFound = bound >= editorContent.length() - 1;
-    boolean firstWasMatch = false;
-    if(bound < editorContent.length()) {
-      Matcher matcher = pattern.matcher(editorContent.substring(bound, bound + 1));
-      firstWasMatch = matcher.matches();
-      bound++;
+    if(!matchesAt(pattern, editorContent, bound)) {
+      return startOfNextQuantum(pattern, editorContent, bound);
     }
-    if(firstWasMatch) {
-      while (!nonmatchFound) {
-        String strToMatch = editorContent.substring(bound, bound + 1);
-        Matcher matcher = pattern.matcher(strToMatch);
-        if (matcher.matches()) {
-          bound++;
-          if (bound == editorContent.length()) {
-            nonmatchFound = true;
-          }
-        } else {
-          nonmatchFound = true;
-        }
-      }
+    return quantumEnd(pattern, editorContent, bound);
+  }
+
+  private static int startOfNextQuantum(Pattern pattern, String editorContent, int bound) {
+    int cursor = bound;
+    while(cursor < editorContent.length() && !matchesAt(pattern, editorContent, cursor)) {
+      cursor++;
     }
-    return bound;
+    return cursor < editorContent.length() ? cursor : bound;
+  }
+
+  /** Whether a quantum starts or continues at {@code bound}. */
+  private static boolean matchesAt(Pattern pattern, String editorContent, int bound) {
+    if(bound < 0 || bound >= editorContent.length()) {
+      return false;
+    }
+    return pattern.matcher(editorContent.substring(bound, bound + 1)).matches();
   }
 
   /** it's the same idea as getNextBound, but it searches backwards

@@ -76,15 +76,18 @@ class WordQuantumBoundsTest {
   }
 
   /**
-   * Pinned as it is today: the walk back from a cursor sitting on whitespace does not stop, so the word before the
-   * cursor is selected rather than nothing. Whether that is right belongs to
-   * <a href="../../../../../docs/wayfinder/span-and-count/issues/02-span-per-quantum.md">ticket 02</a>, which takes
-   * the word quantum's span semantics as its subject.
+   * No word under the cursor means nothing selected, whatever the span — the same answer a blank line gives, which is
+   * what makes {@code s} on an indent or between two words behave like {@code s} on an empty line instead of reaching
+   * for a word somewhere else. The number survives; the range is empty
+   * ({@link RelativeMoveOpTest}, where a move onto a blank line keeps span 1 and selects nothing).
    */
   @Test
-  void aCursorOnWhitespaceSelectsTheWordBeforeIt() {
+  void aCursorOnWhitespaceSelectsNothing() {
     String content = "one two";
-    assertArrayEquals(new int[]{0, 3}, boundsAt(content, 3, 1));
+    assertArrayEquals(new int[]{3, 3}, boundsAt(content, 3, 1));
+    assertArrayEquals(new int[]{3, 3}, boundsAt(content, 3, 2));
+    String wideGap = "one   two"; // the space in the middle is three characters
+    assertArrayEquals(new int[]{4, 4}, boundsAt(wideGap, 4, 3));
   }
 
   @Test
@@ -93,13 +96,29 @@ class WordQuantumBoundsTest {
     assertArrayEquals(new int[]{0, 0}, boundsAt("", 0, 0));
   }
 
+  @Test
+  void aSpanOfWordsInWhitespaceOnlyContentSelectsNothing() {
+    assertArrayEquals(new int[]{0, 0}, boundsAt(" ", 0, 3));
+    assertArrayEquals(new int[]{0, 0}, boundsAt("  one", 0, 2), "an indent is not a word either");
+  }
+
   /**
-   * Also pinned rather than endorsed: with no word in sight the walk to the next bound runs to the end of the
-   * content, which leaves the whitespace itself selected. See ticket 02, same as above.
+   * The gap between two words is one quantum walk, not one character per remaining span: {@code 2} words at a wide gap
+   * used to select "one ", one word and a character of whitespace.
    */
   @Test
-  void aSpanOfWordsInWhitespaceOnlyContentReachesTheEndOfTheContent() {
-    assertArrayEquals(new int[]{0, 1}, boundsAt(" ", 0, 3));
+  void aSpanOfWordsCrossesAWideGap() {
+    String content = "one   two   three"; // words at 0, 6 and 12, three characters of gap between them
+    assertArrayEquals(new int[]{0, 9}, boundsAt(content, 0, 2), "one, the gap, two");
+    assertArrayEquals(new int[]{0, content.length()}, boundsAt(content, 0, 3));
+    assertArrayEquals(new int[]{6, content.length()}, boundsAt(content, 6, 2));
+  }
+
+  /** Trailing whitespace is not between two words, so a span that runs out of words stops at the end of the last one. */
+  @Test
+  void aSpanThatRunsOutOfWordsStopsAtTheLastOne() {
+    String content = "one two   ";
+    assertArrayEquals(new int[]{0, 7}, boundsAt(content, 0, 3));
   }
 
   @Test

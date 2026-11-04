@@ -62,6 +62,20 @@ class RelativeMoveOpTest {
     assertEquals(14, emc.getCursorQuantumEnd());
   }
 
+  /**
+   * Word movement shares {@code getNextBound} with the selection, so this pins the walk from the other side: the
+   * branch that returns the end of the quantum under the cursor is now {@code quantumEnd}, and a movement test is what
+   * says it means the same thing.
+   */
+  @Test
+  void aWideGapIsOneStepInBothDirections() {
+    emc.putEditorContent("one   two   three"); // words at 0, 6 and 12
+    move(1, 0);
+    assertEquals(6, emc.getCA(), "right, onto the next word");
+    move(-1, 0);
+    assertEquals(0, emc.getCA(), "and back");
+  }
+
   private int selectedWidth() {
     return emc.getCursorQuantumEnd() - emc.getCursorQuantumStart();
   }

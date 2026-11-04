@@ -79,6 +79,11 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   a one-character selection, which quietly moved where `p` inserts and where `n` starts searching (both now agree with
   the drawn caret); and at span 0 `] r` lands at the *start* of the document, because the document quantum parks the
   cursor there — [ticket 09](issues/09-remove-gg-and-capg.md) owns that.
+- [Word spans mean words](issues/02-span-per-quantum.md): a word span covers whole words plus the whitespace between
+  them, and starts only where a word actually is — an indent, a blank line or the gap between two words selects nothing
+  and keeps the number, which is the answer a blank line already gave rather than a new one. The walk between words now
+  crosses a gap in one step (`2 s` at `"one   two   three"` was one word and a character of space) and stops at the end
+  of the last word. `move` shares that walk, so word movement crosses wide gaps in one press too.
 - [`SetSpanOp` stops clamping](issues/04-setspanop-no-clamp.md): span keeps the number it was given and the range
   clamps at the content end, so `s 3` selects three quanta today. `d` and `y` needed no change — neither wrote span —
   and the `tempSpan` stash across insert mode turns out to be magnitude-blind. Two input gaps left for
@@ -95,11 +100,10 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   vector, as this ticket sketched, does nothing — the character quantum reads only its sign — so the count loops the
   call instead.
 - [Frame ranked at span 1](issues/07-frame-at-span-one.md): `] w` leaves the cursor in the same quantum whatever the
-  span, and the locals in `Quantum.java` say *frame* — the search fence keeps the name *scope*. Found on the way: the
-  word quantum's walk advances **one character per remaining span** across whitespace, so twenty words can never
-  out-measure twenty lines and the ranking example in this ticket's text is unreachable until
-  [02](issues/02-span-per-quantum.md) fixes that walk. The inversion that is reachable today is `character` versus
-  `word` across a run of blank lines, where the two measure equal at span 20 and tie for the frame.
+  span, and the locals in `Quantum.java` say *frame* — the search fence keeps the name *scope*. It was found through
+  `character` versus `word` across a run of blank lines, where the two measured equal at span 20 and tied for the frame;
+  [02](issues/02-span-per-quantum.md) has since removed that tie, and the case that keeps the ranking honest is twenty
+  words past a blank run out-measuring the twenty lines that stop at it.
 - [Terminal block cursor at `span > 0`](issues/08-terminal-block-cursor.md): the terminal chose its cursor shape with
   the value that used to be the only nonzero one, so it shipped a bar over a three-cell highlight. Landed with 04
   rather than after it. Its amendment turned out to be five documents, not one: the conformance row and four places in
@@ -110,7 +114,7 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 | # | title | blocked by |
 |---|---|---|
 | ~~01~~ [closed](issues/01-bound-seam-and-tests.md) | Pure bound seam + boundary tests | — |
-| [02](issues/02-span-per-quantum.md) | Span > 1 in each quantum's bounds | 01 |
+| ~~02~~ [closed](issues/02-span-per-quantum.md) | Span > 1 in each quantum's bounds | 01 |
 | [03](issues/03-overflow-order.md) | Overflow counts in document order | 02 |
 | ~~04~~ [closed](issues/04-setspanop-no-clamp.md) | `SetSpanOp` stops clamping; span survives `d` and `y` | 02 |
 | ~~05~~ [closed](issues/05-count-prefix.md) | Count prefix in navigate mode; delete the `s`-then-digit submode | — |

@@ -111,6 +111,6 @@ breaks, clamped at the content end) and `LineQuantum` (span N lines) now impleme
 [ticket 02](02-span-per-quantum.md)'s rule, and `DocumentQuantum` returns the whole document at any span. What is left
 of ticket 02 is the word quantum, where the tests pinned two things that look wrong rather than confirming what is
 right: a cursor sitting on whitespace selects the word *before* it, and in whitespace-only content a span above 1
-selects the whitespace by running to the end of the content. Both are pinned by name in
+selects the whitespace by running to the end of the content. Both were pinned by name in
 [`WordQuantumBoundsTest`](../../../../src/test/java/com/ple/visur/WordQuantumBoundsTest.java) so that fixing them is
-a decision and not a surprise.
+a decision and not a surprise — [ticket 02](02-span-per-quantum.md) made the decision and replaced both pins.
