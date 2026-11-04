@@ -32,7 +32,7 @@ Quantum keys are shared by every command that takes one:
 | `j` / `k` | move one quantum down / up, or `count` of them | `j` one line down; `2 j` two lines, same column |
 | `ArrowLeft` / `ArrowRight` / `ArrowDown` / `ArrowUp` | same as `h` `l` `j` `k` | — |
 | `q` / `w` / `e` / `r` | change the **cursor quantum**, re-deriving the selection around the cursor | `w` then `l` walks by words |
-| `0`–`9` before any key | the **count** for the key that follows; digits accumulate, so `1` then `2` is twelve. It is spent by the command it belongs to — including a two-key command — and any other key drops it. `0` means none: `0 l` does not move, `0 s` selects nothing | `12 s` twelve quanta; `3 ] w` three words |
+| `0`–`9` before any key | the **count** for the key that follows; digits accumulate, so `1` then `2` is twelve. It is spent by the command it belongs to — including a two-key command — and any other key drops it. `0` means none: `0 l` does not move, `0 s` selects nothing. While it is pending the mode line shows `COUNT=n` | `12 s` twelve quanta; `3 ] w` three words |
 | `s` | set **span** to the pending count — one with no count typed. `0 s` collapses the selection | `3 s` three quanta; `s` one; `0 s` none |
 | `[` then `q`/`w`/`e`/`r` | jump to the **start** of that quantum — one quantum per press, whatever the span | `[ w` start of the current word; `[ r` start of the document |
 | `]` then `q`/`w`/`e`/`r` | jump to the **end** of that quantum, `count` of them | `] e` last character of the current line; `] r` end of the document; `3 ] e` of the third line |
@@ -120,7 +120,3 @@ those tickets land, the table above is the truth:
   ([12](../wayfinder/span-and-count/issues/12-count-on-operators.md))
 - **The scope fence grows to fit** a selection or operator that needs more room than it has, stepping up
   character → word → line → document. This never changes what `f` searches. ([11](../wayfinder/span-and-count/issues/11-fence-auto-promotion.md))
-- **The mode line always shows scope next to span**, and the pending count while one is being typed. Today only span
-  is shown. ([10](../wayfinder/span-and-count/issues/10-mode-line-scope.md))
-- **`gg` and `G` are going away** in favour of `[ r` and `] r`.
-  ([09](../wayfinder/span-and-count/issues/09-remove-gg-and-capg.md))

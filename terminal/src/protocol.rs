@@ -28,6 +28,8 @@ pub struct ViewUpdate {
   pub command_state_content: String,
   pub command_cursor: i64,
   pub search_target: String,
+  /// The count typed in front of a key and not yet spent; zero when none was typed (spec §5.9).
+  pub pending_count: i64,
 }
 
 fn string(body: &Value, key: &str) -> String {
@@ -84,6 +86,7 @@ pub fn parse(frame: &str) -> Option<ViewUpdate> {
     command_state_content: string(&body, "commandStateContent"),
     command_cursor: number(&body, "commandCursor"),
     search_target: string(&body, "searchTarget"),
+    pending_count: number(&body, "pendingCount"),
   })
 }
 
@@ -98,7 +101,7 @@ mod tests {
     "span":1,"cursorQuantumStart":13,"cursorQuantumEnd":14,"cursorRow":2,"cursorCol":7,
     "isAtQuantumStart":true,"cursorQuantum":"character","scopeQuantum":"line",
     "editorMode":"navigate","editorSubmode":"character","isInCommandState":false,
-    "commandStateContent":"","commandCursor":0,"searchTarget":"necess"}}"#;
+    "commandStateContent":"","commandCursor":0,"searchTarget":"necess","pendingCount":4}}"#;
 
   #[test]
   fn decodes_every_field_of_the_view_payload() {
@@ -124,6 +127,7 @@ mod tests {
     assert_eq!(view.command_state_content, "");
     assert_eq!(view.command_cursor, 0);
     assert_eq!(view.search_target, "necess");
+    assert_eq!(view.pending_count, 4);
   }
 
   #[test]
@@ -148,6 +152,7 @@ mod tests {
     let view = parse(sparse).expect("a view frame");
     assert_eq!(view.span, 0);
     assert_eq!(view.search_target, "");
+    assert_eq!(view.pending_count, 0, "no count typed is no count shown");
     assert!(!view.full);
   }
 }

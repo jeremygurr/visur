@@ -146,9 +146,9 @@ decision** — the spec asks for something the build deliberately does not do, w
 | §5.7 Exit codes carry detach vs quit | met | `0` detach, `3` quit, `4` server gone |
 | §5.8 Scrolling is server-mediated; the renderer never scrolls | met | the client has no scroll code and no text to scroll |
 | §5.8 Page-scroll and overscan are not in beta | met (by decision) | not implemented |
-| §5.9 Rows, cursor, mode line with mode/submode/quantum/span | met | [screen.rs](../../../terminal/src/screen.rs) |
+| §5.9 Rows, cursor, mode line with mode/submode/quantum/**scope**/**pending count**/span | met | [screen.rs](../../../terminal/src/screen.rs) `mode_line`; scope is named in every mode but command state, and a count is shown only while one is pending ([span-and-count ticket 10](../span-and-count/issues/10-mode-line-scope.md)) |
 | §5.9 Command-state line when `isInCommandState` | **met (unreachable)** | rendered and unit-tested; nothing sets `isInCommandState` — P4 |
-| §5.9 `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`+digit | met | directed through the adapter; `hjkl`/`i`/`Esc`/`s`+digit exercised end-to-end in the pty test |
+| §5.9 `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`+digit | met | directed through the adapter; `hjkl`/`i`/`Esc`/`s` exercised end-to-end in the pty test (`s`+digit was the deleted span submode; a count is now typed before the key) |
 | §5.9 `Backspace` on a line with no characters before it | met | the adapter sends `"Backspace"`; the *binding* is insert/replace only, as in vim |
 | §5.9 Search: `f`/`F`/`n`/`N`/`/` and typing the target | met (partly unverified) | `f` + target exercised end-to-end; `F`, `n`, `N`, `/` reach the server as ordinary characters but no test drives them |
 | §5.9 `SIGWINCH` → `viewportWasChanged` → full repaint | met | pty resize test asserts the declaration, the 40-row repaint, and the cursor's new bounds |

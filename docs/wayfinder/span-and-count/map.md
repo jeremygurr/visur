@@ -96,8 +96,8 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 - [Count prefix](issues/05-count-prefix.md): digits go before the key, so `12 s` selects twelve quanta, and the
   `s`-then-digit submode is deleted. It is not a `KeymapHandler`, as this ticket planned — the keymap only consults
   handlers on a miss, so a handler could not clear the count for the bound keys; it is a static either side of the
-  keypress in the verticle instead. **A pending count is still invisible** — the state is in the model, and
-  [10](issues/10-mode-line-scope.md) puts it on the mode line.
+  keypress in the verticle instead. **A pending count is invisible**, as this ticket shipped it — the state is in the
+  model, and [10](issues/10-mode-line-scope.md) has since put it on the mode line.
 - [Count reaches movement and jumps](issues/06-count-on-jumps-and-movement.md): `3 l` is three quanta, `2 j` two lines,
   `0 l` nowhere, and `]` walks count quanta while the span only decides how wide the selection lands. Two decisions
   beyond the ticket: **a count outlives the keypress that opens a submode**, because `] w` is one command and `]` was
@@ -119,6 +119,11 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   of the last non-empty line, `] r` reaches the end of the content — different characters when there is no trailing
   line break. Both ends hold at span 0, so the ticket 01 finding about the document quantum parking the cursor at index
   0 turned out to be dead on that path.
+- [The mode line names the fence](issues/10-mode-line-scope.md): scope sits beside span in every mode but command
+  state, and a count shows while it is pending. It went on the wire for that — `pendingCount`, zero when none was
+  typed, since a pending `0` means "none" to every command that reads a count. Order on the row is deliberate
+  (quantum, fence, span, count) because the line clips at the right: below fifty columns the span is what falls off,
+  and that is pinned rather than dressed up.
 
 ## Tickets
 
@@ -133,7 +138,7 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 | ~~07~~ [closed](issues/07-frame-at-span-one.md) | Frame chosen structurally at span 1; rename the `Quantum.java` locals | — |
 | ~~08~~ [closed](issues/08-terminal-block-cursor.md) | Terminal block cursor at `span > 0` | — |
 | ~~09~~ [closed](issues/09-remove-gg-and-capg.md) | Remove `gg` / `G` / `DocumentJumpOp` | — |
-| [10](issues/10-mode-line-scope.md) | Mode line always shows scope next to span | — |
+| ~~10~~ [closed](issues/10-mode-line-scope.md) | Mode line always shows scope next to span | — |
 | [11](issues/11-fence-auto-promotion.md) | Fence auto-promotion, transient | 02, 07 |
 | [12](issues/12-count-on-operators.md) | Count × span on `d` / `y` / `p`; `d` yanks | 05, 11 |
 

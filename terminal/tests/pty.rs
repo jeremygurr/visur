@@ -591,6 +591,9 @@ fn live_multiline_paste_and_document_jumps() {
     eprintln!("skipped: set VISUR_E2E=1 with a server running to run paste and jump checks");
     return;
   }
+  // Skipped unless a server is up, which is how a stale key sequence survives a deletion unnoticed. These presses are
+  // the grammar of the editor: `[ r` and `] r`, not the `gg` and `G` that were deleted, and `s` on its own, not a
+  // `s` followed by the digit of the span submode that was deleted.
   assert!(server_is_up(), "no server on 127.0.0.1:8888 — start one with ./gradlew run");
   let mut terminal = Terminal::spawn();
   assert!(terminal.wait_for(Duration::from_secs(5), |t| t.screen().contains("MODE")), "initial view was not painted");
@@ -599,26 +602,20 @@ fn live_multiline_paste_and_document_jumps() {
   terminal.send("\x1b[200~FM_PASTE_FIRST\r\nFM_PASTE_SECOND\x1b[201~");
   assert!(terminal.wait_for(Duration::from_secs(5), |t| t.screen().contains("FM_PASTE_FIRST") && t.screen().contains("FM_PASTE_SECOND")), "server did not insert the multiline paste: {:?}", terminal.screen());
 
-  terminal.press("g");
-  terminal.press("g");
-  let top = terminal.cursor().expect("cursor after gg");
-  terminal.press("g");
-  terminal.press("l");
-  let after_prefix_fallback = terminal.cursor().expect("cursor after g then l");
-  assert!(after_prefix_fallback.1 > top.1, "non-g key must clear the prefix and still move: {top:?} -> {after_prefix_fallback:?}");
-  terminal.press("g");
-  terminal.press("g");
-  terminal.press("G");
-  let bottom = terminal.cursor().expect("cursor after G");
-  assert!(bottom.0 > top.0, "G should reach the bottom line after gg: {top:?} -> {bottom:?}");
+  terminal.press("[");
+  terminal.press("r");
+  let top = terminal.cursor().expect("cursor after [ r");
+  terminal.press("]");
+  terminal.press("r");
+  let bottom = terminal.cursor().expect("cursor after ] r");
+  assert!(bottom.0 > top.0, "] r should reach the bottom after [ r: {top:?} -> {bottom:?}");
   if std::env::var("VISUR_EXPECT_SHORT").is_ok() {
     assert!(bottom.0 < rows() as usize - 1, "short document bottom should stay above the viewport edge: {bottom:?}");
   }
 
-  terminal.press("g");
-  terminal.press("g");
+  terminal.press("[");
+  terminal.press("r");
   terminal.press("s");
-  terminal.press("1");
   terminal.press("y");
   terminal.press("p");
   assert!(terminal.wait_for_screen("FFM_PASTE_FIRST"), "yank and paste-from-register did not duplicate the active span: {:?}", terminal.screen());
@@ -693,12 +690,28 @@ fn the_client_paints_edits_searches_and_detaches() {
   let (row, _) = terminal.cursor().expect("a cursor position");
   assert!(row < rows() as usize, "the cursor left the grid at row {row}");
 
-  // Span and search reach the mode line, which is how a terminal user sees editor state at all.
-  terminal.press("s");
-  terminal.press("1");
+  // The count, the span it produced, the fence and the search all reach the mode line, which is how a terminal user
+  // sees editor state at all. Each one is a trip through the model and back on the wire.
+  terminal.press("3");
   assert!(
-    terminal.wait_for(Duration::from_secs(2), |t| t.screen().contains("SPAN=")),
+    terminal.wait_for(Duration::from_secs(2), |t| t.screen().contains("COUNT=3")),
+    "a typed count never reached the mode line: {:?}",
+    terminal.screen()
+  );
+  terminal.press("s");
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.screen().contains("SPAN=3")),
     "mode line lost its span: {:?}",
+    terminal.screen()
+  );
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.screen().contains("SCOPE=")),
+    "mode line never named the fence: {:?}",
+    terminal.screen()
+  );
+  assert!(
+    !terminal.screen().contains("COUNT="),
+    "a spent count outstayed its key: {:?}",
     terminal.screen()
   );
   terminal.press("f");

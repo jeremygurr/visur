@@ -33,7 +33,8 @@ public record View(
   boolean isInCommandState,
   String commandStateContent,
   int commandCursor,
-  String searchTarget
+  String searchTarget,
+  int pendingCount
 ) {
 
   /**
@@ -73,7 +74,8 @@ public record View(
       emc.getIsInCommandState(),
       emc.getCommandStateContent(),
       emc.getCommandCursor(),
-      searchTarget(emc)
+      searchTarget(emc),
+      pendingCount(emc)
     );
   }
 
@@ -98,6 +100,15 @@ public record View(
     return searching ? emc.getSearchPrompt() : "";
   }
 
+  /**
+   * The count typed in front of a key and not yet spent, which the mode line shows while it is pending. Zero is the
+   * absence of one: a pending {@code 0} means "none" to every command that reads a count, so it has nothing to show.
+   */
+  private static int pendingCount(EditorModelCoupler emc) {
+    Integer count = emc.getPendingCount();
+    return count == null ? 0 : count;
+  }
+
   public JsonObject render() {
     JsonObject payload = new JsonObject();
     payload.put("full", full);
@@ -117,6 +128,7 @@ public record View(
     payload.put("commandStateContent", commandStateContent);
     payload.put("commandCursor", commandCursor);
     payload.put("searchTarget", searchTarget);
+    payload.put("pendingCount", pendingCount);
     return payload;
   }
 

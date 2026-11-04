@@ -228,7 +228,7 @@ mod tests {
       concat!(
         "\x1b[1;1H", "\x1b[7m", "ab", "\x1b[0m", "\x1b[K",
         // The mode line is a real change too: the span went from 0 to 1.
-        "\x1b[4;24H", "\x1b[7m", "1", "\x1b[0m",
+        "\x1b[4;32H", "\x1b[7m", "1", "\x1b[0m",
         "\x1b[?25h", "\x1b[1 q", "\x1b[1;1H",
       )
     );

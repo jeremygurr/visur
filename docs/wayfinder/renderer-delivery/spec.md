@@ -309,7 +309,7 @@ Canvas keeps what the terminal cannot express, and the spec does not try to unif
 
 ### 5.9 Parity
 
-**Must** — paint rows and cursor (block for any `span` above 0, bar for `span` 0) from `cursorRow`/`cursorCol`; mode line with mode/submode/quantum/span; command-state line when `isInCommandState`; `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`+digit; search (`f`/`F`/`n`/`N`/`/` and typing the target); `SIGWINCH` → `viewportWasChanged` → full repaint; `?2026` probe; alt screen, raw mode, ordered restore on panic **and** normal exit; **`ZZ` save-and-detach, `ZQ` detach, `ZD` quit**.
+**Must** — paint rows and cursor (block for any `span` above 0, bar for `span` 0) from `cursorRow`/`cursorCol`; mode line with mode/submode/quantum/scope/span and the pending count while one is typed; command-state line when `isInCommandState`; `h j k l`, arrows, `i`, `a`, `o`, `Esc`, printable, `Backspace`, `Enter`, `s`, and a count typed in front of any key; search (`f`/`F`/`n`/`N`/`/` and typing the target); `SIGWINCH` → `viewportWasChanged` → full repaint; `?2026` probe; alt screen, raw mode, ordered restore on panic **and** normal exit; **`ZZ` save-and-detach, `ZQ` detach, `ZD` quit**.
 
 **Should** — kitty `DISAMBIGUATE_ESCAPE_CODES` push; `?2026` on every frame; overscan/local scroll; page-scroll without moving the cursor; truecolor once `VisurColor` is wired up.
 

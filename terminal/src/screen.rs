@@ -54,11 +54,21 @@ pub fn mode_line(view: &ViewUpdate, cols: usize) -> String {
     format!(" {} SUBMODE ", view.editor_submode.to_uppercase())
   };
   let searching = view.editor_submode == "searchForward" || view.editor_submode == "searchBackward";
+  let span = format!("SPAN={}", view.span);
   let tail = if searching {
     let direction = if view.editor_submode == "searchForward" { 'f' } else { 'F' };
-    format!(" {}({}) {} ", view.scope_quantum.to_uppercase(), direction, view.search_target)
+    // The fence is already here, named and parenthesised by direction, so only the span is added to it.
+    format!(" {}({}) {}  {} ", view.scope_quantum.to_uppercase(), direction, view.search_target, span)
   } else {
-    format!(" {} QUANTUM  SPAN={} ", view.cursor_quantum.to_uppercase(), view.span)
+    // A count is the most transient thing on the row, so it goes last and is the first thing a narrow window loses.
+    let count = if view.pending_count > 0 { format!("  COUNT={} ", view.pending_count) } else { String::new() };
+    format!(
+      " {} QUANTUM  SCOPE={}  {}{}",
+      view.cursor_quantum.to_uppercase(),
+      view.scope_quantum.to_uppercase(),
+      span,
+      count
+    )
   };
   pad(&format!("{label}{tail}"), cols)
 }
@@ -198,8 +208,51 @@ mod tests {
     v.editor_mode = "navigate".to_string();
     v.editor_submode = "navigate".to_string();
     v.cursor_quantum = "character".to_string();
+    v.scope_quantum = "line".to_string();
     v.span = 1;
-    assert_eq!(mode_line(&v, 60).trim_end(), " NAVIGATE MODE  CHARACTER QUANTUM  SPAN=1");
+    assert_eq!(mode_line(&v, 60).trim_end(), " NAVIGATE MODE  CHARACTER QUANTUM  SCOPE=LINE  SPAN=1");
+  }
+
+  /// The fence is what a search is bounded by, and fence promotion (span-and-count ticket 11) would otherwise move it
+  /// invisibly, so it is shown beside the span rather than only while searching. The order is deliberate: the transient
+  /// count is rightmost, because the line clips at the right.
+  #[test]
+  fn the_mode_line_shows_the_fence_and_the_span_in_every_mode_but_command_state() {
+    let mut v = view(&[]);
+    v.editor_mode = "navigate".to_string();
+    v.editor_submode = "navigate".to_string();
+    v.cursor_quantum = "word".to_string();
+    v.scope_quantum = "document".to_string();
+    v.span = 3;
+    assert_eq!(
+      mode_line(&v, 80).trim_end(),
+      " NAVIGATE MODE  WORD QUANTUM  SCOPE=DOCUMENT  SPAN=3",
+      "the whole line has to fit an 80-column window"
+    );
+
+    v.editor_mode = "insert".to_string();
+    v.editor_submode = "insert".to_string();
+    assert!(mode_line(&v, 80).contains("SCOPE=DOCUMENT  SPAN=3"), "insert mode carries them too");
+  }
+
+  #[test]
+  fn a_pending_count_is_shown_after_the_span_and_a_count_never_typed_is_not() {
+    let mut v = navigate_view();
+    v.pending_count = 12;
+    assert_eq!(mode_line(&v, 80).trim_end(), " NAVIGATE MODE  WORD QUANTUM  SCOPE=LINE  SPAN=3  COUNT=12");
+
+    v.pending_count = 0;
+    assert!(!mode_line(&v, 80).contains("COUNT"), "no count was typed, so there is nothing to show");
+  }
+
+  /// Below about fifty columns the tail clips, and what goes is the right end of it. Pinning the boundary rather
+  /// than dressing it up: a forty-column window still shows the mode, the quantum and the fence, and the span is what
+  /// falls off the right.
+  #[test]
+  fn a_narrow_window_clips_the_right_end_of_the_tail() {
+    let v = navigate_view();
+    assert_eq!(mode_line(&v, 40).trim_end(), " NAVIGATE MODE  WORD QUANTUM  SCOPE=LINE");
+    assert_eq!(mode_line(&v, 40).chars().count(), 40, "padded out to the width it was asked for");
   }
 
   #[test]
@@ -209,7 +262,19 @@ mod tests {
     v.editor_submode = "searchForward".to_string();
     v.scope_quantum = "line".to_string();
     v.search_target = "necess".to_string();
-    assert_eq!(mode_line(&v, 60).trim_end(), " SEARCHFORWARD SUBMODE  LINE(f) necess");
+    v.span = 2;
+    // The fence keeps its (f) shape, and the span rides along at the end of the row.
+    assert_eq!(mode_line(&v, 60).trim_end(), " SEARCHFORWARD SUBMODE  LINE(f) necess  SPAN=2");
+  }
+
+  fn navigate_view() -> ViewUpdate {
+    let mut v = view(&[]);
+    v.editor_mode = "navigate".to_string();
+    v.editor_submode = "navigate".to_string();
+    v.cursor_quantum = "word".to_string();
+    v.scope_quantum = "line".to_string();
+    v.span = 3;
+    v
   }
 
   #[test]

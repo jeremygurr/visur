@@ -141,6 +141,8 @@ function drawModeLine() {
   } else {
     document.getElementById("currentEditorModeDisplay").innerHTML = view.editorSubmode.toUpperCase() + " SUBMODE";
   }
+  // The fence and the span travel together in every mode but command state: the fence is what a search looks inside,
+  // and it moves on its own whenever a selection needs more room than it has.
   if(view.editorSubmode == "searchForward" || view.editorSubmode == "searchBackward") {
     document.getElementById("currentEditorModeDisplay").innerHTML = " " + view.scopeQuantum.toUpperCase()
     if(view.editorSubmode == "searchForward") {
@@ -149,8 +151,14 @@ function drawModeLine() {
       document.getElementById("currentEditorModeDisplay").innerHTML += " (F) "
     }
     document.getElementById("currentEditorModeDisplay").innerHTML += view.searchTarget + "_"
-  } else {
     document.getElementById("currentEditorModeDisplay").innerHTML += "; SPAN = " + view.span
+  } else {
+    document.getElementById("currentEditorModeDisplay").innerHTML += "; SCOPE = " + view.scopeQuantum.toUpperCase()
+    document.getElementById("currentEditorModeDisplay").innerHTML += "; SPAN = " + view.span
+    // Rightmost, because it is the shortest-lived thing on the line. A count of 0 means none, so it shows nothing.
+    if(view.pendingCount > 0) {
+      document.getElementById("currentEditorModeDisplay").innerHTML += "; COUNT = " + view.pendingCount
+    }
   }
 }
 
