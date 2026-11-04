@@ -51,6 +51,21 @@ class WordQuantumBoundsTest {
   }
 
   @Test
+  void aSpanOfWordsRunsAcrossSeveralLineBreaks() {
+    // five words, four line breaks, one range. It stops at the end of "five": the last line break is trailing
+    // whitespace, not whitespace between two words.
+    String content = "one\ntwo\nthree\nfour\nfive\n";
+    assertArrayEquals(new int[]{0, content.length() - 1}, boundsAt(content, 0, 5));
+  }
+
+  @Test
+  void aSpanStartingInsideTheLastWordStopsAtTheEndOfTheContent() {
+    // the span starts at the word's start, as it does at span 1; what it must not do is reach past the content for
+    // want of a quantum after the last one
+    assertArrayEquals(new int[]{0, 7}, boundsAt("one two", 2, 5));
+  }
+
+  @Test
   void aSpanLongerThanTheContentClampsAtItsEnd() {
     String content = "one two\nthree";
     assertArrayEquals(new int[]{0, 13}, boundsAt(content, 0, 3));

@@ -5,6 +5,11 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
@@ -16,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 class SetSpanOpTest {
   private static final String CONTENT = "one two three four five\n";
+  private static final String TWENTY_FIVE_WORDS = IntStream.rangeClosed(1, 25)
+      .mapToObj(word -> "w" + word)
+      .collect(Collectors.joining(" ")) + "\n";
 
   private Vertx vertx;
   private EditorModelCoupler emc;
@@ -48,6 +56,12 @@ class SetSpanOpTest {
   private void requestSpan(int span) {
     emc.putOnExecutionDataStack(span);
     new SetSpanOp().execute(null);
+  }
+
+  /** How many words the selection covers, counted from what is actually selected. */
+  private int wordsSelected() {
+    String selected = emc.getEditorContent().substring(emc.getCursorQuantumStart(), emc.getCursorQuantumEnd()).trim();
+    return selected.isEmpty() ? 0 : selected.split("\\s+").length;
   }
 
   private int selectedWidth() {
@@ -138,6 +152,31 @@ class SetSpanOpTest {
     new RelativeMoveOp().execute(null);
     assertEquals(3, emc.getSpan());
     assertEquals(3, selectedWidth());
+  }
+
+  /**
+   * The range is a function of the span, and running out of content does not reduce the span, so walking back into the
+   * document grows the window back to the number that was asked for and holds it there. A stored span that had been
+   * clamped to what was available would leave this stuck at one word.
+   */
+  @Test
+  void aWindowThatRanOutOfContentGrowsBackToTheSizeThatWasAskedFor() {
+    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.putEditorContent(TWENTY_FIVE_WORDS);
+    emc.putCA(TWENTY_FIVE_WORDS.lastIndexOf(' ') + 1); // the last word, with one word left to select
+    requestSpan(5);
+    emc.clearPendingCount(); // the keypress path retires the count once spent; this test drives the operators directly
+    assertEquals(5, emc.getSpan());
+
+    List<Integer> wordsAtEachStep = new ArrayList<>();
+    for (int step = 0; step < 5; step++) {
+      emc.putOnExecutionDataStack(-1); // one word back; the operator pops dy, then dx
+      emc.putOnExecutionDataStack(0);
+      new RelativeMoveOp().execute(null);
+      wordsAtEachStep.add(wordsSelected());
+    }
+
+    assertEquals(List.of(2, 3, 4, 5, 5), wordsAtEachStep, "the window grows back to the five asked for, then holds");
   }
 
   @Test

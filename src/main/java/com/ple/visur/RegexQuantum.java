@@ -136,19 +136,14 @@ public class RegexQuantum extends Quantum {
     int startingCA = emc.getCA();
     int destination = startingCA;
     int span = emc.getSpan();
-    int spansRemaining = span;
     int incrementer = mv.dx > 0 ? 1 : -1;
     while(mv.dx != 0) {
       destination = mv.dx > 0 ? getNextBound(pattern, editorContent, destination) : getPrevBound(pattern, editorContent, destination);
-      if(span > 0 && isAtBeginningOfQuantum(destination)) {
-        spansRemaining--;
-      }
-      while(spansRemaining > 0) {
+      // A step that starts in the middle of a quantum stops inside it, and the quantum meant is the next one along.
+      // The span is not consulted for distance: it says how wide the selection is, and the count says how far this
+      // press goes.
+      if(!isAtBeginningOfQuantum(destination)) {
         destination = mv.dx > 0 ? getNextQuantumStart(destination) : getPrevQuantumStart(destination);
-        spansRemaining--;
-        if(spansRemaining > 0) {
-          destination = mv.dx > 0 ? getNextBound(pattern, editorContent, destination) : getPrevBound(pattern, editorContent, destination);
-        }
       }
       emc.putCA(destination);
       emc.putVirtualCX(emc.getCX());

@@ -11,9 +11,10 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 /**
  * A count says how far, and the span says how much travels with you.
  *
- * <p>Before this, a jump walked as far as the span: {@code ] w} at span 3 was a three-word jump, so selecting more text
- * moved the cursor further for the same two keys. One press now moves one quantum, {@code 3 ]} moves three, and the span
- * only decides the width of the window that lands there. Movement scales the same way, in both axes.
+ * <p>Before this, a jump walked as far as the span, and so did a word move: {@code ] w} at span 3 was a three-word
+ * jump, and {@code h} at span 5 went back five words. Either way, selecting more text moved the cursor further for the
+ * same keys. One press now moves one quantum, {@code 3 ]} moves three, and the span only decides the width of the window
+ * that lands there. Movement scales the same way, in both axes.
  *
  * <p>Both read the count typed <em>before</em> the key, and a count belongs to the whole key sequence it opens — which
  * for a jump is two keypresses, {@code ]} and then the quantum key.
@@ -65,6 +66,38 @@ class MovementCountTest {
     assertEquals(FOURTH_WORD, emc.getCA());
     assertEquals(FOURTH_WORD, emc.getCursorQuantumStart());
     assertEquals(18, emc.getCursorQuantumEnd(), "and it selects the word it landed on");
+  }
+
+  /**
+   * The word quantum read the span as a distance rather than a width, so the selection decided how far {@code h} and
+   * {@code l} went. It looked like one quantum per press because the span used to stop at one.
+   */
+  @Test
+  void aWordMoveIsOneQuantumWhateverTheSpan() {
+    chooseCursorQuantum("word");
+    press("l"); // onto "two"
+    press("5");
+    press("s");
+    assertEquals(CONTENT.indexOf("six") + 3, emc.getCursorQuantumEnd(), "five words wide from here");
+
+    press("l");
+
+    assertEquals(CONTENT.indexOf("three"), emc.getCA(), "one word along, not five");
+  }
+
+  /**
+   * A move that starts mid-quantum used to stop at the end of that quantum when nothing was selected, and at the start
+   * of the next one when something was — two answers for the same key. There is one now, and it is the one that says
+   * "one quantum along".
+   */
+  @Test
+  void aWordMoveLandsOnTheNextQuantumStartEvenWithNoSelection() {
+    chooseCursorQuantum("word");
+    press("0");
+    press("s"); // nothing selected, which is the case the old branch skipped
+    press("l");
+    assertEquals(CONTENT.indexOf("two"), emc.getCA());
+    assertEquals(0, emc.getSpan());
   }
 
   @Test
