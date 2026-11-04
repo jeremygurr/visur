@@ -1,7 +1,7 @@
 # Visur key reference
 
 Every key that does something in Visur today, what it is meant to do, and an example. Describes the editor
-as of 2026-11-02. When a key changes, this page changes with it.
+as of 2026-11-03. When a key changes, this page changes with it.
 
 Two words carry most of the design:
 
@@ -35,7 +35,7 @@ Quantum keys are shared by every command that takes one:
 | `0`–`9` before any key | the **count** for the key that follows; digits accumulate, so `1` then `2` is twelve. It is spent by the command it belongs to — including a two-key command — and any other key drops it. `0` means none: `0 l` does not move, `0 s` selects nothing | `12 s` twelve quanta; `3 ] w` three words |
 | `s` | set **span** to the pending count — one with no count typed. `0 s` collapses the selection | `3 s` three quanta; `s` one; `0 s` none |
 | `[` then `q`/`w`/`e`/`r` | jump to the **start** of that quantum — one quantum per press, whatever the span | `[ w` start of the current word; `[ r` start of the document |
-| `]` then `q`/`w`/`e`/`r` | jump to the **end** of that quantum, `count` of them | `] e` last character of the current line; `3 ] e` of the third line |
+| `]` then `q`/`w`/`e`/`r` | jump to the **end** of that quantum, `count` of them | `] e` last character of the current line; `] r` end of the document; `3 ] e` of the third line |
 | `/` then `q`/`w`/`e`/`r` | change the **scope quantum** — the fence search looks inside — and return to navigate | `/ r f foo` search the whole document for `foo` instead of only this line |
 | `f` + text + `Enter` | search **forward** for a literal string, inside the scope fence | `f` `bar` `Enter` |
 | `F` + text + `Enter` | search **backward** for a literal string, inside the scope fence | `F` `bar` `Enter` |
@@ -46,13 +46,16 @@ Quantum keys are shared by every command that takes one:
 | `d` | delete the selection when there is one, then re-derive the bounds at the same span | `s d` delete the quantum under the cursor |
 | `y` | copy the selection to the yank register | `s y` |
 | `p` | paste the yank register at the cursor | `p` |
-| `g` `g` | jump to the start of the document (two-key) | `gg` |
-| `G` | jump to the start of the last non-empty line | `G` |
 | `;` | open **command state**: type a raw command sentence and run it | `;` `"word" quantumStart` `Enter` |
 | `ZZ` | save the file | `ZZ` |
 
 `i`, `a` and `o` all stash the current span and cursor quantum, force the span to 0 and the quantum to character,
 and restore both on `Escape`.
+
+**`gg` and `G` are gone**, along with the only hand-written two-key sequence in the server: `[ r` and `] r` reach both
+ends through the document quantum. Recorded so nobody puts them back: `G` landed on the *start of the last non-empty
+line*, and `] r` lands on the *end of the document* — on a document that does not end in a line break those are different
+characters, and the second is what the quantum model means by "the end".
 
 ## Insert mode
 

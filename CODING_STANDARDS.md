@@ -52,7 +52,7 @@ One line, stating the why the code cannot show. Stale pseudocode gets rewritten 
 
 JUnit 5. `mockito-core` is declared in the build file and no test uses it; there are two live precedents instead.
 
-When the behavior is arithmetic, test the static seam and boot nothing — [`ViewportTest`](src/test/java/com/ple/visur/ViewportTest.java), [`DocumentJumpOpTest`](src/test/java/com/ple/visur/DocumentJumpOpTest.java), the `*BoundsTest` set. That is why `boundsFor` is a static: a live model holds one span at a time, and a span test wants to try several.
+When the behavior is arithmetic, test the static seam and boot nothing — [`ViewportTest`](src/test/java/com/ple/visur/ViewportTest.java), the `*BoundsTest` set. That is why `boundsFor` is a static: a live model holds one span at a time, and a span test wants to try several.
 
 When the behavior *is* the service wiring, boot it in `@BeforeEach` — `Vertx.vertx()` then `ServiceHolder.init(vertx.sharedData())`, a `@TempDir` for files — and drive the real [`EditorModelCoupler`](src/test/java/com/ple/visur/FileIoTest.java). That is the honest way to test file I/O and command state.
 

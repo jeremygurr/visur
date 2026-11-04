@@ -27,9 +27,9 @@ static, and then performs the writes it used to do inline. Move each `putCA` / `
 actually meant them (`SetSpanOp`, `ChangeCursorQuantumOp`, `RelativeMoveOp`, `SearchForwardOp`, `SearchBackwardOp`,
 `ChangeScopeOp`'s users), so the collapse-to-zero-span rule lives in **one** place instead of three.
 
-Write the tests against the statics, in the style of
-[`DocumentJumpOpTest`](../../../../src/test/java/com/ple/visur/DocumentJumpOpTest.java) — a pure assertion per case, no
-server, no `SharedData`. Cover, per quantum: span 0, 1, 2, 3; cursor at content end; empty content; a span that runs
+Write the tests against the statics — a pure assertion per case, no server, no `SharedData`. (The precedent cited here
+when the ticket was written, `DocumentJumpOpTest`, is since deleted by
+[ticket 09](09-remove-gg-and-capg.md); the seam tests are that style now.) Cover, per quantum: span 0, 1, 2, 3; cursor at content end; empty content; a span that runs
 past a line break; a span that runs past the end of the content; and that calling the function twice with the same
 arguments returns the same range (the property the current code fails).
 
@@ -86,6 +86,10 @@ Both are cursor writes, not span writes, and both are marked `// legacy side eff
   end of the content. **Consequence worth knowing:** at span 0, `] r` therefore lands at the *start* of the document,
   because that is where the cursor is put before the bounds are read. [Ticket 09](09-remove-gg-and-capg.md) requires
   `] r` to reach the last character at span 0, so this write is one of the things that ticket has to settle.
+  **Settled by [ticket 09](09-remove-gg-and-capg.md), and nothing had to change:** the write no longer fires on the way to
+  the end, because at span 0 the range collapses at the cursor when the cursor is already at the end of the content —
+  which is where the jump leaves it. `] r` reaching the last character at span 0 is pinned now, from the character
+  quantum and from the document quantum.
 - `RegexQuantum` still snaps the cursor to the start of the quantum it selected.
 
 ### Three things changed behavior, all of them at span 0 with the character quantum

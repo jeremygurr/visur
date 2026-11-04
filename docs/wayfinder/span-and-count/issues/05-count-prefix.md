@@ -73,8 +73,8 @@ every keypress passes through, and the rule is two calls around the keypress:
 `press` became static for the same reason the `gg`/`G` state was split out beside it into `documentJumpConsumed`: a
 verticle cannot be constructed outside a Vert.x context ([`AbstractVisurVerticle`](../../../../src/main/java/com/ple/visur/AbstractVisurVerticle.java)
 reads the current context in its constructor), and the precedent for "static so it can be tested" is
-`enterCommandStateIfRequested`. Splitting the jump out also means [ticket 09](09-remove-gg-and-capg.md) deletes one
-method. Incidentally the jump paths used to `send(modelWasChanged)` and then fall into the sender at the end; now one
+`enterCommandStateIfRequested`. Splitting the jump out meant [ticket 09](09-remove-gg-and-capg.md) had one method to
+delete rather than one to unpick; both it and `documentJumpConsumed` are gone now. Incidentally the jump paths used to `send(modelWasChanged)` and then fall into the sender at the end; now one
 keypress sends exactly one.
 
 ### Two sources for the span, ranked

@@ -6,8 +6,6 @@ import io.vertx.rxjava3.core.eventbus.Message;
 
 public class KeyWasPressedVerticle extends AbstractVisurVerticle {
 
-  private boolean pendingDocumentStart;
-
   @Override
   public void start() {
     vertx.eventBus().consumer(BusEvent.keyWasPressed.name(), this::handle);
@@ -20,9 +18,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
     KeyPressed keyPressed = KeyPressed.from(key);
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     try {
-      if (!documentJumpConsumed(emc, key)) {
-        press(emc, keyPressed, key);
-      }
+      press(emc, keyPressed, key);
     } finally {
       // every keypress but a digit ends whatever count was pending, whether or not it matched a binding
       CountPrefix.retireUnlessDigit(emc, key);
@@ -54,33 +50,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
     }
   }
 
-  /** The two-key jump to the start of the document, and its one-key twin. True once the keypress belongs to them. */
-  private boolean documentJumpConsumed(EditorModelCoupler emc, String key) {
-    if (emc.getIsInCommandState()) {
-      pendingDocumentStart = false;
-      return false;
-    }
-    boolean navigating = emc.getEditorSubmode() == EditorSubmode.navigate;
-    if (pendingDocumentStart) {
-      pendingDocumentStart = false;
-      if (navigating && key.equals("g")) {
-        DocumentJumpOp.jumpToStart();
-        return true;
-      }
-    }
-    if (navigating && key.equals("g")) {
-      pendingDocumentStart = true;
-      return true;
-    }
-    if (navigating && key.equals("G")) {
-      DocumentJumpOp.jumpToEnd();
-      return true;
-    }
-    return false;
-  }
-
   private void handlePaste(Message event) {
-    pendingDocumentStart = false;
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     emc.clearPendingCount(); // typed text arrives without a keypress, so it retires a pending count the way one would
     JsonObject body = jsonBody(event);

@@ -29,9 +29,8 @@ expressed" ([renderer-delivery/map.md](../renderer-delivery/map.md), [terminal-b
 - **The selection model is a window, not a rubber band.** A movement with span 3 and count 3 slides a three-unit
   window three units. It never grows the selection, and neither does `d` or `y` collapse it.
 - **Tests go through a pure seam, not the live editor.** `getBoundaries` reads `ServiceHolder.editorModelCoupler`
-  statics (Vert.x `SharedData` maps) which no test can boot cheaply. Ticket 01 extracts static bound functions so
-  the arithmetic is testable the way [`DocumentJumpOpTest`](../../../src/test/java/com/ple/visur/DocumentJumpOpTest.java)
-  already tests `bottomLineStart(String)`. Ticket 01 lands first for this reason, not as a courtesy refactor.
+  statics (Vert.x `SharedData` maps) which no test can boot cheaply. Ticket 01 extracts static bound functions so the
+  arithmetic is a pure assertion per case, no server. Ticket 01 lands first for this reason, not as a courtesy refactor.
 - **Skills to consult**: `tdd` for tickets 01–04 and 11–12 (all pure arithmetic once the seam exists),
   `codebase-design` if ticket 01's seam starts wanting to be an interface, `wiki-lint`-style doc care when the key
   reference changes.
@@ -77,8 +76,9 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   `(content, nl, ca, cy, span)`, 42 tests at that seam, and "a collapsed range leaves no span" was one method called
   from four operators instead of three hand-written copies — that method is since deleted, see the rule above. Two findings: span 0 on the character quantum used to mean
   a one-character selection, which quietly moved where `p` inserts and where `n` starts searching (both now agree with
-  the drawn caret); and at span 0 `] r` lands at the *start* of the document, because the document quantum parks the
-  cursor there — [ticket 09](issues/09-remove-gg-and-capg.md) owns that.
+  the drawn caret); and at span 0 `] r` landed at the *start* of the document, because the document quantum parked the
+  cursor there — [ticket 09](issues/09-remove-gg-and-capg.md) settled it: that parking no longer fires on the way to the
+  end, and both ends are pinned at span 0 and above.
 - [Word spans mean words](issues/02-span-per-quantum.md): a word span covers whole words plus the whitespace between
   them, and starts only where a word actually is — an indent, a blank line or the gap between two words selects nothing
   and keeps the number, which is the answer a blank line already gave rather than a new one. The walk between words now
@@ -114,6 +114,12 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   rather than after it. Its amendment turned out to be five documents, not one: the conformance row and four places in
   the spec that read "0 or 1 today".
 
+- [`gg` and `G` are gone](issues/09-remove-gg-and-capg.md): `[ r` and `] r` reach both ends, which deletes the only
+  hand-written two-key sequence in the server. Accepted loss, kept out of the reference's reach: `G` reached the start
+  of the last non-empty line, `] r` reaches the end of the content — different characters when there is no trailing
+  line break. Both ends hold at span 0, so the ticket 01 finding about the document quantum parking the cursor at index
+  0 turned out to be dead on that path.
+
 ## Tickets
 
 | # | title | blocked by |
@@ -126,7 +132,7 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 | ~~06~~ [closed](issues/06-count-on-jumps-and-movement.md) | Count reaches `[` `]` and movement | 05, 07 |
 | ~~07~~ [closed](issues/07-frame-at-span-one.md) | Frame chosen structurally at span 1; rename the `Quantum.java` locals | — |
 | ~~08~~ [closed](issues/08-terminal-block-cursor.md) | Terminal block cursor at `span > 0` | — |
-| [09](issues/09-remove-gg-and-capg.md) | Remove `gg` / `G` / `DocumentJumpOp` | — |
+| ~~09~~ [closed](issues/09-remove-gg-and-capg.md) | Remove `gg` / `G` / `DocumentJumpOp` | — |
 | [10](issues/10-mode-line-scope.md) | Mode line always shows scope next to span | — |
 | [11](issues/11-fence-auto-promotion.md) | Fence auto-promotion, transient | 02, 07 |
 | [12](issues/12-count-on-operators.md) | Count × span on `d` / `y` / `p`; `d` yanks | 05, 11 |

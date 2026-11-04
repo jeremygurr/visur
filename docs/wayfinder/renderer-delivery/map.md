@@ -63,7 +63,7 @@ Work consciously ruled out of this effort. Never graduates; returns only if the 
 - **Visur feature gaps and stress cases surfaced by the renderer work** — all app features, not renderer ones, and all deferred to the effort that builds this spec. Span is no longer one of them: as of [span-and-count ticket 04](../span-and-count/issues/04-setspanop-no-clamp.md) `SetSpanOp` keeps the number it was given, so `s 3` selects three quanta.
   - **No quit.** No quit/exit operator exists; `CommandStateService.exitCommandState` only leaves the `;` line. A client must bind quitting, but there is nothing to bind it to yet.
   - **No copy/paste**, and no paste message in the protocol (only bracketed paste at the terminal).
-  - **No document-jump keys** — no `gg`/`G` equivalent, so top↔bottom is unreachable in one key.
+  - **No document-jump keys** — voided: `gg`/`G` are deleted in favour of `[ r` and `] r` ([span-and-count ticket 09](../span-and-count/issues/09-remove-gg-and-capg.md)), which the terminal already forwards as ordinary characters, so there is nothing left for a client to bind.
   - **No search-and-replace** — search (`f`/`F`/`n`/`N`) exists; substitution does not, and replace mode is overwrite-typing.
   - **No file I/O at all**, so "keeping changes" means the server's memory, not a saved document.
   These are also the **benchmark set** for the scaling question: they are the operations that will expose the full-buffer payload on large documents, which is why they matter here even though they are not built here.
