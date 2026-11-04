@@ -84,6 +84,11 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
   and keeps the number, which is the answer a blank line already gave rather than a new one. The walk between words now
   crosses a gap in one step (`2 s` at `"one   two   three"` was one word and a character of space) and stops at the end
   of the last word. `move` shares that walk, so word movement crosses wide gaps in one press too.
+- [Overflow needed no code](issues/03-overflow-order.md): each quantum states the range in the units it has, and only
+  the word quantum walks, so the shared unit-walker this ticket planned is struck — the other three read the answer out
+  of an index, and the line clipping it blamed was already gone. It left the round trip pinned instead (five words asked
+  for at the last word, growing 2, 3, 4, 5 back into the document), and that found `move` still reading the span as a
+  distance at the word quantum, against [06](issues/06-count-on-jumps-and-movement.md)'s rule.
 - [`SetSpanOp` stops clamping](issues/04-setspanop-no-clamp.md): span keeps the number it was given and the range
   clamps at the content end, so `s 3` selects three quanta today. `d` and `y` needed no change — neither wrote span —
   and the `tempSpan` stash across insert mode turns out to be magnitude-blind. Two input gaps left for
@@ -115,7 +120,7 @@ Settled in the design session of 2026-11-02. Each is implemented by a ticket, no
 |---|---|---|
 | ~~01~~ [closed](issues/01-bound-seam-and-tests.md) | Pure bound seam + boundary tests | — |
 | ~~02~~ [closed](issues/02-span-per-quantum.md) | Span > 1 in each quantum's bounds | 01 |
-| [03](issues/03-overflow-order.md) | Overflow counts in document order | 02 |
+| ~~03~~ [closed](issues/03-overflow-order.md) | Overflow counts in document order | 02 |
 | ~~04~~ [closed](issues/04-setspanop-no-clamp.md) | `SetSpanOp` stops clamping; span survives `d` and `y` | 02 |
 | ~~05~~ [closed](issues/05-count-prefix.md) | Count prefix in navigate mode; delete the `s`-then-digit submode | — |
 | ~~06~~ [closed](issues/06-count-on-jumps-and-movement.md) | Count reaches `[` `]` and movement | 05, 07 |
