@@ -128,6 +128,7 @@ mod tests {
       cursor_quantum_start: 1,
       cursor_quantum_end: 3,
       span: 1,
+      include_separators: true,
       cursor_row: 0,
       cursor_col: 1,
       editor_mode: "navigate".to_string(),
@@ -293,6 +294,7 @@ mod tests {
     let view = ViewUpdate {
       rows: lines,
       span: 1,
+      include_separators: true,
       cursor_quantum_start: 100,
       cursor_quantum_end: 140,
       cursor_row: 2,

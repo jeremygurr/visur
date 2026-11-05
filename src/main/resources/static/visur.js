@@ -151,9 +151,11 @@ function drawModeLine() {
       document.getElementById("currentEditorModeDisplay").innerHTML += " (F) "
     }
     document.getElementById("currentEditorModeDisplay").innerHTML += view.searchTarget + "_"
+    document.getElementById("currentEditorModeDisplay").innerHTML += "; SEP = " + (view.includeSeparators ? "ON" : "OFF")
     document.getElementById("currentEditorModeDisplay").innerHTML += "; SPAN = " + view.span
   } else {
     document.getElementById("currentEditorModeDisplay").innerHTML += "; SCOPE = " + view.scopeQuantum.toUpperCase()
+    document.getElementById("currentEditorModeDisplay").innerHTML += "; SEP = " + (view.includeSeparators ? "ON" : "OFF")
     document.getElementById("currentEditorModeDisplay").innerHTML += "; SPAN = " + view.span
     // Rightmost, because it is the shortest-lived thing on the line. A count of 0 means none, so it shows nothing.
     if(view.pendingCount > 0) {

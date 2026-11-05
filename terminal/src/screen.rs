@@ -54,18 +54,20 @@ pub fn mode_line(view: &ViewUpdate, cols: usize) -> String {
     format!(" {} SUBMODE ", view.editor_submode.to_uppercase())
   };
   let searching = view.editor_submode == "searchForward" || view.editor_submode == "searchBackward";
+  let sep = if view.include_separators { "SEP=ON" } else { "SEP=OFF" };
   let span = format!("SPAN={}", view.span);
   let tail = if searching {
     let direction = if view.editor_submode == "searchForward" { 'f' } else { 'F' };
     // The fence is already here, named and parenthesised by direction, so only the span is added to it.
-    format!(" {}({}) {}  {} ", view.scope_quantum.to_uppercase(), direction, view.search_target, span)
+    format!(" {}({}) {}  {}  {} ", view.scope_quantum.to_uppercase(), direction, view.search_target, sep, span)
   } else {
     // A count is the most transient thing on the row, so it goes last and is the first thing a narrow window loses.
     let count = if view.pending_count > 0 { format!("  COUNT={} ", view.pending_count) } else { String::new() };
     format!(
-      " {} QUANTUM  SCOPE={}  {}{}",
+      " {} QUANTUM  SCOPE={}  {}  {}{}",
       view.cursor_quantum.to_uppercase(),
       view.scope_quantum.to_uppercase(),
+      sep,
       span,
       count
     )
@@ -133,6 +135,7 @@ mod tests {
   fn view(rows: &[(i64, &str)]) -> ViewUpdate {
     ViewUpdate {
       rows: rows.iter().map(|(start, text)| Row { start: *start, text: text.to_string() }).collect(),
+      include_separators: true,
       ..ViewUpdate::default()
     }
   }
@@ -210,7 +213,7 @@ mod tests {
     v.cursor_quantum = "character".to_string();
     v.scope_quantum = "line".to_string();
     v.span = 1;
-    assert_eq!(mode_line(&v, 60).trim_end(), " NAVIGATE MODE  CHARACTER QUANTUM  SCOPE=LINE  SPAN=1");
+    assert_eq!(mode_line(&v, 70).trim_end(), " NAVIGATE MODE  CHARACTER QUANTUM  SCOPE=LINE  SEP=ON  SPAN=1");
   }
 
   /// The fence is what a search is bounded by, and fence promotion (span-and-count ticket 11) would otherwise move it
@@ -226,20 +229,20 @@ mod tests {
     v.span = 3;
     assert_eq!(
       mode_line(&v, 80).trim_end(),
-      " NAVIGATE MODE  WORD QUANTUM  SCOPE=DOCUMENT  SPAN=3",
+      " NAVIGATE MODE  WORD QUANTUM  SCOPE=DOCUMENT  SEP=ON  SPAN=3",
       "the whole line has to fit an 80-column window"
     );
 
     v.editor_mode = "insert".to_string();
     v.editor_submode = "insert".to_string();
-    assert!(mode_line(&v, 80).contains("SCOPE=DOCUMENT  SPAN=3"), "insert mode carries them too");
+    assert!(mode_line(&v, 80).contains("SCOPE=DOCUMENT  SEP=ON  SPAN=3"), "insert mode carries them too");
   }
 
   #[test]
   fn a_pending_count_is_shown_after_the_span_and_a_count_never_typed_is_not() {
     let mut v = navigate_view();
     v.pending_count = 12;
-    assert_eq!(mode_line(&v, 80).trim_end(), " NAVIGATE MODE  WORD QUANTUM  SCOPE=LINE  SPAN=3  COUNT=12");
+    assert_eq!(mode_line(&v, 80).trim_end(), " NAVIGATE MODE  WORD QUANTUM  SCOPE=LINE  SEP=ON  SPAN=3  COUNT=12");
 
     v.pending_count = 0;
     assert!(!mode_line(&v, 80).contains("COUNT"), "no count was typed, so there is nothing to show");
@@ -264,7 +267,7 @@ mod tests {
     v.search_target = "necess".to_string();
     v.span = 2;
     // The fence keeps its (f) shape, and the span rides along at the end of the row.
-    assert_eq!(mode_line(&v, 60).trim_end(), " SEARCHFORWARD SUBMODE  LINE(f) necess  SPAN=2");
+    assert_eq!(mode_line(&v, 60).trim_end(), " SEARCHFORWARD SUBMODE  LINE(f) necess  SEP=ON  SPAN=2");
   }
 
   fn navigate_view() -> ViewUpdate {

@@ -21,6 +21,7 @@ public record View(
   int origin,
   List<Viewport.Row> rows,
   int span,
+  boolean includeSeparators,
   int cursorQuantumStart,
   int cursorQuantumEnd,
   int cursorRow,
@@ -62,6 +63,7 @@ public record View(
       origin,
       rows,
       emc.getSpan(),
+      includeSeparators(emc),
       emc.getCursorQuantumStart(),
       emc.getCursorQuantumEnd(),
       cursor.row(),
@@ -104,6 +106,11 @@ public record View(
    * The count typed in front of a key and not yet spent, which the mode line shows while it is pending. Zero is the
    * absence of one: a pending {@code 0} means "none" to every command that reads a count, so it has nothing to show.
    */
+  private static boolean includeSeparators(EditorModelCoupler emc) {
+    VisurVar state = emc.getGlobalVar("includeSeparators");
+    return state == null || Boolean.TRUE.equals(state.getVal());
+  }
+
   private static int pendingCount(EditorModelCoupler emc) {
     Integer count = emc.getPendingCount();
     return count == null ? 0 : count;
@@ -115,6 +122,7 @@ public record View(
     payload.put("origin", origin);
     payload.put("rows", renderRows());
     payload.put("span", span);
+    payload.put("includeSeparators", includeSeparators);
     payload.put("cursorQuantumStart", cursorQuantumStart);
     payload.put("cursorQuantumEnd", cursorQuantumEnd);
     payload.put("cursorRow", cursorRow);
