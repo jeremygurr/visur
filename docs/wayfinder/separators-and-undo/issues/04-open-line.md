@@ -1,7 +1,7 @@
 # `g` / `G` open a line above / below at line bounds
 
 Type: task
-Status: open
+Status: closed
 Blocked by: 02
 
 ## Work
@@ -53,7 +53,7 @@ to the selection you had.
   [05](05-insert-repeat.md)).
 - `keys.md` gains `g` and `G` with an example each, and says the count repeats the typed text rather than opening many
   lines.
-- [ ] Manual (user-driven) check: `g` from the middle of a line, type, Escape, and confirm line breaks above are clean;
+- [x] Manual (user-driven) check: `g` from the middle of a line, type, Escape, and confirm line breaks above are clean;
   same for `G` at the end of the document.
 
 ## Result
