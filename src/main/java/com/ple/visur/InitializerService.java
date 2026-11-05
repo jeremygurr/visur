@@ -403,13 +403,21 @@ public class InitializerService {
       scs.compile("toggleSeparators")
     );
     keymap.put(KeyPressed.from("i"),
-      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> 0 setSpan \"character\" quantumStart \"insert\" changeMode \"character\" changeCursorQuantum")
+      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> stashCount 0 setSpan \"character\" quantumStart \"insert\" changeMode \"character\" changeCursorQuantum")
     );
     keymap.put(KeyPressed.from("a"),
-      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> 0 setSpan \"character\" quantumEnd \"insert\" changeMode \"character\" changeCursorQuantum")
+      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> stashCount 0 setSpan \"character\" quantumEnd \"insert\" changeMode \"character\" changeCursorQuantum")
     );
     keymap.put(KeyPressed.from("o"),
-      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> \"replace\" changeMode 0 setSpan \"character\" changeCursorQuantum")
+      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> stashCount \"replace\" changeMode 0 setSpan \"character\" changeCursorQuantum")
+    );
+    // The caret comes from the operator rather than from `quantumStart`, which would put it back at the selection the
+    // line opened in front of. Everything else is what `i` and `a` do.
+    keymap.put(KeyPressed.from("g"),
+      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> stashCount openLineAbove 0 setSpan \"insert\" changeMode \"character\" changeCursorQuantum")
+    );
+    keymap.put(KeyPressed.from("G"),
+      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> stashCount openLineBelow 0 setSpan \"insert\" changeMode \"character\" changeCursorQuantum")
     );
     keymap.put(KeyPressed.from("d"),
       scs.compile("deleteCursorQuantum")

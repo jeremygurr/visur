@@ -43,6 +43,8 @@ Quantum keys are shared by every command that takes one:
 | `i` | insert at the **start** of the selection; switches to insert mode | `i` |
 | `a` | insert at the **end** of the selection; switches to insert mode | `a` |
 | `o` | enter **replace** mode at the cursor | `o` |
+| `g` | open a line **above** the one the cursor is on, and type on it | `g` mid-word still opens a line above, never splits the line it is in |
+| `G` | open a line **below** the one the cursor is on, and type on it | `G` on the last line of a document with no trailing newline still gives a new empty line |
 | `d` | delete the selection, taken `count` times, leaving the highlight as the gap it made — the span survives, and the next move re-derives the window from it. What it removed goes to the yank register, so `p` puts it back. Nothing selected, or a count of zero, and nothing happens | `s d` delete the quantum under the cursor; `3 s` then `3 d` delete nine |
 | `y` | copy the selection, taken `count` times, to the yank register | `s y`; `2 s` then `3 y` copy six quanta |
 | `p` | **replace the selection** with the yank register, `count` copies, and put what the paste displaced into the register. Over nothing it displaces nothing, so the register keeps what it held and `p p` pastes twice. The caret ends on the last pasted character, span 0 | `s y` `] e` `p` move a quantum; `3 p` three copies over one selection |
@@ -50,13 +52,18 @@ Quantum keys are shared by every command that takes one:
 | `;` | open **command state**: type a raw command sentence and run it | `;` `"word" quantumStart` `Enter` |
 | `ZZ` | save the file | `ZZ` |
 
-`i`, `a` and `o` all stash the current span and cursor quantum, force the span to 0 and the quantum to character,
-and restore both on `Escape`.
+`i`, `a`, `o`, `g` and `G` all stash the current span and cursor quantum, force the span to 0 and the quantum to
+character, and restore both on `Escape`.
 
-**`gg` and `G` are gone**, along with the only hand-written two-key sequence in the server: `[ r` and `] r` reach both
-ends through the document quantum. Recorded so nobody puts them back: `G` landed on the *start of the last non-empty
-line*, and `] r` lands on the *end of the document* — on a document that does not end in a line break those are different
-characters, and the second is what the quantum model means by "the end".
+**Both line-opening keys read the line the cursor sits on**, not the cursor quantum, `SPAN` or `SCOPE`, and the same
+document comes out whether the separator toggle is on or off. A count in front of either — `3 g` — opens **one** line,
+not three: the count is stashed for the session, and
+[05](../wayfinder/separators-and-undo/issues/05-insert-repeat.md) is what will spend it by repeating what you type.
+
+**`gg` is gone**, along with the only hand-written two-key sequence in the server: `[ r` and `] r` reach both ends
+through the document quantum. `G` came back as open-a-line-below; recorded so nobody puts the *old* `G` back: it landed
+on the *start of the last non-empty line*, and `] r` lands on the *end of the document* — on a document that does not
+end in a line break those are different characters, and the second is what the quantum model means by "the end".
 
 ## Insert mode
 
@@ -120,8 +127,6 @@ Until those tickets land, the table above is the truth:
   spaces or tabs after them, but never a newline. `\` will turn this off, shown as `SEP=ON` / `SEP=OFF` beside the span.
   ([01](../wayfinder/separators-and-undo/issues/01-editor-spec.md),
   [02](../wayfinder/separators-and-undo/issues/02-selection-includes-separator.md))
-- **`g` and `G`** will open a line above and below at the line bounds, whatever the cursor quantum, and drop you into
-  insert mode on it. ([04](../wayfinder/separators-and-undo/issues/04-open-line.md))
 - **A count before an insert-entering key will repeat the typed text**, vim's `3o`: `3 g`, type once, Escape gives
   three identical lines — not three newlines. ([05](../wayfinder/separators-and-undo/issues/05-insert-repeat.md))
 - **`u` and `R`** will undo and redo a whole command. Undo will restore the selection, never the yank register.

@@ -107,21 +107,6 @@ class DocumentQuantumJumpTest {
     assertEquals(0, emc.getCA());
   }
 
-  /**
-   * What "removed" has to mean here: no partial match, no state kept between the two presses, no stray letter doing
-   * anything else. Verified by hand in both renderers too, since {@code g} arrives from the terminal as an ordinary
-   * character and from the browser as one too.
-   */
-  @Test
-  void ggAndUpperGDoNothingAtAll() {
-    press("g");
-    press("g");
-    assertEquals(MIDDLE_OF_CONTENT, emc.getCA());
-    press("G");
-    assertEquals(MIDDLE_OF_CONTENT, emc.getCA());
-    assertEquals(1, emc.getSpan(), "and nothing was selected on the way");
-  }
-
   private void chooseCursorQuantum(String quantumName) {
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
   }

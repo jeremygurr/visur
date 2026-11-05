@@ -56,8 +56,17 @@ public class NativeOpWord implements Word {
         case "insertNewline":
           op = new InsertNewlineOp();
           break;
+        case "openLineAbove":
+          op = new OpenLineAboveOp();
+          break;
+        case "openLineBelow":
+          op = new OpenLineBelowOp();
+          break;
         case "deletePreviousChar":
           op = new DeletePreviousCharOp();
+          break;
+        case "stashCount":
+          op = new StashCountOp();
           break;
         case "removeGlobalVar":
           op = new RemoveGlobalVarOp();

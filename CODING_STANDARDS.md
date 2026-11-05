@@ -18,6 +18,10 @@ zero nothing re-derived a selection. A number the user typed outlives the conten
 span there would highlight the text that slid into the hole — text nobody selected — and `p` replaces the selection, so
 that highlight is what a paste would eat instead of putting the deleted text back.
 
+A count lives one keypress: `CountPrefix.retireUnlessDigit` clears it once the command it belongs to has run. A key that
+opens a session longer than that — `i`, `a`, `o`, `g`, `G` — runs `stashCount` on the way in, and typing no count
+*removes* the stash rather than leaving it, so no session can inherit the previous one's number.
+
 ## Document types are declared, not hardcoded
 
 A quantum and the facts about it — its name, what separates it from the next quantum, how coarse it is — belong to an

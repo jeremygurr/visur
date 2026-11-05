@@ -56,6 +56,40 @@ to the selection you had.
 - [ ] Manual (user-driven) check: `g` from the middle of a line, type, Escape, and confirm line breaks above are clean;
   same for `G` at the end of the document.
 
+## Result
+
+Shipped as `openLineAbove` / `openLineBelow` (`OpenLineAboveOp`, `OpenLineBelowOp`), bound to `g` and `G` with the same
+stash-and-collapse sequence `i` and `a` use. `OpenLineTest` holds ten cases.
+
+**The bounds are the line indices and the cursor's row, not the line quantum.** Both operators read
+`getNextLineIndices()` and `getCY()` directly. That is what makes the separator toggle irrelevant here rather than merely
+tested-irrelevant: there is no quantum call in the path for its inclusion of the terminator to change. `G`'s caret rule
+is the one thing the toggle could not have told us either way: when the line has a newline of its own the inserted
+newline lands after it and terminates the new empty line itself, so the caret goes at the insertion index; when it does
+not — the last line of a document with no trailing newline — the inserted newline terminates the text line, and the
+caret goes one past it, on the empty line the document now ends with. That caret is at `content.length()`, which the
+model already knows as the phantom line after a trailing newline.
+
+**"A selection survives the round trip" needed narrowing.** Escape restores the span and the cursor quantum, and
+re-derives the *range* at them from wherever the typing left the caret — Escape's existing behavior for `i` and `a`,
+unchanged here. Typing leaves the caret one quantum past what was typed, which after `g` is the newline that ends the
+line, and a word quantum over a newline derives nothing. So the test pins what is actually promised: span 3 and the
+quantum come back, and a selection is there when there is a unit under the caret (`OpenLineTest.escapeRestoresTheSpanAndQuantumThatWereStashedOnEntry`, at the character quantum).
+
+**The count is stashed by all five insert-entering keys** — `i`, `a`, `o`, `g`, `G` — through one new word,
+`stashCount`. Typing no count *removes* the stashed one, which is what keeps a `3 g` from repeating text the next
+session never typed, and is why no key has to clean the variable up. Escape is untouched: putting the count back where
+[05](05-insert-repeat.md) can spend it is that ticket's compile, and a stash nobody reads is harmless.
+
+**One test from the previous map is gone.** `DocumentQuantumJumpTest.ggAndUpperGDoNothingAtAll` asserted exactly that
+`g` and `G` do nothing; this ticket takes both keys, so the test went with the behavior, and `keys.md`'s "`gg` and `G`
+are gone" note became "`gg` is gone" with the reason the old `G` must not come back still recorded.
+
+Both keys arrive through both clients already — `token(KeyCode::Char(c))` in the terminal sends any plain character and
+uppercase needs no handling, as `F`, `N` and `P` already showed — so neither client changed.
+
+Remaining: the manual check below.
+
 ## Notes
 
 - `o` is **replace mode** today. Vim fingers will reach for it wanting this, and get a mode they did not ask for.
