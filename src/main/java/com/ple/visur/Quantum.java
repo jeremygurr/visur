@@ -8,8 +8,10 @@ public abstract class Quantum implements Shareable {
   /** Apply the editor spec's separator rule after this quantum computes its own bounds. */
   public final int[] getBoundaries(int ca, ArrayList<Integer> newlineIndices, int span, boolean includeTail) {
     int[] bounds = boundsFor(ca, newlineIndices, span, includeTail);
-    return Separators.including(emc.getEditorContent(), bounds,
-      emc.getQuantumNameToQuantum().separatorsFor(getName()));
+    VisurVar separatorState = emc.getGlobalVar("includeSeparators");
+    boolean includeSeparators = separatorState == null || Boolean.TRUE.equals(separatorState.getVal());
+    return includeSeparators ? Separators.including(emc.getEditorContent(), bounds,
+      emc.getQuantumNameToQuantum().separatorsFor(getName())) : bounds;
   }
 
   abstract public int[] boundsFor(int ca, ArrayList<Integer> newlineIndices, int span, boolean includeTail); // newlineIndices are only needed in CustomQuantums

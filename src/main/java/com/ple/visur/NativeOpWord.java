@@ -44,6 +44,9 @@ public class NativeOpWord implements Word {
         case "setSpan":
           op = new SetSpanOp();
           break;
+        case "toggleSeparators":
+          op = new ToggleSeparatorsOp();
+          break;
         case "changeMode":
           op = new ChangeModeOp();
           break;
