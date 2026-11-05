@@ -32,7 +32,8 @@ Quantum keys are shared by every command that takes one:
 | `j` / `k` | move one quantum down / up, or `count` of them | `j` one line down; `2 j` two lines, same column |
 | `ArrowLeft` / `ArrowRight` / `ArrowDown` / `ArrowUp` | same as `h` `l` `j` `k` | — |
 | `q` / `w` / `e` / `r` | change the **cursor quantum**, re-deriving the selection around the cursor | `w` then `l` walks by words |
-| `0`–`9` before any key | the **count** for the key that follows; digits accumulate, so `1` then `2` is twelve. It is spent by the command it belongs to — including a two-key command — and any other key drops it. `0` means none: `0 l` does not move, `0 s` selects nothing. While it is pending the mode line shows `COUNT=n` | `12 s` twelve quanta; `3 ] w` three words |
+| `0`–`9` before any key | the **count** for the key that follows; digits accumulate, so `1` then `2` is twelve. It is spent by the command it belongs to — including a two-key command — and any other key drops it. `0` means none: `0 l` does not move, `0 s` selects nothing. While it is pending the mode line shows `COUNT=n`. A count spent on an insert-entering key is kept for the session it
+opens, where it repeats the typing instead | `12 s` twelve quanta; `3 ] w` three words |
 | `s` | set **span** to the pending count — one with no count typed. `0 s` collapses the selection | `3 s` three quanta; `s` one; `0 s` none |
 | `[` then `q`/`w`/`e`/`r` | jump to the **start** of that quantum — one quantum per press, whatever the span | `[ w` start of the current word; `[ r` start of the document |
 | `]` then `q`/`w`/`e`/`r` | jump to the **end** of that quantum, `count` of them | `] e` last character of the current line; `] r` end of the document; `3 ] e` of the third line |
@@ -56,9 +57,14 @@ Quantum keys are shared by every command that takes one:
 character, and restore both on `Escape`.
 
 **Both line-opening keys read the line the cursor sits on**, not the cursor quantum, `SPAN` or `SCOPE`, and the same
-document comes out whether the separator toggle is on or off. A count in front of either — `3 g` — opens **one** line,
-not three: the count is stashed for the session, and
-[05](../wayfinder/separators-and-undo/issues/05-insert-repeat.md) is what will spend it by repeating what you type.
+document comes out whether the separator toggle is on or off.
+
+**A count in front of an insert-entering key repeats what you type**, vim's `3o`: `3 g` opens **one** line rather than
+three, you type once, and `Escape` writes the other copies. `g` and `G` separate the copies with the newline they
+opened the line with, so `3 g` with nothing typed is three blank lines; `i`, `a` and `o` separate them with nothing, so
+`3 i` then `abc` gives `abcabcabc`. A session that typed across a newline repeats whole, a `Backspace` takes the
+character out of what gets repeated, and the copies go in at the caret. Only the count typed *before* the key counts:
+digits typed inside the session are text.
 
 **`gg` is gone**, along with the only hand-written two-key sequence in the server: `[ r` and `] r` reach both ends
 through the document quantum. `G` came back as open-a-line-below; recorded so nobody puts the *old* `G` back: it landed
@@ -127,10 +133,8 @@ Until those tickets land, the table above is the truth:
   spaces or tabs after them, but never a newline. `\` will turn this off, shown as `SEP=ON` / `SEP=OFF` beside the span.
   ([01](../wayfinder/separators-and-undo/issues/01-editor-spec.md),
   [02](../wayfinder/separators-and-undo/issues/02-selection-includes-separator.md))
-- **A count before an insert-entering key will repeat the typed text**, vim's `3o`: `3 g`, type once, Escape gives
-  three identical lines — not three newlines. ([05](../wayfinder/separators-and-undo/issues/05-insert-repeat.md))
 - **`u` and `R`** will undo and redo a whole command. Undo will restore the selection, never the yank register.
   ([06](../wayfinder/separators-and-undo/issues/06-undo-redo.md))
 
 Counting already means four things, and vim has all four: it multiplies a span (`3 s`), repeats a motion or jump
-(`3 l`, `3 ] e`), multiplies an operator's extent (`3 d`), and will repeat an insert session (`3 g`).
+(`3 l`, `3 ] e`), multiplies an operator's extent (`3 d`), and repeats an insert session (`3 g`).

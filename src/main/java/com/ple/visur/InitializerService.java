@@ -414,10 +414,10 @@ public class InitializerService {
     // The caret comes from the operator rather than from `quantumStart`, which would put it back at the selection the
     // line opened in front of. Everything else is what `i` and `a` do.
     keymap.put(KeyPressed.from("g"),
-      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> stashCount openLineAbove 0 setSpan \"insert\" changeMode \"character\" changeCursorQuantum")
+      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> stashCountNewlineSeparated openLineAbove 0 setSpan \"insert\" changeMode \"character\" changeCursorQuantum")
     );
     keymap.put(KeyPressed.from("G"),
-      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> stashCount openLineBelow 0 setSpan \"insert\" changeMode \"character\" changeCursorQuantum")
+      scs.compile("\"span\" \"tempSpan\" -> \"cursorQuantum\" \"tempCursorQuantum\" -> stashCountNewlineSeparated openLineBelow 0 setSpan \"insert\" changeMode \"character\" changeCursorQuantum")
     );
     keymap.put(KeyPressed.from("d"),
       scs.compile("deleteCursorQuantum")
@@ -480,7 +480,7 @@ public class InitializerService {
   private Keymap initializeInsertKeymap(Keymap insertKeymap) {
     CommandCompileService scs = ServiceHolder.commandCompileService;
     insertKeymap.put(KeyPressed.from("Escape"),
-      scs.compile("\"tempSpan\" \"span\" -> \"tempCursorQuantum\" changeCursorQuantum \"tempSpan\" removeGlobalVar \"tempCursorQuantum\" removeGlobalVar \"navigate\" changeMode")
+      scs.compile("\"tempSpan\" \"span\" -> \"tempCursorQuantum\" changeCursorQuantum \"tempSpan\" removeGlobalVar \"tempCursorQuantum\" removeGlobalVar repeatSessionText \"navigate\" changeMode")
     );
     insertKeymap.put(KeyPressed.from("ArrowLeft"),
       scs.compile("-1 0 relativeMove")
@@ -510,7 +510,7 @@ public class InitializerService {
   private Keymap initializeReplaceKeymap(Keymap replaceKeymap) {
     CommandCompileService scs = ServiceHolder.commandCompileService;
     replaceKeymap.put(KeyPressed.from("Escape"),
-      scs.compile("\"tempSpan\" \"span\" -> \"tempCursorQuantum\" changeCursorQuantum \"tempSpan\" removeGlobalVar \"tempCursorQuantum\" removeGlobalVar \"navigate\" changeMode")
+      scs.compile("\"tempSpan\" \"span\" -> \"tempCursorQuantum\" changeCursorQuantum \"tempSpan\" removeGlobalVar \"tempCursorQuantum\" removeGlobalVar repeatSessionText \"navigate\" changeMode")
     );
     replaceKeymap.put(KeyPressed.from("ArrowLeft"),
       scs.compile("-1 0 relativeMove")

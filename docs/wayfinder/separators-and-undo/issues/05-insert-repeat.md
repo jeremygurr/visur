@@ -52,6 +52,38 @@ when the user arrows around inside it or backspaces into text that existed befor
 - [ ] Manual (user-driven) check: `3 g`, type a sentence, Escape, and confirm three identical lines with no stray blank
   line between them.
 
+## Result
+
+Three pieces, and the count already in the model doing the work:
+
+- **`stashCount`** (on `i`, `a`, `o`) and **`stashCountNewlineSeparated`** (on `g`, `G`) — one class, two words, because
+  the only thing the five keys disagree about is what goes between the copies. Both copy the pending count into
+  `tempCount` and start the recording; with a count of one or none they clear the session state instead.
+- **`SessionText`** owns the three variables (`tempCount`, `tempInsertSeparator`, `tempTypedText`), the append-on-insert
+  / pop-on-backspace tracking, and the repeat. `InsertCharOp`, `InsertNewlineOp` and `DeletePreviousCharOp` each call it
+  once; with nothing recording, that is one failed lookup and no work.
+- **`repeatSessionText`** at the end of both Escape bindings: the unit — separator, then the text — inserted
+  `count - 1` times at the caret, so an empty session repeats the separator alone and `3 g` with nothing typed is three
+  blank lines. `10` tests in `InsertRepeatTest`.
+
+**This ticket found a bug that predates it.** A pending count survived into insert and replace mode, because
+`retireUnlessDigit` deliberately keeps one alive while a mode other than navigate is open (the count in `3 ] w` is typed
+three keypresses before the jump). Insert mode is not a sequence in flight, so `3 i` spent its three on every character
+afterwards — three columns right per `insertChar`, three deleted per backspace. Nothing in the suite had typed more than
+one character in a session, so it had never shown. `stashCount` now retires the count it has copied, which fixes `3 i`,
+`3 a`, `3 o`, `3 g` and `3 G` in one place. `InsertRepeatTest.aCountBeforeReplaceModeIsSpentByTheKeyAndNotByTheTyping`
+pins the replace-mode half.
+
+**The copies land at the caret**, which is the rule this ticket gives, and after arrowing left the caret is in the
+middle of what was typed: the repeated text is still what the session inserted (`acb` on the line, `abc` in the copies),
+which is what that Done-when item is about. `ReplaceCharOp` never records, so `3 o` repeats nothing — replace mode
+overwrites, and there is no session text to lay out again.
+
+**Pinned for [06](06-undo-redo.md), as its Notes ask:** the opened newline, the typing and the repeat are one command
+sequence ending in one `changeMode`, so they are **one undo unit**. Undo of `3 g` + typing removes the line, the text and
+all the copies together; anything less is the bug that ticket's Notes name ("`u` will remove the words and leave the
+blank line").
+
 ## Notes
 
 - The count now means four things across the editor — multiply a span, repeat a motion, multiply an operator's extent,

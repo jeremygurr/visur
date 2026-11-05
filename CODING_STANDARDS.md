@@ -18,8 +18,11 @@ zero nothing re-derived a selection. A number the user typed outlives the conten
 span there would highlight the text that slid into the hole — text nobody selected — and `p` replaces the selection, so
 that highlight is what a paste would eat instead of putting the deleted text back.
 
-A count lives one keypress: `CountPrefix.retireUnlessDigit` clears it once the command it belongs to has run. A key that
-opens a session longer than that — `i`, `a`, `o`, `g`, `G` — runs `stashCount` on the way in, and typing no count
+A count lives one keypress, with one exception: `CountPrefix.retireUnlessDigit` leaves a pending count alone while a
+mode other than navigate is open, because the count in `3 ] w` is typed three keypresses before the jump that spends
+it. Insert and replace mode are not a sequence in flight, so the keys that open them — `i`, `a`, `o`, `g`, `G` — run
+`stashCount`, which copies the count where the session can reach it and clears the pending one. Left pending it goes on
+being spent by the typing: `3 i` moved three columns per character and deleted three per backspace. Typing no count
 *removes* the stash rather than leaving it, so no session can inherit the previous one's number.
 
 ## Document types are declared, not hardcoded

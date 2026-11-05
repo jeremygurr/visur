@@ -13,6 +13,7 @@ public class InsertCharOp implements Operator {
     String contentAfterChar = editorContent.substring(ca, editorContent.length());
     String resultingEditorContent = contentBeforeChar + charToBeInserted + contentAfterChar;
     emc.putEditorContent(resultingEditorContent);
+    SessionText.record(emc, charToBeInserted);
   }
 
 }

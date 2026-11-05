@@ -13,6 +13,7 @@ public class DeletePreviousCharOp implements Operator {
     String resultingEditorContent = editorContentBeforeChar + editorContentAfterChar;
     emc.putEditorContent(resultingEditorContent);
     emc.putCA(ca);
+    SessionText.unrecord(emc);
   }
 
 }

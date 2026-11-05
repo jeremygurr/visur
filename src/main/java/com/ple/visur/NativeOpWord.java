@@ -66,7 +66,13 @@ public class NativeOpWord implements Word {
           op = new DeletePreviousCharOp();
           break;
         case "stashCount":
-          op = new StashCountOp();
+          op = new StashCountOp("");
+          break;
+        case "stashCountNewlineSeparated":
+          op = new StashCountOp("\n");
+          break;
+        case "repeatSessionText":
+          op = new RepeatSessionTextOp();
           break;
         case "removeGlobalVar":
           op = new RemoveGlobalVarOp();
