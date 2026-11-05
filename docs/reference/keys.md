@@ -108,3 +108,25 @@ Intercepted by the terminal before the server sees them:
 | `ZD` | quit, stopping a server the launcher started |
 
 `Ctrl-C` is a byte in raw mode, not a signal, which is why quitting needs its own binding.
+
+## In flight
+
+Decisions recorded in [the separators-and-undo map](../wayfinder/separators-and-undo/map.md) change the following.
+Until those tickets land, the table above is the truth:
+
+- **A selection will include the separator after it.** `s` on a line will highlight one cell past the end of the row,
+  standing for the newline, so `d` on a line will leave no blank line behind. Word selections take the whole run of
+  spaces or tabs after them, but never a newline. `\` will turn this off, shown as `SEP=ON` / `SEP=OFF` beside the span.
+  ([01](../wayfinder/separators-and-undo/issues/01-editor-spec.md),
+  [02](../wayfinder/separators-and-undo/issues/02-selection-includes-separator.md))
+- **`p` will replace the selection** and put what it displaced into the yank register; `P` will insert the same text in
+  front of the selection without disturbing it. ([03](../wayfinder/separators-and-undo/issues/03-paste-replaces-selection.md))
+- **`g` and `G`** will open a line above and below at the line bounds, whatever the cursor quantum, and drop you into
+  insert mode on it. ([04](../wayfinder/separators-and-undo/issues/04-open-line.md))
+- **A count before an insert-entering key will repeat the typed text**, vim's `3o`: `3 g`, type once, Escape gives
+  three identical lines — not three newlines. ([05](../wayfinder/separators-and-undo/issues/05-insert-repeat.md))
+- **`u` and `Ctrl-r`** will undo and redo a whole command. Undo will restore the selection, never the yank register.
+  ([06](../wayfinder/separators-and-undo/issues/06-undo-redo.md))
+
+Counting already means four things, and vim has all four: it multiplies a span (`3 s`), repeats a motion or jump
+(`3 l`, `3 ] e`), multiplies an operator's extent (`3 d`), and will repeat an insert session (`3 g`).
