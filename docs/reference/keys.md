@@ -32,9 +32,9 @@ Quantum keys are shared by every command that takes one:
 | `j` / `k` | move one quantum down / up, or `count` of them | `j` one line down; `2 j` two lines, same column |
 | `ArrowLeft` / `ArrowRight` / `ArrowDown` / `ArrowUp` | same as `h` `l` `j` `k` | — |
 | `q` / `w` / `e` / `r` | change the **cursor quantum**, re-deriving the selection around the cursor | `w` then `l` walks by words |
-| `0`–`9` before any key | the **count** for the key that follows; digits accumulate, so `1` then `2` is twelve. It is spent by the command it belongs to — including a two-key command — and any other key drops it. `0` means none: `0 l` does not move, `0 s` selects nothing. While it is pending the mode line shows `COUNT=n`. A count spent on an insert-entering key is kept for the session it
-opens, where it repeats the typing instead | `12 s` twelve quanta; `3 ] w` three words |
+| `0`–`9` before any key | the **count** for the key that follows; digits accumulate, so `1` then `2` is twelve. It is spent by the command it belongs to — including a two-key command — and any other key drops it. `0` means none: `0 l` does not move, `0 s` selects nothing. While it is pending the mode line shows `COUNT=n`. A count spent on an insert-entering key is kept for the session it opens, where it repeats the typing instead | `12 s` twelve quanta; `3 ] w` three words |
 | `s` | set **span** to the pending count — one with no count typed. `0 s` collapses the selection | `3 s` three quanta; `s` one; `0 s` none |
+| `\` | toggle **separators** — whether a selection includes what follows it. Shown as `SEP=ON` / `SEP=OFF` in the mode line | `s` on a line includes its newline; after `\` the highlight stops at the last character |
 | `[` then `q`/`w`/`e`/`r` | jump to the **start** of that quantum — one quantum per press, whatever the span | `[ w` start of the current word; `[ r` start of the document |
 | `]` then `q`/`w`/`e`/`r` | jump to the **end** of that quantum, `count` of them | `] e` last character of the current line; `] r` end of the document; `3 ] e` of the third line |
 | `/` then `q`/`w`/`e`/`r` | change the **scope quantum** — the fence search looks inside — and return to navigate | `/ r f foo` search the whole document for `foo` instead of only this line |
@@ -132,16 +132,12 @@ Intercepted by the terminal before the server sees them:
 
 `Ctrl-C` is a byte in raw mode, not a signal, which is why quitting needs its own binding.
 
-## In flight
+## Selections and separators
 
-Decisions recorded in [the separators-and-undo map](../wayfinder/separators-and-undo/map.md) change the following.
-Until those tickets land, the table above is the truth:
-
-- **A selection will include the separator after it.** `s` on a line will highlight one cell past the end of the row,
-  standing for the newline, so `d` on a line will leave no blank line behind. Word selections take the whole run of
-  spaces or tabs after them, but never a newline. `\` will turn this off, shown as `SEP=ON` / `SEP=OFF` beside the span.
-  ([01](../wayfinder/separators-and-undo/issues/01-editor-spec.md),
-  [02](../wayfinder/separators-and-undo/issues/02-selection-includes-separator.md))
+**A selection covers the unit and whatever joins it to the next one**, so `s` on a line highlights one cell past the end
+of the row — the newline — and `d` on it leaves no blank line behind. A word takes the whole run of spaces and tabs after
+it but never a newline; the character and document quantums have no separator. `\` turns the rule off, and it changes
+bounds only: span, cursor quantum and search are untouched by the toggle.
 
 Counting already means four things, and vim has all four: it multiplies a span (`3 s`), repeats a motion or jump
 (`3 l`, `3 ] e`), multiplies an operator's extent (`3 d`), and repeats an insert session (`3 g`).

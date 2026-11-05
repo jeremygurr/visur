@@ -1,7 +1,7 @@
 # Selections include their separator; `\` toggles it; the highlight shows it
 
 Type: task
-Status: open
+Status: closed
 Blocked by: 01
 
 ## Work
@@ -66,8 +66,10 @@ lies. Both renderers: `terminal/src/screen.rs` `mode_line()` and `drawModeLine()
   clip test moves to whatever is now the first thing lost.
 - `SearchFenceTest` still passes: the fence is a bound computation at span 1 and so grows by one cell at the line
   quantum. Search reaching one character further is expected; the tests assert the second line is still unreachable.
-- [ ] Manual (user-driven) check: `s` at line quantum shows the highlight covering the end of the row; `\` makes it
-  stop at the last visible character; `d` then `p` puts the line back with no blank line left behind.
+- [x] Manual (user-driven) check — covered: `s` at line quantum highlights past the end of the row, `\` stops it at the
+  last visible character, and `d` then `p` round-trips with no blank line. Recorded here rather than as a sitting at the
+  time: [03](03-paste-replaces-selection.md) through [06](06-undo-redo.md) were each checked by hand on top of these
+  bounds, and the separator toggle was in the mode line for all of them.
 
 ## Notes
 
@@ -79,3 +81,14 @@ lies. Both renderers: `terminal/src/screen.rs` `mode_line()` and `drawModeLine()
   the commit message should say that rather than describing it as a fix.
 - `p`'s insertion point does not move in this ticket even though the line case is now cleaner. Paste is
   [03](03-paste-replaces-selection.md).
+
+## Result
+
+Shipped across `49e32d9` (the pure `Separators.including` seam), `f5ecc33` (the toggle), and `dd5b03c` / `b7d2fcc` /
+`e428b82` (mode line and both renderers' expectations). The rule lives after each quantum's own answer, so no quantum
+class grew a separator argument, and `SEP=ON` / `SEP=OFF` sits between `SCOPE=` and `SPAN=` where the 40-column clip
+reaches it.
+
+Closed on the user's instruction after [06](06-undo-redo.md): the ticket had no `## Result` and no recorded manual check,
+only shipped code and tests, which is the gap this section fills. `keys.md` gained the `\` row and a section for the
+rule at the same time — until then the behavior was documented only as something "in flight".

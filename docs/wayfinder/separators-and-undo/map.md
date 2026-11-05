@@ -11,6 +11,8 @@ selection without disturbing it. `g` and `G` open a line above and below and dro
 there — `3 g` — types once and repeats what you typed, the way vim's `3o` does. `u` and `R` walk the document back and
 forward.
 
+**All six tickets are closed** as of 2026-11-09.
+
 Underneath all of it: **Visur's four quantums stop being hardcoded.** They become the content of an **editor
 specification** — a declared list of quantums, each with its separator, and the nesting order between them. `plaintext`
 is the first specification and reproduces exactly today's four quantums; a `json` specification, with key-value quantums
@@ -105,11 +107,11 @@ structural assumption in the model.
 | # | title | blocked by |
 |---|---|---|
 | ~~01~~ [closed](issues/01-editor-spec.md) | Editor specification: declared quantums, separators, nesting rank | — |
-| [02](issues/02-selection-includes-separator.md) | Selections include their separator; `\` toggle; highlight and mode line | 01 |
+| ~~02~~ [closed](issues/02-selection-includes-separator.md) | Selections include their separator; `\` toggle; highlight and mode line | 01 |
 | ~~03~~ [closed](issues/03-paste-replaces-selection.md) | `p` replaces the selection and takes what it displaced; `P` inserts before it | 02 |
 | ~~04~~ [closed](issues/04-open-line.md) | `g` / `G` open a line above / below at line bounds | 02 |
 | ~~05~~ [closed](issues/05-insert-repeat.md) | A count repeats the insert session's text on Escape | 04 |
-| [06](issues/06-undo-redo.md) | Undo and redo: snapshot ring, `u`, `R` | 02, 03 |
+| ~~06~~ [closed](issues/06-undo-redo.md) | Undo and redo: snapshot ring, `u`, `R` | 02, 03 |
 
 **01 → 02** is the spine: nothing in the batch behaves differently until 02 lands, because 01 is a pure refactor that
 must reproduce every existing bound exactly. **03** and **04** are independent of each other and both read the register

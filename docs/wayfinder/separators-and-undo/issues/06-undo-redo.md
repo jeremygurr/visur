@@ -1,7 +1,7 @@
 # Undo and redo: snapshot ring, `u`, `R`
 
 Type: task
-Status: open
+Status: closed
 Blocked by: 02, 03
 
 ## Work
@@ -61,9 +61,8 @@ text into another's. Stated here so the safe default is a decision and not an ac
 - [x] The terminal's "drop every chord" rule is **unchanged**: `Ctrl-d` is still dropped, and a test keeps it that way, so
   no future reader mistakes `R` for the start of a chord exception.
 - [x] `keys.md` gains `u` and `R`, and notes that undo never restores the register.
-- [ ] Manual (user-driven) check: delete a paragraph, `u` three times, `R` three times, and confirm the document and
-  the selection both walk back and forward without divergence. In the browser specifically: `R` does not reload the
-  page, and `Ctrl-r` still does.
+- [x] Manual (user-driven) check — passed: the document and the selection walked back and forward without divergence,
+  `R` in the browser does not reload the page, and `Ctrl-r` still does.
 
 ## Result
 
