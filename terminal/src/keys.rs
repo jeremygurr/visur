@@ -77,6 +77,9 @@ mod tests {
     assert_eq!(token(KeyCode::Char('R')).as_deref(), Some("R")); // redo rides the same rule; no chord exception for it
     assert_eq!(token(KeyCode::Char(' ')).as_deref(), Some(" "));
     assert_eq!(token(KeyCode::Char(';')).as_deref(), Some(";"));
+    // One backslash, not two. The server keymap holds the character the key produces, and a client that escaped it
+    // for the wire before the server could decode it would sit unbound with no error anywhere.
+    assert_eq!(token(KeyCode::Char('\\')).as_deref(), Some("\\"));
   }
 
   #[test]

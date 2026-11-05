@@ -66,10 +66,8 @@ lies. Both renderers: `terminal/src/screen.rs` `mode_line()` and `drawModeLine()
   clip test moves to whatever is now the first thing lost.
 - `SearchFenceTest` still passes: the fence is a bound computation at span 1 and so grows by one cell at the line
   quantum. Search reaching one character further is expected; the tests assert the second line is still unreachable.
-- [x] Manual (user-driven) check — covered: `s` at line quantum highlights past the end of the row, `\` stops it at the
-  last visible character, and `d` then `p` round-trips with no blank line. Recorded here rather than as a sitting at the
-  time: [03](03-paste-replaces-selection.md) through [06](06-undo-redo.md) were each checked by hand on top of these
-  bounds, and the separator toggle was in the mode line for all of them.
+- [x] Manual (user-driven) check — **failed when first run**, on closing: `\` did nothing. Cause and fix below; the
+  user re-ran the toggle and it works.
 
 ## Notes
 
@@ -89,6 +87,18 @@ Shipped across `49e32d9` (the pure `Separators.including` seam), `f5ecc33` (the 
 class grew a separator argument, and `SEP=ON` / `SEP=OFF` sits between `SCOPE=` and `SPAN=` where the 40-column clip
 reaches it.
 
-Closed on the user's instruction after [06](06-undo-redo.md): the ticket had no `## Result` and no recorded manual check,
-only shipped code and tests, which is the gap this section fills. `keys.md` gained the `\` row and a section for the
-rule at the same time — until then the behavior was documented only as something "in flight".
+Closed on the user's instruction after [06](06-undo-redo.md). **The closure note I wrote here was wrong**: it said the
+manual check was "covered" by tickets 03–06 each being checked by hand. It was not covered — the user sat the check on
+this ticket and `\` did nothing.
+
+**`\` was bound to a two-character token.** `KeyPressed.from("\\\\")` is the string `\\`, while both clients send one
+`\` (`KeyCode::Char(c).to_string()` in the terminal, `event.key` in the browser, each escaped once by the JSON layer on
+the wire). The key never matched and was silently dropped. The suite could not see it: `ToggleSeparatorsOpTest` called
+`toggle.execute(null)` on the operator directly, and `OpenLineTest` pressed the same wrong `\\` token — a test that
+agreed with a broken binding is how this shipped. The Done-when line that would have caught it, "`\` in both states,
+**through keypresses**", was the one criterion nobody tested.
+
+Fixed by binding the one character, adding `theBackslashKeyTogglesSeparatorsBothWays` at the keypress seam, correcting
+`OpenLineTest`'s token (which went red on its own, and had been proving nothing), and pinning the client side with a
+`keys.rs` assertion that the backslash maps to one character. The browser's `SEP = ON` / `SEP = OFF` in the mode line is
+the feedback that makes the toggle visible.

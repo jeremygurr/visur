@@ -31,6 +31,28 @@ class ToggleSeparatorsOpTest {
     vertx.close();
   }
 
+  /**
+   * The key, not the operator. The operator has passed its own test since it was written, while the binding asked the
+   * keymap for a two-character {@code \\} that no client ever sends, and {@code \} did nothing in the real editor.
+   * Ticket 02's "through keypresses" was the criterion that went untested.
+   */
+  @Test
+  void theBackslashKeyTogglesSeparatorsBothWays() {
+    Quantum word = emc.getQuantumNameToQuantum().get("word");
+    int[] withSeparator = word.getBoundaries(0, emc.getNextLineIndices(), 1, false);
+
+    press("\\");
+    assertArrayEquals(new int[]{0, 3}, word.getBoundaries(0, emc.getNextLineIndices(), 1, false));
+
+    press("\\");
+    assertArrayEquals(withSeparator, word.getBoundaries(0, emc.getNextLineIndices(), 1, false));
+  }
+
+  private void press(String key) {
+    ServiceHolder.editorModelCoupler.clearPendingCount();
+    KeyWasPressedVerticle.press(ServiceHolder.editorModelCoupler, KeyPressed.from(key), key);
+  }
+
   @Test
   void togglingOffAndOnChangesOnlySeparatorInclusion() {
     Quantum word = emc.getQuantumNameToQuantum().get("word");

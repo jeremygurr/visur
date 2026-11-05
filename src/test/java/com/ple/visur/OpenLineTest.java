@@ -115,7 +115,7 @@ class OpenLineTest {
   void capitalGGivesTheSameDocumentWhicheverWayTheSeparatorToggleIsSet() {
     assertEquals(WITH_A_LINE_OPENED, openBelow(), "SEP=ON");
 
-    press("\\\\"); // the toggle's own key token, which both clients send for backslash
+    press("\\"); // one backslash, which is what both clients actually send
     assertEquals(false, drawn().getBoolean("includeSeparators"), "the toggle actually moved, or this proves nothing");
     assertEquals(WITH_A_LINE_OPENED, openBelow(), "SEP=OFF");
   }

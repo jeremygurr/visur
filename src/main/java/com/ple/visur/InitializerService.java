@@ -401,7 +401,7 @@ public class InitializerService {
     keymap.put(KeyPressed.from("s"),
       scs.compile("setSpan") // the count, if any, was typed before it: "12 s"
     );
-    keymap.put(KeyPressed.from("\\\\"),
+    keymap.put(KeyPressed.from("\\"),
       scs.compile("toggleSeparators")
     );
     keymap.put(KeyPressed.from("i"),
