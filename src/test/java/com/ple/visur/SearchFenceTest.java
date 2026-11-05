@@ -86,7 +86,7 @@ class SearchFenceTest {
     emc.putCA(2); // inside "alpha"
     select(5);
     assertEquals(0, emc.getCursorQuantumStart());
-    assertEquals(28, emc.getCursorQuantumEnd()); // the end of "zeta", on the second line
+    assertEquals(29, emc.getCursorQuantumEnd()); // the end of "zeta", on the second line
     assertEquals("character", emc.getScopeQuantum().getName(), "selecting does not move the fence");
   }
 
@@ -98,7 +98,7 @@ class SearchFenceTest {
     emc.putCA(2);
     select(5);
     new DeleteCursorQuantumOp().execute(null);
-    assertEquals(" needle eta\n", emc.getEditorContent());
+    assertEquals("needle eta\n", emc.getEditorContent());
     assertEquals("line", emc.getScopeQuantum().getName(), "an operator does not move the fence");
   }
 

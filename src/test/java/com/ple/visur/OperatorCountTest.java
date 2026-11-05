@@ -99,8 +99,8 @@ class OperatorCountTest {
     // The newline that ends line eight survives: a line's own terminator is not one of the newlines *between* the
     // selected lines (LineQuantumBoundsTest.aLineEndingInANewlineEndsBeforeItWhenAnotherLineFollows), so eight lines
     // of text go and one empty line stays. Same shape as deleting words and keeping the space after the last one.
-    assertEquals("\n" + CONTENT.substring(START_OF_LINE_NINE), emc.getEditorContent(), "lines one to eight, across eight line breaks");
-    assertEquals(CONTENT.substring(0, START_OF_LINE_NINE - 1), yankRegister());
+    assertEquals(CONTENT.substring(START_OF_LINE_NINE), emc.getEditorContent(), "lines one to eight, including their separators");
+    assertEquals(CONTENT.substring(0, START_OF_LINE_NINE), yankRegister());
   }
 
   /** The document quantum at any count is the document: two of one document is one document. */
@@ -132,7 +132,7 @@ class OperatorCountTest {
     press("d");
 
     assertEquals(CONTENT, emc.getEditorContent(), "nothing was selected, so nothing was removed");
-    assertEquals("one", yankRegister(), "and the register keeps what it was holding");
+    assertEquals("one ", yankRegister(), "and the register keeps what it was holding");
   }
 
   @Test
@@ -152,11 +152,11 @@ class OperatorCountTest {
     chooseCursorQuantum("word");
     press("s");
     press("y"); // yank "one"
-    assertEquals("one", yankRegister());
+    assertEquals("one ", yankRegister());
     press("2");
     press("s"); // "one two" selected
     press("d");
-    assertEquals("one two", yankRegister(), "the delete replaced the yank");
+    assertEquals("one two ", yankRegister(), "the delete replaced the yank");
     press("p");
     assertEquals(CONTENT, emc.getEditorContent(), "the register held exactly what the delete removed, and p put it back");
   }

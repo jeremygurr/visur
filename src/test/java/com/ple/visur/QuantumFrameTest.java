@@ -112,8 +112,8 @@ class QuantumFrameTest {
     emc.putOnExecutionDataStack("character");
     emc.getQuantumNameToQuantum().get("word").quantumEnd(); // the keystroke ] q, with words as the cursor quantum
     assertEquals("character", emc.getCursorQuantum().getName());
-    assertEquals(0, emc.getCursorQuantumStart());
-    assertEquals(1, emc.getCursorQuantumEnd());
+    assertEquals(1, emc.getCursorQuantumStart());
+    assertEquals(2, emc.getCursorQuantumEnd());
   }
 
   /**

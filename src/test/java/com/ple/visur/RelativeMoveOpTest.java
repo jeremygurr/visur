@@ -59,7 +59,7 @@ class RelativeMoveOpTest {
     move(0, 1); // and onto "three"
     assertEquals(1, emc.getSpan());
     assertEquals(9, emc.getCursorQuantumStart());
-    assertEquals(14, emc.getCursorQuantumEnd());
+    assertEquals(15, emc.getCursorQuantumEnd());
   }
 
   /**

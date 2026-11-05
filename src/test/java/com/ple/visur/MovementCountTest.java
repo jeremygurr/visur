@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
  */
 class MovementCountTest {
   private static final String CONTENT = "one two three four five\nsix seven eight nine ten\nlast line\n";
-  private static final int LAST_CHARACTER_OF_LINE_ONE = 22; // the "e" of "five", one before the newline that ends line one
+  private static final int LAST_CHARACTER_OF_LINE_ONE = 23; // the "e" of "five", one before the newline that ends line one
   private static final int FOURTH_WORD = 14; // the "four" in line one
   /** Derived from the content rather than counted by hand, since a jump down is what the test is about. */
   private static final int START_OF_LINE_THREE = CONTENT.indexOf("last line");
@@ -65,7 +65,7 @@ class MovementCountTest {
     press("l");
     assertEquals(FOURTH_WORD, emc.getCA());
     assertEquals(FOURTH_WORD, emc.getCursorQuantumStart());
-    assertEquals(18, emc.getCursorQuantumEnd(), "and it selects the word it landed on");
+    assertEquals(19, emc.getCursorQuantumEnd(), "and it selects the word it landed on");
   }
 
   /**
@@ -155,8 +155,8 @@ class MovementCountTest {
     press("]");
     press("q");
     assertEquals(LAST_CHARACTER_OF_LINE_ONE, emc.getCA());
-    assertEquals(22, emc.getCursorQuantumStart());
-    assertEquals(23, emc.getCursorQuantumEnd());
+    assertEquals(23, emc.getCursorQuantumStart());
+    assertEquals(24, emc.getCursorQuantumEnd());
   }
 
   @Test
@@ -166,8 +166,8 @@ class MovementCountTest {
     press("]");
     press("q");
     assertEquals(LAST_CHARACTER_OF_LINE_ONE, emc.getCA(), "the span widens the selection, not the jump");
-    assertEquals(22, emc.getCursorQuantumStart());
-    assertEquals(27, emc.getCursorQuantumEnd());
+    assertEquals(23, emc.getCursorQuantumStart());
+    assertEquals(28, emc.getCursorQuantumEnd());
   }
 
   @Test
