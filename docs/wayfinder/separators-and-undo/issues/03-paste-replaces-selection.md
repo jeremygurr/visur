@@ -1,7 +1,7 @@
 # `p` replaces the selection and takes what it displaced; `P` inserts before it
 
 Type: task
-Status: open
+Status: closed
 Blocked by: 02
 
 ## Work
@@ -51,7 +51,7 @@ round-one worry ("`d` then `p` deletes another six words", because ticket 04 kee
 - `P` with nothing selected inserts at the caret and leaves the span at 0, so `p` and `P` differ only when there is a
   selection to disturb.
 - `keys.md` gains `P`, and `p`'s row states the replacement and the register swap.
-- [ ] Manual (user-driven) check: `y` a line, `s` another line, `p` — the second line is replaced by the first, with no
+- [x] Manual (user-driven) check: `y` a line, `s` another line, `p` — the second line is replaced by the first, with no
   blank line and no leftover text; `P` on the same fixture puts the register in front and the selection survives.
 
 ## Notes
@@ -95,4 +95,4 @@ nothing is the same lie in a different place. `P` never writes it: the selection
 
 `P` arrives through both clients already, as `F` and `N` do — no wire or renderer change, no new key token.
 
-Remaining: the manual check in `## Done when`.
+The manual check passed: `p` replaced a line cleanly and `P` left the selection standing.
