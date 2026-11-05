@@ -125,7 +125,7 @@ Until those tickets land, the table above is the truth:
   insert mode on it. ([04](../wayfinder/separators-and-undo/issues/04-open-line.md))
 - **A count before an insert-entering key will repeat the typed text**, vim's `3o`: `3 g`, type once, Escape gives
   three identical lines — not three newlines. ([05](../wayfinder/separators-and-undo/issues/05-insert-repeat.md))
-- **`u` and `Ctrl-r`** will undo and redo a whole command. Undo will restore the selection, never the yank register.
+- **`u` and `R`** will undo and redo a whole command. Undo will restore the selection, never the yank register.
   ([06](../wayfinder/separators-and-undo/issues/06-undo-redo.md))
 
 Counting already means four things, and vim has all four: it multiplies a span (`3 s`), repeats a motion or jump

@@ -1,4 +1,4 @@
-# Undo and redo: snapshot ring, `u`, `Ctrl-r`
+# Undo and redo: snapshot ring, `u`, `R`
 
 Type: task
 Status: open
@@ -25,19 +25,23 @@ the last *edit*, so the cursor jumps back — that is vim's behavior and it is w
 the register holding the text that paste displaced. Someone will later "fix" this by including the register; the test is
 the argument against it, since a register restored from a snapshot can name text that is no longer in the document.
 
-**Redo discipline.** `Ctrl-r` pops the redo stack. Any new content-changing command **clears** redo. `u` at the bottom
-and `Ctrl-r` at the top are no-ops, not errors.
+**Redo discipline.** `R` pops the redo stack. Any new content-changing command **clears** redo. `u` at the bottom
+and `R` at the top are no-ops, not errors.
 
-**`Ctrl-r` on the wire.** Collides with both clients:
+**`R` is the redo key.** No client work, no new wire token: uppercase letters already arrive intact, which is why
+`F` and `N` are bound today. This was `Ctrl-r` when the ticket was written, and the reason it changed is worth
+recording:
 
-- **Terminal** — [`terminal/src/keys.rs`](../../../../terminal/src/keys.rs) returns `None` for any
-  CONTROL/ALT/SUPER/HYPER chord, deliberately, so `Ctrl-d` cannot fire `d`. `Ctrl-r` needs an explicit exception that
-  maps to a named token, and the vocabulary grows from seven names to eight (in `keys.rs` and wherever the terminal
-  parses view/key names).
-- **Browser** — [`visur.js`](../../../../src/main/resources/static/visur.js) sends `event.key`, so `Ctrl-r` arrives as
-  `"r"` *and* reloads the page. Without `preventDefault()` redo destroys the document it was undoing.
+- the **browser** sends `event.key`, so `Ctrl-r` arrives as `"r"` *and* reloads the page — redo would destroy the
+  document it was undoing unless every client remembered `preventDefault`, and the browser client has no test harness
+  to prove it did;
+- the **terminal** drops every CONTROL/ALT/SUPER/HYPER chord on purpose, so `Ctrl-d` cannot fire `d`. Granting `Ctrl-r`
+  an exception means the safety rule has a carve-out, and the reason the rule exists is that a carve-out is easy to
+  widen by accident.
 
-`u` needs nothing new: it is an ordinary navigate binding.
+One uppercase letter buys both of those back. `R` is replace mode in vim, and a vim user will reach for it wanting one
+— the same class of collision as `o`, accepted for the same reason (keymaps are the next map's subject; this key is
+wanted now). `u` needs nothing new either: it is an ordinary navigate binding.
 
 **`loadFile` clears the ring.** Snapshotting a document and then loading another would leave `u` pasting one file's
 text into another's. Stated here so the safe default is a decision and not an accident.
@@ -49,16 +53,17 @@ text into another's. Stated here so the safe default is a decision and not an ac
 - An insert session (`g`, type several characters, Escape) is **one** `u`, and `u` removes the words *and* the line that
   `g` opened.
 - `3 d`, `u` restores all of what the count removed, in one step.
-- `u` with nothing to undo does nothing and does not corrupt the stacks; `Ctrl-r` likewise at the top.
-- `u`, then a new edit, then `Ctrl-r` — redo does nothing, because the new edit cleared it.
+- `u` with nothing to undo does nothing and does not corrupt the stacks; `R` likewise at the top.
+- `u`, then a new edit, then `R` — redo does nothing, because the new edit cleared it.
 - The register is **not** restored: undo a paste and the register still holds the displaced text.
 - `loadFile` empties both stacks.
-- Terminal: `Ctrl-r` reaches the server as a token and the existing "drop every chord" test gains its one documented
-  exception — including a test that `Ctrl-d` is *still* dropped, so the exception is provably narrow.
-- Browser: `Ctrl-r` does not reload the page (manual, since there is no JS harness).
-- `keys.md` gains `u` and `Ctrl-r`, and notes that undo never restores the register.
-- [ ] Manual (user-driven) check: delete a paragraph, `u` three times, `Ctrl-r` three times, and confirm the document
-  and the selection both walk back and forward without divergence.
+- `R` reaches the server through both clients as it already does for `F` and `N` — a keypress test, not a client change.
+- The terminal's "drop every chord" rule is **unchanged**: `Ctrl-d` is still dropped, and a test keeps it that way, so
+  no future reader mistakes `R` for the start of a chord exception.
+- `keys.md` gains `u` and `R`, and notes that undo never restores the register.
+- [ ] Manual (user-driven) check: delete a paragraph, `u` three times, `R` three times, and confirm the document and
+  the selection both walk back and forward without divergence. In the browser specifically: `R` does not reload the
+  page, and `Ctrl-r` still does.
 
 ## Notes
 
