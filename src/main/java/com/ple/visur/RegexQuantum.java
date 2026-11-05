@@ -24,7 +24,7 @@ public class RegexQuantum extends Quantum {
    * collapses used to happen here too; nothing zeroes it now, because only {@code s} writes the span.
    */
   @Override
-  public int[] getBoundaries(int realCA, ArrayList<Integer> newlineIndices, int span, boolean includeTail) {
+  public int[] boundsFor(int realCA, ArrayList<Integer> newlineIndices, int span, boolean includeTail) {
     int[] bounds = boundsFor(pattern, emc.getEditorContent(), newlineIndices, realCA, emc.getCY(), span);
     emc.putCA(bounds[0]); // legacy side effect: the cursor snaps to the start of the quantum it selected
     return bounds;

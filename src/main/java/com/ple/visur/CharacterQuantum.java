@@ -5,7 +5,7 @@ import java.util.ArrayList;
 public class CharacterQuantum extends Quantum {
   EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
   @Override
-  public int[] getBoundaries(int ca, ArrayList<Integer> nextLineIndices, int span, boolean includeTail) {
+  public int[] boundsFor(int ca, ArrayList<Integer> nextLineIndices, int span, boolean includeTail) {
     return boundsFor(emc.getEditorContent(), nextLineIndices, ca, emc.getCY(), span);
   }
 

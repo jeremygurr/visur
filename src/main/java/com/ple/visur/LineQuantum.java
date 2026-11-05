@@ -7,7 +7,7 @@ public class LineQuantum extends Quantum {
   EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
 
   @Override
-  public int[] getBoundaries(int ca, ArrayList<Integer> nl, int span, boolean includeTail) {
+  public int[] boundsFor(int ca, ArrayList<Integer> nl, int span, boolean includeTail) {
     return boundsFor(emc.getEditorContent(), nl, ca, emc.getCY(), span);
   }
 

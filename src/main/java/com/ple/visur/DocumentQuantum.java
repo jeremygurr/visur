@@ -4,7 +4,7 @@ import java.util.ArrayList;
 
 public class DocumentQuantum extends Quantum {
   @Override
-  int[] getBoundaries(int realCA, ArrayList<Integer> newlineIndices, int span, boolean includeTail) {
+  public int[] boundsFor(int realCA, ArrayList<Integer> newlineIndices, int span, boolean includeTail) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     int[] bounds = boundsFor(emc.getEditorContent(), newlineIndices, realCA, emc.getCY(), span);
     boolean nothingSelectedAndCursorIsNotAlreadyAtTheEnd = span <= 0 && realCA != bounds[0];
