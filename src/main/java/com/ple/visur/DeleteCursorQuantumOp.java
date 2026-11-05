@@ -1,7 +1,5 @@
 package com.ple.visur;
 
-import java.util.ArrayList;
-
 public class DeleteCursorQuantumOp implements Operator {
 
   EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
@@ -27,11 +25,11 @@ public class DeleteCursorQuantumOp implements Operator {
         emc.putCA(ca);
         emc.putVirtualCX(emc.getCX());
       }
-      ArrayList<Integer> nl = emc.getNextLineIndices();
-      Quantum cursorQuantum = emc.getCursorQuantum();
-      int[] bounds = cursorQuantum.getBoundaries(ca, nl, emc.getSpan(), false);
-      emc.putCursorQuantumStartAndScroll(bounds[0]);
-      emc.putCursorQuantumEndAndScroll(bounds[1]);
+      // The range collapses to the gap the delete made, while the span survives: a window re-derived over the text
+      // that slid into the deleted one would be a highlight over text nobody selected, and p (ticket 03) would eat it
+      // instead of putting what d removed back. Moving re-derives the window at the span still in the model.
+      emc.putCursorQuantumStartAndScroll(startBound);
+      emc.putCursorQuantumEndAndScroll(startBound);
     }
   }
 

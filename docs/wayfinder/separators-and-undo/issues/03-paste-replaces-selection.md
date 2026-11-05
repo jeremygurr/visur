@@ -62,3 +62,37 @@ round-one worry ("`d` then `p` deletes another six words", because ticket 04 kee
   editor, and after this ticket its result is "the text you deleted, back where the cursor is, and the register now
   holding the six words you displaced" — which is only safe because undo is coming in
   [06](06-undo-redo.md).
+
+## Result
+
+Shipped as `p` = replace-selection-then-insert, `P` = insert-at-start-and-shift. `PasteTest` holds the nine cases this
+ticket named; `OperatorCountTest` lost its two paste-related `@Disabled`s.
+
+**One decision the ticket left open, settled here.** The Done-when bullet ("`d` then `p` puts the deleted text back")
+and `SetSpanOpTest.deletingLeavesAWindowThatWideBehind` could not both hold: after a delete, a window re-derived at the
+span covers the text that slid into the hole, and a `p` that replaces the selection eats it. `d` now collapses the range
+to the gap and keeps the span, which is what the ticket's own test encodes and what makes the map's note true: the
+reason `d` then `p` does not delete another six words is that there is no stale window for the paste to widen, and the
+reason a second `p` does not either is that `p` ends at span 0. The reversed test is
+`SetSpanOpTest.deletingLeavesAGapAndKeepsTheSpanForTheNextMove`; the surviving
+`movingAfterADeleteRederivesAWindowThatWide` is the half of the old contract that still matters, and
+`CODING_STANDARDS.md` now says which operator recomputes what.
+
+**The count on `p` multiplies the copies, never the text removed.** Step 1 of `## Work` says the capture is "the extent
+ticket 12 computes: count × span" while the prose below says "never `operatorExtent()`'s count × span"; the second is
+what ships, since the first is the failure the paragraph rejects. `3 p` therefore replaces one selection with three
+copies and records the displaced text once.
+
+**`p` over nothing does not even remove the selection.** A count of zero, or an empty register, makes the paste nothing,
+and an operator that does nothing displaces no text: `0 p` leaves both the selection and the register alone.
+
+**`P` respects the count** (`3 P` inserts three copies in front and shifts the selection by all of them), which the
+ticket does not mention; it is the only reading consistent with `p`, and the count of zero declines the same way.
+
+**`p` writes the span 0 it finishes at**, since a mode line still reading `SPAN=3` after a paste that highlighted
+nothing is the same lie in a different place. `P` never writes it: the selection it preserves carries the span with it.
+`CODING_STANDARDS.md` names the exception beside the rule.
+
+`P` arrives through both clients already, as `F` and `N` do — no wire or renderer change, no new key token.
+
+Remaining: the manual check in `## Done when`.

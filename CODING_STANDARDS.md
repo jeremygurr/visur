@@ -8,11 +8,15 @@ Conventions this codebase follows that the code itself does not force. Tooling a
 
 Writes that scroll use the `AndScroll` variant; the plain variant is for restoring a position the renderer already knows.
 
-One key owns each piece of state, and the operators that read it leave it alone. `s` writes span and nothing else does:
-`RelativeMoveOp`, `ChangeCursorQuantumOp` and `DeleteCursorQuantumOp` recompute the *range* at the span already in the
+One key owns each piece of state, and the operators that read it leave it alone. `s` writes span; nothing does besides boot, a file load, and `p`'s stated post-condition (paste finishes at span 0):
+`RelativeMoveOp` and `ChangeCursorQuantumOp` recompute the *range* at the span already in the
 model. They used to share a `SpanCollapse` that also zeroed the span whenever that range came back empty, which made a
 blank line a trap door at the word quantum — a range derived from span zero is always empty, so once the span fell to
 zero nothing re-derived a selection. A number the user typed outlives the content it was typed against.
+
+`DeleteCursorQuantumOp` keeps the span but collapses the range to the gap its delete made. Re-deriving a window at the
+span there would highlight the text that slid into the hole — text nobody selected — and `p` replaces the selection, so
+that highlight is what a paste would eat instead of putting the deleted text back.
 
 ## Document types are declared, not hardcoded
 

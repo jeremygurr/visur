@@ -71,6 +71,9 @@ public class NativeOpWord implements Word {
         case "pasteYankRegister":
           op = new PasteYankRegisterOp();
           break;
+        case "pasteBeforeYankRegister":
+          op = new PasteBeforeYankRegisterOp();
+          break;
         case "replaceChar":
           op = new ReplaceCharOp();
           break;

@@ -122,7 +122,6 @@ class OperatorCountTest {
    * editor that deletes text it never highlighted is an editor nobody trusts with a count.
    */
   @Test
-  @org.junit.jupiter.api.Disabled("register behavior is covered by ticket 03")
   void anEmptySelectionDeletesNothingHoweverBigTheCountIs() {
     chooseCursorQuantum("word");
     press("0");
@@ -135,11 +134,15 @@ class OperatorCountTest {
     press("d");
 
     assertEquals(CONTENT, emc.getEditorContent(), "nothing was selected, so nothing was removed");
-    assertEquals("one ", yankRegister(), "and the register keeps what it was holding");
+    assertEquals("one", yankRegister(), "and the register keeps what it was holding");
   }
 
+  /**
+   * The count on {@code p} multiplies the copies pasted; the text it removes is the selection on screen, never count ×
+   * span. Ticket 03 reversed this test's first expectation, which pasted three copies <em>in front of</em> the
+   * selection it left standing.
+   */
   @Test
-  @org.junit.jupiter.api.Disabled("paste replacement is ticket 03")
   void aCountOfThreePastesThreeCopies() {
     chooseCursorQuantum("character");
     press("3");
@@ -147,12 +150,11 @@ class OperatorCountTest {
     press("y");
     press("3");
     press("p");
-    assertEquals("one" + "oneoneone" + CONTENT.substring(3), emc.getEditorContent());
+    assertEquals("oneoneone" + CONTENT.substring(3), emc.getEditorContent());
   }
 
   /** The register is one unnamed slot, so the delete wins over the yank. Pinned, not implied. */
   @Test
-  @org.junit.jupiter.api.Disabled("paste replacement is ticket 03")
   void deletingOverwritesWhatWasYanked() {
     chooseCursorQuantum("word");
     press("s");

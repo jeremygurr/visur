@@ -68,6 +68,9 @@ structural assumption in the model.
 - **`EditorSpec` declares quantums in nesting order, each with a separator**, and nothing else. Keymaps keep the
   `q`/`w`/`e`/`r` → name mapping (`KeyToQuantumName`), so keybinding changes stay keybinding changes. **Boot validates
   the keymap against the spec** and fails loudly rather than leaving a dead key.
+- **A delete leaves a gap, not a window.** The span survives `d`, but the range collapses to where the text was: a
+  window re-derived over the neighbours would be a highlight nobody selected, and `p` replaces the selection. Detail in
+  [ticket 03](issues/03-paste-replaces-selection.md).
 - **`p` and `P` both insert at `cursorQuantumStart`.** `p` captures the selection, deletes it, pastes there, and makes
   what it displaced the new register contents. `P` inserts there and **leaves the selection covering the same text,
   shifted right by the pasted length** — it is non-destructive by definition, and quantum-independent.

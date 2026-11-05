@@ -135,12 +135,17 @@ class SetSpanOpTest {
     assertEquals(0, emc.getSpan());
   }
 
+  /**
+   * Reversed by paste ticket 03: the delete used to re-derive a window over whatever slid into the hole, which is a
+   * highlight over text nobody selected — and {@code p} replaces the selection, so {@code d} then {@code p} ate that
+   * text instead of putting the deleted text back. The span survives; the range is the gap.
+   */
   @Test
-  void deletingLeavesAWindowThatWideBehind() {
+  void deletingLeavesAGapAndKeepsTheSpanForTheNextMove() {
     requestSpan(3);
     new DeleteCursorQuantumOp().execute(null);
     assertEquals(3, emc.getSpan());
-    assertEquals(3, selectedWidth());
+    assertEquals(0, selectedWidth(), "the highlight marks the gap the delete made");
   }
 
   @Test

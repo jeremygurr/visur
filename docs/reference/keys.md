@@ -43,9 +43,10 @@ Quantum keys are shared by every command that takes one:
 | `i` | insert at the **start** of the selection; switches to insert mode | `i` |
 | `a` | insert at the **end** of the selection; switches to insert mode | `a` |
 | `o` | enter **replace** mode at the cursor | `o` |
-| `d` | delete the selection, taken `count` times, then re-derive the bounds at the same span. What it removed goes to the yank register, so `p` puts it back. Nothing selected, or a count of zero, and nothing happens | `s d` delete the quantum under the cursor; `3 s` then `3 d` delete nine |
+| `d` | delete the selection, taken `count` times, leaving the highlight as the gap it made — the span survives, and the next move re-derives the window from it. What it removed goes to the yank register, so `p` puts it back. Nothing selected, or a count of zero, and nothing happens | `s d` delete the quantum under the cursor; `3 s` then `3 d` delete nine |
 | `y` | copy the selection, taken `count` times, to the yank register | `s y`; `2 s` then `3 y` copy six quanta |
-| `p` | paste the yank register at the cursor, `count` copies | `p`; `3 p` three copies |
+| `p` | **replace the selection** with the yank register, `count` copies, and put what the paste displaced into the register. Over nothing it displaces nothing, so the register keeps what it held and `p p` pastes twice. The caret ends on the last pasted character, span 0 | `s y` `] e` `p` move a quantum; `3 p` three copies over one selection |
+| `P` | insert the yank register at the **start** of the selection without deleting anything; the selection keeps covering the same text, shifted right | `P` with three words selected puts the register in front and leaves those three selected |
 | `;` | open **command state**: type a raw command sentence and run it | `;` `"word" quantumStart` `Enter` |
 | `ZZ` | save the file | `ZZ` |
 
@@ -119,8 +120,6 @@ Until those tickets land, the table above is the truth:
   spaces or tabs after them, but never a newline. `\` will turn this off, shown as `SEP=ON` / `SEP=OFF` beside the span.
   ([01](../wayfinder/separators-and-undo/issues/01-editor-spec.md),
   [02](../wayfinder/separators-and-undo/issues/02-selection-includes-separator.md))
-- **`p` will replace the selection** and put what it displaced into the yank register; `P` will insert the same text in
-  front of the selection without disturbing it. ([03](../wayfinder/separators-and-undo/issues/03-paste-replaces-selection.md))
 - **`g` and `G`** will open a line above and below at the line bounds, whatever the cursor quantum, and drop you into
   insert mode on it. ([04](../wayfinder/separators-and-undo/issues/04-open-line.md))
 - **A count before an insert-entering key will repeat the typed text**, vim's `3o`: `3 g`, type once, Escape gives
