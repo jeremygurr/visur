@@ -63,6 +63,9 @@ public class LoadFileOp implements Operator {
       // This file becomes the new remembered source
       emc.setSourceFilePath(filePath);
 
+      // A different document is not this document's history: u would paste one file's text into another's.
+      emc.getUndoHistory().clear();
+
       // Exit command state (it's been executed successfully)
       // Note: CommandStateService.exitCommandState() handles this
 

@@ -77,6 +77,12 @@ public class NativeOpWord implements Word {
         case "removeGlobalVar":
           op = new RemoveGlobalVarOp();
           break;
+        case "undo":
+          op = new UndoOp();
+          break;
+        case "redo":
+          op = new RedoOp();
+          break;
         case "deleteCursorQuantum":
           op = new DeleteCursorQuantumOp();
           break;

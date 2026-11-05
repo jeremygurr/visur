@@ -35,4 +35,5 @@ public enum EditorModelKey {
   fy,
   sourceFilePath,
   pendingCount,
+  undoHistory,
 }

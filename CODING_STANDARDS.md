@@ -25,6 +25,13 @@ it. Insert and replace mode are not a sequence in flight, so the keys that open 
 being spent by the typing: `3 i` moved three columns per character and deleted three per backspace. Typing no count
 *removes* the stash rather than leaving it, so no session can inherit the previous one's number.
 
+Undo snapshots the state rather than inverting the operation. `KeyWasPressedVerticle.press` is the only place a command
+runs, and it brackets that call with `UndoHistory.beforeCommand` / `afterCommand`: the state before the command is kept,
+and reaches the stack only if content changed. The unit is a command and the boundary is entering navigate mode, so the
+pending snapshot survives an insert session and `g`, the typing and the count's repeat are one `u`. No operator knows
+undo exists — that is what keeps a command's boundary from being gotten wrong once per operator. `undo` and `redo` clear
+the pending snapshot themselves, which is how they decline to count as an edit.
+
 ## Document types are declared, not hardcoded
 
 A quantum and the facts about it — its name, what separates it from the next quantum, how coarse it is — belong to an

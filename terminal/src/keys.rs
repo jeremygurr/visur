@@ -74,6 +74,7 @@ mod tests {
   fn maps_any_single_character_verbatim() {
     assert_eq!(token(KeyCode::Char('j')).as_deref(), Some("j"));
     assert_eq!(token(KeyCode::Char('F')).as_deref(), Some("F")); // shift needs no handling: it arrives uppercase
+    assert_eq!(token(KeyCode::Char('R')).as_deref(), Some("R")); // redo rides the same rule; no chord exception for it
     assert_eq!(token(KeyCode::Char(' ')).as_deref(), Some(" "));
     assert_eq!(token(KeyCode::Char(';')).as_deref(), Some(";"));
   }
@@ -94,7 +95,7 @@ mod tests {
   #[test]
   fn keeps_shift_because_it_is_only_how_an_uppercase_character_arrives() {
     // Measured, not assumed: crossterm reports SHIFT alongside Char('Z') for the shift key. Dropping it would make
-    // every uppercase binding -- F, N, and the Z prefix -- unreachable.
+    // every uppercase binding -- F, N, R, and the Z prefix -- unreachable.
     let shift = Event::Key(KeyEvent::new(KeyCode::Char('Z'), KeyModifiers::SHIFT));
     assert_eq!(action(shift).as_deref(), Some("Z"));
   }

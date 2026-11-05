@@ -1,7 +1,7 @@
 # A count repeats the insert session's text on Escape
 
 Type: task
-Status: open
+Status: closed
 Blocked by: 04
 
 ## Work
@@ -49,8 +49,8 @@ when the user arrows around inside it or backspaces into text that existed befor
 - Count 1 changes nothing: `g`, `abc`, Escape is one line, exactly as before this ticket.
 - `3 g` with the count already spent behaves like `g` — the stash is what reads it, and the retired count cannot leak
   in twice.
-- [ ] Manual (user-driven) check: `3 g`, type a sentence, Escape, and confirm three identical lines with no stray blank
-  line between them.
+- [x] Manual (user-driven) — passed: `3 g`, type a sentence, Escape, three identical lines, no stray blank line
+  between them.
 
 ## Result
 

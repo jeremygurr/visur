@@ -48,22 +48,52 @@ text into another's. Stated here so the safe default is a decision and not an ac
 
 ## Done when
 
-- `x d`, `u` restores the content **and** the span and cursor that were selected before the delete, so re-running the
+- [x] `x d`, `u` restores the content **and** the span and cursor that were selected before the delete, so re-running the
   command is one keypress.
-- An insert session (`g`, type several characters, Escape) is **one** `u`, and `u` removes the words *and* the line that
+- [x] An insert session (`g`, type several characters, Escape) is **one** `u`, and `u` removes the words *and* the line that
   `g` opened.
-- `3 d`, `u` restores all of what the count removed, in one step.
-- `u` with nothing to undo does nothing and does not corrupt the stacks; `R` likewise at the top.
-- `u`, then a new edit, then `R` — redo does nothing, because the new edit cleared it.
-- The register is **not** restored: undo a paste and the register still holds the displaced text.
-- `loadFile` empties both stacks.
-- `R` reaches the server through both clients as it already does for `F` and `N` — a keypress test, not a client change.
-- The terminal's "drop every chord" rule is **unchanged**: `Ctrl-d` is still dropped, and a test keeps it that way, so
+- [x] `3 d`, `u` restores all of what the count removed, in one step.
+- [x] `u` with nothing to undo does nothing and does not corrupt the stacks; `R` likewise at the top.
+- [x] `u`, then a new edit, then `R` — redo does nothing, because the new edit cleared it.
+- [x] The register is **not** restored: undo a paste and the register still holds the displaced text.
+- [x] `loadFile` empties both stacks.
+- [x] `R` reaches the server through both clients as it already does for `F` and `N` — a keypress test, not a client change.
+- [x] The terminal's "drop every chord" rule is **unchanged**: `Ctrl-d` is still dropped, and a test keeps it that way, so
   no future reader mistakes `R` for the start of a chord exception.
-- `keys.md` gains `u` and `R`, and notes that undo never restores the register.
+- [x] `keys.md` gains `u` and `R`, and notes that undo never restores the register.
 - [ ] Manual (user-driven) check: delete a paragraph, `u` three times, `R` three times, and confirm the document and
   the selection both walk back and forward without divergence. In the browser specifically: `R` does not reload the
   page, and `Ctrl-r` still does.
+
+## Result
+
+`UndoHistory` in the model (a `Shareable` like `ExecutionDataStack`), one hook in `KeyWasPressedVerticle.press`, two
+bindings. `UndoRedoTest` holds nine cases at the keypress seam plus a load-through-`LoadFileOp` one in `UndoRedoTest`.
+
+**The hook is the design.** `press` brackets the one `ces.execute` call with `beforeCommand` / `afterCommand`: take the
+state, run the command, and if content differs push what was taken. No operator knows undo exists, so no operator has a
+boundary to get wrong. The state is held rather than pushed while a mode other than navigate is open, which is the whole
+of "the unit is a command and the boundary is entering navigate mode": `g`, the typing, the repeat and the Escape that
+closes the session commit once, and a movement command changes nothing so it pushes nothing — `u` after `5 l` walks back
+to the last edit, cursor and all, which is the consequence the Work section asked to pin.
+
+**`undo` and `redo` clear the pending snapshot themselves** instead of committing it. Without that the state `u` arrives
+at would land on the undo stack and undo would walk in place. Pushing what it leaves onto the *redo* stack is also why
+redo needs no special case in `afterCommand`: the only commands that clear redo are edits.
+
+**`isAtQuantumStart` is deliberately not in the snapshot.** It is part of where the caret is drawn when the span is 0,
+so the ticket's five fields looked like an oversight and there is a test that would have caught it — but nothing in the
+server sets it false, so the state it would restore never occurs. If a future key does set it, it joins the tuple.
+
+**The register stays out**, as decided, and the test is the argument: `y` `j` `p` `u` leaves the document back and the
+register holding the text the paste displaced. cx/cy are not snapshotted either — the renderer derives the caret from
+`ca` (`View.cursorIndex`), and the two fields are already stale after every jump and paste, which undo neither causes
+nor inherits.
+
+**No client change, and the chord rule is untouched.** `R` arrives as an ordinary uppercase character: the terminal's
+`drops_every_modifier_chord` already asserts `Ctrl-d` is dropped, and `maps_any_single_character_verbatim` now asserts
+`R` arrives next to `F`, with a note that redo rides that rule rather than an exception to it. The browser page sends
+`event.key` verbatim and never calls `preventDefault`, so `R` reaches the keymap and `Ctrl-r` still reloads.
 
 ## Notes
 

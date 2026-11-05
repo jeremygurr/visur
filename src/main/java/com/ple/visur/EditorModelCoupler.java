@@ -128,6 +128,14 @@ public class EditorModelCoupler {
     return submodeStack.peek();
   }
 
+  public UndoHistory getUndoHistory() {
+    return (UndoHistory) editorModel.get(undoHistory);
+  }
+
+  public void putUndoHistory(UndoHistory history) {
+    editorModel.put(undoHistory, history);
+  }
+
   public Stack<EditorSubmode> getEditorSubmodeStack() {
     return (Stack<EditorSubmode>) editorModel.get(editorSubmodeStack);
   }

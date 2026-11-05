@@ -50,6 +50,8 @@ opens, where it repeats the typing instead | `12 s` twelve quanta; `3 ] w` three
 | `y` | copy the selection, taken `count` times, to the yank register | `s y`; `2 s` then `3 y` copy six quanta |
 | `p` | **replace the selection** with the yank register, `count` copies, and put what the paste displaced into the register. Over nothing it displaces nothing, so the register keeps what it held and `p p` pastes twice. The caret ends on the last pasted character, span 0 | `s y` `] e` `p` move a quantum; `3 p` three copies over one selection |
 | `P` | insert the yank register at the **start** of the selection without deleting anything; the selection keeps covering the same text, shifted right | `P` with three words selected puts the register in front and leaves those three selected |
+| `u` | undo **one command** — the whole command, so an insert session comes back with the line it opened, and everything a count repeated comes back at once. Movement is not an edit: `u` after `5 l` walks back to the last edit, cursor and all. Nothing to undo is a no-op | `s d` then `u`; `3 g`, type, `Escape`, then `u` |
+| `R` | redo one command. A new edit clears what `R` can walk forward to, and the top of the stack is a no-op | `u` then `R` |
 | `;` | open **command state**: type a raw command sentence and run it | `;` `"word" quantumStart` `Enter` |
 | `ZZ` | save the file | `ZZ` |
 
@@ -58,6 +60,13 @@ character, and restore both on `Escape`.
 
 **Both line-opening keys read the line the cursor sits on**, not the cursor quantum, `SPAN` or `SCOPE`, and the same
 document comes out whether the separator toggle is on or off.
+
+**Undo is snapshots, and a command is the unit.** The boundary is entering navigate mode, so `g`, everything typed and
+the count's repeat are one `u`. Undo puts the content, the cursor and the span back — **never the yank register**:
+undoing a paste leaves the register holding the text that paste displaced, because a register restored from a snapshot
+can name text that is no longer in the document. Loading a file empties the history, so `u` cannot paste one file into
+another. Redo is `R` rather than `Ctrl-r` because the browser sends `Ctrl-r` as plain `r` and reloads the page with it,
+and the terminal drops modifier chords on purpose.
 
 **A count in front of an insert-entering key repeats what you type**, vim's `3o`: `3 g` opens **one** line rather than
 three, you type once, and `Escape` writes the other copies. `g` and `G` separate the copies with the newline they
@@ -133,8 +142,6 @@ Until those tickets land, the table above is the truth:
   spaces or tabs after them, but never a newline. `\` will turn this off, shown as `SEP=ON` / `SEP=OFF` beside the span.
   ([01](../wayfinder/separators-and-undo/issues/01-editor-spec.md),
   [02](../wayfinder/separators-and-undo/issues/02-selection-includes-separator.md))
-- **`u` and `R`** will undo and redo a whole command. Undo will restore the selection, never the yank register.
-  ([06](../wayfinder/separators-and-undo/issues/06-undo-redo.md))
 
 Counting already means four things, and vim has all four: it multiplies a span (`3 s`), repeats a motion or jump
 (`3 l`, `3 ] e`), multiplies an operator's extent (`3 d`), and repeats an insert session (`3 g`).

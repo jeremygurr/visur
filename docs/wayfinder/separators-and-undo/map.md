@@ -108,7 +108,7 @@ structural assumption in the model.
 | [02](issues/02-selection-includes-separator.md) | Selections include their separator; `\` toggle; highlight and mode line | 01 |
 | ~~03~~ [closed](issues/03-paste-replaces-selection.md) | `p` replaces the selection and takes what it displaced; `P` inserts before it | 02 |
 | ~~04~~ [closed](issues/04-open-line.md) | `g` / `G` open a line above / below at line bounds | 02 |
-| [05](issues/05-insert-repeat.md) | A count repeats the insert session's text on Escape | 04 |
+| ~~05~~ [closed](issues/05-insert-repeat.md) | A count repeats the insert session's text on Escape | 04 |
 | [06](issues/06-undo-redo.md) | Undo and redo: snapshot ring, `u`, `R` | 02, 03 |
 
 **01 → 02** is the spine: nothing in the batch behaves differently until 02 lands, because 01 is a pure refactor that

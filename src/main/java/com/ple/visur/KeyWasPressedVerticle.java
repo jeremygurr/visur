@@ -45,20 +45,31 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
       VisurCommand currentCommand = keymap.get(keyPressed);
       CommandExecutionService ces = ServiceHolder.commandExecutionService.make();
       if(currentCommand != null) {
+        // The one place a command runs, so this is the one place a command can be snapshotted before it changes
+        // content. UndoHistory decides whether what it changes is worth a unit.
+        UndoHistory history = emc.getUndoHistory();
+        history.beforeCommand(emc);
         ces.execute(currentCommand);
+        history.afterCommand(emc);
       }
     }
   }
 
   private void handlePaste(Message event) {
-    EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    emc.clearPendingCount(); // typed text arrives without a keypress, so it retires a pending count the way one would
     JsonObject body = jsonBody(event);
-    String text = body.getString("text", "");
-    if (!emc.getIsInCommandState() && emc.getEditorSubmode() == EditorSubmode.navigate) {
-      TextInsertion.insertAt(emc, text, emc.getCA());
-    }
+    pasteText(ServiceHolder.editorModelCoupler, body.getString("text", ""));
     bus.send(BusEvent.modelWasChanged.name(), null);
+  }
+
+  /** A pasted block arrives on the bus rather than as a key; static for the same reason {@link #press} is. */
+  static void pasteText(EditorModelCoupler emc, String text) {
+    emc.clearPendingCount(); // typed text arrives without a keypress, so it retires a pending count the way one would
+    if (!emc.getIsInCommandState() && emc.getEditorSubmode() == EditorSubmode.navigate) {
+      UndoHistory history = emc.getUndoHistory();
+      history.beforeCommand(emc);
+      TextInsertion.insertAt(emc, text, emc.getCA());
+      history.afterCommand(emc);
+    }
   }
 
   static void enterCommandStateIfRequested(EditorModelCoupler emc, String key) {
