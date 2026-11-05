@@ -89,11 +89,16 @@ public abstract class Quantum implements Shareable {
    * which is then selected inside it. The operand quantum comes off the execution data stack — it is the quantum key
    * typed after {@code [} or {@code ]}.
    *
-   * <p>They are ranked at span 1, not at the span currently selected. Which quantum is coarser is a fact about nesting
-   * (a character is inside a word is inside a line); measuring the two at the live span only approximates that, and the
-   * approximation ties where both grow one character per span — across blank lines, where a character and a step over a
-   * blank line each measure one character. A tie hands the frame to the operand, so {@code ] w} would leave the cursor
-   * in a different quantum depending on how much the selection happened to cover.
+   * <p>Which quantum is coarser is a fact about nesting (a character is inside a word is inside a line), and the editor
+   * spec declares it by listing its quantums finest first — so the frame is whichever of the two comes later in that
+   * list. Measuring the two, at span 1 or at the live span, only approximates nesting and ties where nesting does not:
+   * a one-character word and the character in it measure the same, and a tie used to hand the frame to the operand,
+   * so {@code ] q} on a one-character word selected a word where the key had asked for a character.
+   *
+   * <p>Rank decides which is coarser; being under the cursor decides whether it can frame at all. A quantum the cursor
+   * is not in covers nothing — a word quantum on a blank line, or between two words — and framing with it would make
+   * {@code ] w} select an empty range there instead of walking to the next word, so the roles swap and the coarser
+   * quantum stays the one selected.
    *
    * <p>This is not the model's {@code scopeQuantum}, which is the fence a search is confined to.
    */
@@ -102,8 +107,8 @@ public abstract class Quantum implements Shareable {
     String otherQuantumName = (String)eds.pop();
     QuantumNameToQuantum quantumNameToQuantum = emc.getQuantumNameToQuantum();
     Quantum otherQuantum = quantumNameToQuantum.get(otherQuantumName);
-    int rankingOfCurrentQuantum = getQuantumBoundsLengthAtSpan(1);
-    int rankingOfOtherQuantum = otherQuantum.getQuantumBoundsLengthAtSpan(1);
+    int rankingOfCurrentQuantum = quantumNameToQuantum.rankOf(getName());
+    int rankingOfOtherQuantum = quantumNameToQuantum.rankOf(otherQuantumName);
     Quantum frameQuantum;
     Quantum cursorQuantum;
     if(rankingOfCurrentQuantum > rankingOfOtherQuantum) {
@@ -113,13 +118,22 @@ public abstract class Quantum implements Shareable {
       frameQuantum = otherQuantum;
       cursorQuantum = this;
     }
+    if(!frameQuantum.hasQuantumAtCursor()) {
+      Quantum absentFrame = frameQuantum;
+      frameQuantum = cursorQuantum;
+      cursorQuantum = absentFrame;
+    }
     return new Quantum[]{frameQuantum, cursorQuantum};
   }
 
-  int getQuantumBoundsLengthAtSpan(int span) {
-    EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    int[] bounds = getBoundaries(emc.getCA(), emc.getNextLineIndices(), span, false);
-    return bounds[1] - bounds[0];
+  /**
+   * Whether this quantum is under the cursor at all, which is not the same as how coarsest it is: a word quantum covers
+   * nothing on a blank line and nothing between two words. Measured at span 1 because presence is a question about the
+   * cursor's neighbourhood, not about how much text is selected.
+   */
+  boolean hasQuantumAtCursor() {
+    int[] bounds = getBoundaries(emc.getCA(), emc.getNextLineIndices(), 1, false);
+    return bounds[1] > bounds[0];
   }
 
 }

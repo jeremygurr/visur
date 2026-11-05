@@ -14,6 +14,20 @@ model. They used to share a `SpanCollapse` that also zeroed the span whenever th
 blank line a trap door at the word quantum — a range derived from span zero is always empty, so once the span fell to
 zero nothing re-derived a selection. A number the user typed outlives the content it was typed against.
 
+## Document types are declared, not hardcoded
+
+A quantum and the facts about it — its name, what separates it from the next quantum, how coarse it is — belong to an
+[`EditorSpec`](src/main/java/com/ple/visur/EditorSpec.java), and the spec is chosen at boot. Nothing outside the spec may
+assume plaintext: the word pattern, the quantum list and the nesting order all live there, and
+`KeyToQuantumName` is validated against it so a key bound to a quantum the document type does not have is a startup
+error rather than a dead key.
+
+Nesting order is the spec's list order, finest first. Do not measure two quanta to decide which contains the other —
+measuring ties exactly where nesting does not (a one-character word and the character in it), and a tie used to hand the
+frame to whichever quantum the key naming order happened to supply. Being *present* is a separate question from being
+coarser: a word quantum covers nothing on a blank line, so it cannot frame there even though it nests outside a
+character.
+
 ## Pure arithmetic goes in a static
 
 A computation that needs no model state becomes a `static` method taking everything it reads as parameters. It is then testable without bootting a verticle, which is how `Viewport`, `SizedContent` and each quantum's `boundsFor` are tested.

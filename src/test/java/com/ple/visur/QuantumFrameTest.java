@@ -93,6 +93,30 @@ class QuantumFrameTest {
   }
 
   /**
+   * {@code ] q} on a one-character word lands on that character.
+   *
+   * <p>The two quanta measure the same length here — a word of one character — so the old tie fell to the operand
+   * quantum and made it the frame, and the jump then selected a word where the key had asked for a character. Nesting
+   * does not tie: a word contains a character whatever the word's length, and the spec says so.
+   */
+  @Test
+  void jumpingToTheCharacterInAOneCharacterWordLeavesYouInTheCharacterQuantum() {
+    emc.putEditorContent("a b\n");
+    emc.putCX(0);
+    emc.putCY(0);
+    emc.putVirtualCX(0);
+    emc.putFY(0);
+    emc.putCA(0);
+    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.putSpan(1);
+    emc.putOnExecutionDataStack("character");
+    emc.getQuantumNameToQuantum().get("word").quantumEnd(); // the keystroke ] q, with words as the cursor quantum
+    assertEquals("character", emc.getCursorQuantum().getName());
+    assertEquals(0, emc.getCursorQuantumStart());
+    assertEquals(1, emc.getCursorQuantumEnd());
+  }
+
+  /**
    * The inversion this ticket was written about, which only became reachable once the word walk crossed a gap in one
    * step rather than one character per remaining span — see
    * {@link WordQuantumBoundsTest#aSpanOfWordsCrossesAWideGap()}. Twenty words do out-measure twenty short lines: the

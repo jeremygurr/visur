@@ -163,13 +163,10 @@ public class InitializerService {
   }
 
   private void initializeQuantums() {
-    QuantumNameToQuantum quantumNameToQuantum = new QuantumNameToQuantum();
+    EditorSpec editorSpec = EditorSpec.plaintext();
     String startingCursorQuantumName = "character";
     String startingScopeQuantumName = "line";
-    quantumNameToQuantum.put("word", new RegexQuantum("word", "\\S+"));
-    quantumNameToQuantum.put("character", new CharacterQuantum());
-    quantumNameToQuantum.put("line", new LineQuantum());
-    quantumNameToQuantum.put("document", new DocumentQuantum());
+    QuantumNameToQuantum quantumNameToQuantum = editorSpec.registry();
     emc.putQuantumNameToQuantum(quantumNameToQuantum);
 
     KeyToQuantumName keyToQuantumName = new KeyToQuantumName();
@@ -177,6 +174,7 @@ public class InitializerService {
     keyToQuantumName.put("w", "word");
     keyToQuantumName.put("e", "line");
     keyToQuantumName.put("r", "document");
+    editorSpec.validate(keyToQuantumName);
     emc.putKeyToQuantumName(keyToQuantumName);
 
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get(startingCursorQuantumName));

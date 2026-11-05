@@ -11,6 +11,10 @@ public class KeyToQuantumName implements Shareable {
     return map.get(key);
   }
 
+  public java.util.Set<String> getKeys() {
+    return map.keySet();
+  }
+
   public void put(String key, String quantumName) {
     map.put(key, quantumName);
   }

@@ -1,7 +1,7 @@
 # Editor specification: declared quantums, separators, nesting rank
 
 Type: refactor
-Status: open
+Status: closed
 Blocked by: —
 
 ## Work
@@ -59,3 +59,31 @@ subject.
 - The separator data is **read by nothing** until [02](02-selection-includes-separator.md). Landing them separately is
   deliberate: 01 is provably behavior-preserving, so if 02 misbehaves the separator *rule* is the suspect, not the
   plumbing.
+
+## Result
+
+Landed. `EditorSpec` holds the entries; `QuantumNameToQuantum` gained the order and the separators and became the thing
+queried at runtime (it is the one object already in the shared model, so nothing new went on the wire).
+`getQuantumBoundsLengthAtSpan` is deleted — rank no longer measures anything.
+
+**The ticket was wrong about "no behavior change", and the three frame tests proved it.** Swapping measurement for
+declared rank alone broke `jumpingToEndOfAWordAtSpanOneLeavesYouInTheWordQuantum` and its two siblings: with the cursor
+in a character quantum on a blank line, the *word* quantum is coarser, so rank made it the frame — but there is no word
+there, and the jump would have selected an empty range instead of walking to the next word.
+
+So the rule has two clauses, and only the first one changed: **rank says which is coarser; presence says whether it can
+frame at all** (`Quantum.hasQuantumAtCursor`, measured at span 1). A quantum measured empty swaps roles with the other,
+which is what the old code achieved by accident — a missing word quantum measured zero, so the character won on length.
+Both clauses are now nameable, and `CODING_STANDARDS.md` got a section saying so.
+
+That second clause is not a measurement returning as a ranking: presence is a question about the cursor's
+neighbourhood, and asking it at the live span is what ticket 07 removed.
+
+**One behavior change, in the tie the ranking used to lose.** `] q` on a one-character word measures equal to the word
+it is in and used to make the *word* the frame — selecting a word where the key asked for a character. It now lands in
+the character quantum, pinned by
+`QuantumFrameTest.jumpingToTheCharacterInAOneCharacterWordLeavesYouInTheCharacterQuantum`. That test failed before the
+change, which is the only reason to believe the fix is real.
+
+Tests: 7 new (6 in `EditorSpecTest`, including a two-quantum spec that builds its own registry, order, separators and
+validator; 1 in `QuantumFrameTest`), 160 Java green.
