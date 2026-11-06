@@ -224,7 +224,7 @@ class OpenLineTest {
 
   /** What {@code g} stashed for the session: the count typed before it, or nothing. */
   private Integer stashedCount() {
-    VisurVar stashed = emc.getGlobalVar("tempCount");
+    VisurVar stashed = emc.session().getGlobalVar("tempCount");
     return stashed == null ? null : (Integer) stashed.getVal();
   }
 

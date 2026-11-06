@@ -8,7 +8,7 @@ public class RecallOp implements Operator {
   @Override
   public void execute(Object opInfo) {
     EditorModelCoupler ems = ServiceHolder.editorModelCoupler;
-    VisurVar vv = ems.getGlobalVar((String)opInfo);
+    VisurVar vv = ems.session().getGlobalVar((String)opInfo);
     ems.putOnExecutionDataStack(vv.getVal());
   }
 

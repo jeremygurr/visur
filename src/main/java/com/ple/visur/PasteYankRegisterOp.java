@@ -14,7 +14,7 @@ public class PasteYankRegisterOp implements Operator {
   @Override
   public void execute(Object ignored) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    VisurVar register = emc.getGlobalVar("yankRegister");
+    VisurVar register = emc.session().getGlobalVar("yankRegister");
     if (register == null) return;
     String value = ((String) register.getVal()).replace("\r\n", "\n");
     // A count of zero pastes nothing, and an operator that does nothing does not displace text either: the guard runs
@@ -27,7 +27,7 @@ public class PasteYankRegisterOp implements Operator {
     String displaced = content.substring(start, end);
     emc.putEditorContent(content.substring(0, start) + pasted + content.substring(end));
     // The register records what this keypress removed, and only then.
-    if (!displaced.isEmpty()) emc.putGlobalVar("yankRegister", ObjectVisurVar.make(displaced));
+    if (!displaced.isEmpty()) emc.session().putGlobalVar("yankRegister", ObjectVisurVar.make(displaced));
     // Paste finishes at span 0 with the caret on the last pasted character, so the next p — or the next d — meets the
     // text the paste left, not the selection the first one consumed. The span is s's to set, and this is the one
     // command whose post-condition is a span of zero rather than a range that happened to come back empty.

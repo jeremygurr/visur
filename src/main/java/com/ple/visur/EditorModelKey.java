@@ -1,13 +1,11 @@
 package com.ple.visur;
 
 public enum EditorModelKey {
-  connection,
   commandCursor,
   commandStateContent,
   contentY,
   editorContent,
   editorMode,
-  globalVariableMap,
   isInCommandState,
   keyBuffer,
   keyPressed,
@@ -22,7 +20,6 @@ public enum EditorModelKey {
   quantumStart,
   quantumEnd,
   newlineIndices,
-  cursorPositionDCHolder,
   editorSubmodeStack,
   keyToQuantumName,
   span,

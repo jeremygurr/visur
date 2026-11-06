@@ -24,7 +24,7 @@ class ViewportPerClientTest {
 
   /** Twenty-four characters wrap at ten and twenty but not at eighty. */
   private static final String CONTENT = "aaaabbbbccccddddeeeeffff\n";
-  private static final int PORT = 8899;
+  private static final int PORT = 8900;
 
   private static int nextPort;
 

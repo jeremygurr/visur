@@ -43,8 +43,7 @@ public class LineQuantum extends Quantum {
 
   @Override
   public int move(String editorContent, ArrayList<Integer> newlineIndices, MovementVector mv) {
-    BrickVisurVar caBVV = (BrickVisurVar)emc.getGlobalVar("ca");
-    int ca = (int)caBVV.getVal();
+    int ca = emc.getCA();
     int span = emc.getSpan();
     if(span > 0) {
       mv.dy += mv.dx;

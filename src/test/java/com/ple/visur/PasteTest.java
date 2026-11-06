@@ -184,11 +184,11 @@ class PasteTest {
 
   /** Puts a known string in the register without involving the operator under test. */
   private void yank(String text) {
-    emc.putGlobalVar("yankRegister", ObjectVisurVar.make(text));
+    emc.session().putGlobalVar("yankRegister", ObjectVisurVar.make(text));
   }
 
   private String yankRegister() {
-    VisurVar register = emc.getGlobalVar("yankRegister");
+    VisurVar register = emc.session().getGlobalVar("yankRegister");
     return register == null ? null : (String) register.getVal();
   }
 

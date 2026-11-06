@@ -6,7 +6,7 @@ public class RemoveGlobalVarOp implements Operator {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     ExecutionDataStack eds = emc.getExecutionDataStack();
     String nameOfElementToRemove = (String)eds.pop();
-    VariableMap gvm = emc.getGlobalVarMap();
+    VariableMap gvm = emc.session().getGlobalVarMap();
     gvm.remove(nameOfElementToRemove);
   }
 }

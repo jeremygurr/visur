@@ -18,7 +18,7 @@ public class DeleteCursorQuantumOp implements Operator {
       emc.putEditorContent(resultingEditorContent);
       // What was removed goes where a yank puts it, so p can put it back. One unnamed register, so d clobbers y by
       // design; named registers are the map's fog.
-      emc.putGlobalVar("yankRegister", ObjectVisurVar.make(deleted));
+      emc.session().putGlobalVar("yankRegister", ObjectVisurVar.make(deleted));
       int ca = emc.getCA();
       if(ca >= resultingEditorContent.length()) {
         ca = resultingEditorContent.length() > 0 ? resultingEditorContent.length() - 1 : 0;

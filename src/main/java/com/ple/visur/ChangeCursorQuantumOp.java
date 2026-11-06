@@ -20,9 +20,9 @@ public class ChangeCursorQuantumOp implements Operator {
     String qName;
     boolean topElementIsInvalidQuantumName = emc.getQuantumNameToQuantum().get(topElement) == null;
     if(topElementIsInvalidQuantumName) {
-      boolean quantumGlobalVarExistsWithTopElementName = emc.getGlobalVar(topElement).getVal() instanceof Quantum;
+      boolean quantumGlobalVarExistsWithTopElementName = emc.session().getGlobalVar(topElement).getVal() instanceof Quantum;
       if(quantumGlobalVarExistsWithTopElementName) {
-        ObjectVisurVar qOVV = (ObjectVisurVar) emc.getGlobalVar(topElement);
+        ObjectVisurVar qOVV = (ObjectVisurVar) emc.session().getGlobalVar(topElement);
         Quantum q = (Quantum)qOVV.getVal();
         qName = q.getName();
       } else {

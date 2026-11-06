@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class SessionsOnOneDocumentTest {
 
   private static final String CONTENT = "aaaabbbbccccddddeeeeffff\n";
-  private static final int PORT = 8898;
+  private static final int PORT = 8950;
 
   private static int nextPort;
 
@@ -56,6 +56,21 @@ class SessionsOnOneDocumentTest {
   void stopTheServer() {
     // Blocking, so the server is gone before the next test asks for the port range back.
     vertx.close().blockingAwait();
+  }
+
+  @Test
+  void aSelectionBelongsToTheWindowThatMadeIt() {
+    try (WireClient first = new WireClient(vertx, port, 40, 10);
+         WireClient second = new WireClient(vertx, port, 40, 10)) {
+      // A window that joins selects the quantum its cursor is on, exactly as the first window does, so the
+      // interesting baseline is whatever the neighbour was already showing rather than a number from the spec.
+      int untouched = second.span();
+
+      first.presses("5");
+      first.presses("s");
+      assertEquals(5, first.span(), "the window that asked for five quantums has five selected");
+      assertEquals(untouched, second.span(), "the other window is still showing what it showed before its neighbour selected");
+    }
   }
 
   @Test

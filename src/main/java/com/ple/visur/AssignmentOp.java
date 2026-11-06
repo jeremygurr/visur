@@ -15,7 +15,7 @@ public class AssignmentOp implements Operator {
     ExecutionDataStack es = emc.getExecutionDataStack();
     String nameToPut = (String)es.pop();
     String nameOfValueToRetrieve = (String)es.pop();
-    VisurVar vvOfValueRetrieved = emc.getGlobalVar(nameOfValueToRetrieve);
+    VisurVar vvOfValueRetrieved = emc.session().getGlobalVar(nameOfValueToRetrieve);
     Object valueRetrieved = vvOfValueRetrieved.getVal();
     VisurVar vvResult;
     if(vvOfValueRetrieved instanceof BrickVisurVar) {
@@ -23,7 +23,7 @@ public class AssignmentOp implements Operator {
     } else {
       vvResult = ObjectVisurVar.make(valueRetrieved);
     }
-    emc.putGlobalVar(nameToPut, vvResult);
+    emc.session().putGlobalVar(nameToPut, vvResult);
   }
 
 }

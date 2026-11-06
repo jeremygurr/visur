@@ -73,8 +73,10 @@ public final class Connections {
   }
 
   /** A socket was accepted. It gets the default grid until it declares its own. */
-  public static void open(String id) {
-    byId.put(id, new Session());
+  public static Session open(String id) {
+    Session session = new Session();
+    byId.put(id, session);
+    return session;
   }
 
   /** A socket closed. Its session goes with it, which is what keeps this map from growing by one per browser reload. */

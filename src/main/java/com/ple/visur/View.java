@@ -109,7 +109,7 @@ public record View(
    * absence of one: a pending {@code 0} means "none" to every command that reads a count, so it has nothing to show.
    */
   private static boolean includeSeparators(EditorModelCoupler emc) {
-    VisurVar state = emc.getGlobalVar("includeSeparators");
+    VisurVar state = emc.session().getGlobalVar("includeSeparators");
     return state == null || Boolean.TRUE.equals(state.getVal());
   }
 

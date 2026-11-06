@@ -22,28 +22,28 @@ public class SessionText {
 
   /** Called on the way into insert mode, by {@link StashCountOp}, with the count already known to be worth repeating. */
   public static void begin(EditorModelCoupler emc, String separator) {
-    emc.putGlobalVar(SEPARATOR, ObjectVisurVar.make(separator));
-    emc.putGlobalVar(TYPED, ObjectVisurVar.make(""));
+    emc.session().putGlobalVar(SEPARATOR, ObjectVisurVar.make(separator));
+    emc.session().putGlobalVar(TYPED, ObjectVisurVar.make(""));
   }
 
   /** A session that will not repeat anything leaves nothing behind, so the next one cannot inherit it. */
   public static void discard(EditorModelCoupler emc) {
-    emc.getGlobalVarMap().remove(COUNT);
-    emc.getGlobalVarMap().remove(SEPARATOR);
-    emc.getGlobalVarMap().remove(TYPED);
+    emc.session().getGlobalVarMap().remove(COUNT);
+    emc.session().getGlobalVarMap().remove(SEPARATOR);
+    emc.session().getGlobalVarMap().remove(TYPED);
   }
 
   public static void record(EditorModelCoupler emc, String inserted) {
     String typed = typedSoFar(emc);
     if (typed == null) return;
-    emc.putGlobalVar(TYPED, ObjectVisurVar.make(typed + inserted));
+    emc.session().putGlobalVar(TYPED, ObjectVisurVar.make(typed + inserted));
   }
 
   /** One backspace. Clamped at empty: a session that arrowed into old text can delete more than it typed. */
   public static void unrecord(EditorModelCoupler emc) {
     String typed = typedSoFar(emc);
     if (typed == null) return;
-    emc.putGlobalVar(TYPED, ObjectVisurVar.make(typed.isEmpty() ? "" : typed.substring(0, typed.length() - 1)));
+    emc.session().putGlobalVar(TYPED, ObjectVisurVar.make(typed.isEmpty() ? "" : typed.substring(0, typed.length() - 1)));
   }
 
   /**
@@ -81,18 +81,18 @@ public class SessionText {
   }
 
   private static Integer stashedCount(EditorModelCoupler emc) {
-    VisurVar stashed = emc.getGlobalVar(COUNT);
+    VisurVar stashed = emc.session().getGlobalVar(COUNT);
     return stashed == null ? null : (Integer) stashed.getVal();
   }
 
   private static String separator(EditorModelCoupler emc) {
-    VisurVar stashed = emc.getGlobalVar(SEPARATOR);
+    VisurVar stashed = emc.session().getGlobalVar(SEPARATOR);
     return stashed == null ? "" : (String) stashed.getVal();
   }
 
   /** Null when this session is not recording, which is the common case and why this is not an empty string. */
   private static String typedSoFar(EditorModelCoupler emc) {
-    VisurVar stashed = emc.getGlobalVar(TYPED);
+    VisurVar stashed = emc.session().getGlobalVar(TYPED);
     return stashed == null ? null : (String) stashed.getVal();
   }
 }

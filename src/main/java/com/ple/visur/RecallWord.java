@@ -12,7 +12,7 @@ public class RecallWord implements Word {
     if(matcher.matches()) {
       CompiledWordResponse cwr;
       Operator op = new RecallOp();
-      VariableMap gvm = ServiceHolder.editorModelCoupler.getGlobalVarMap();
+      VariableMap gvm = ServiceHolder.editorModelCoupler.session().getGlobalVarMap();
       String recallWordName = matcher.group(1);
       if(gvm.get(recallWordName) != null) {
         cwr = new CompiledWordResponse(op, recallWordName, matcher.group(2));

@@ -48,14 +48,6 @@ public class EditorModelCoupler {
     return ecs.getEditorContent(editorModel);
   }
 
-  public VisurVar getGlobalVar(String varName) {
-    return ecs.getGlobalVar(varName, editorModel);
-  }
-
-  public VariableMap getGlobalVarMap() {
-    return ecs.getGlobalVarMap(editorModel);
-  }
-
   public LineWrapping getLineWrapping() {
     return (LineWrapping) editorModel.get(lineWrapping);
   }
@@ -64,40 +56,38 @@ public class EditorModelCoupler {
     return (int)editorModel.get(virtualCX);
   }
 
-  public int getCA() {
-    BrickVisurVar caBVV = (BrickVisurVar) getGlobalVar("ca");
-    return (int)caBVV.getVal();
-  }
-
-  public int getCX() {
-    BrickVisurVar cxBVV = (BrickVisurVar) getGlobalVar("cx");
-    return (int)cxBVV.getVal();
-  }
-
-  public int getCY() {
-    BrickVisurVar cyBVV = (BrickVisurVar) getGlobalVar("cy");
-    return (int)cyBVV.getVal();
-  }
-
   public ArrayList<Integer> getNextLineIndices() {
     return ecs.getNextLineIndices(editorModel);
   }
 
+  /** One cell for the whole document; see {@link CursorPositionDC.EditorContentService#putNewlineIndicesCell}. */
+  public void putNewlineIndicesCell(BrickVisurVar cell) {
+    ecs.putNewlineIndicesCell(cell, editorModel);
+  }
+
   /**
-   * The connection the code currently executing is working for.
+   * The connection the code currently executing is working for, and it is confined to this thread on purpose.
    *
    * <p>Set once at the top of every inbound message, which is how an operator forty calls deep reaches the geometry
-   * of the client whose key it is handling without anybody in the call chain taking a parameter. It is safe because
-   * one command runs at a time: every verticle here is deployed once, so its consumers are serialised on one context
-   * and a command never yields between adopting a connection and finishing.
+   * of the client whose key it is handling without anybody in the call chain taking a parameter. It holds because a
+   * command never yields: a verticle's consumers are serialised on one context, and the handler runs to completion on
+   * one event-loop thread.
+   *
+   * <p>It would not hold if it were shared. Repainting is a verticle of its own, on another context, and it adopts
+   * each connection in turn to lay the document out at that client's width — so a repaint that started for another
+   * client while a key was mid-command used to leave the rest of that command reading the other client's session,
+   * which showed up as {@code 5 s} setting a span of one because the count typed a key earlier had gone missing.
+   * Per-thread, the repaint steals nothing, because it is not on the key's thread.
    */
+  private static final ThreadLocal<String> connectionForThisThread = new ThreadLocal<>();
+
   public String getConnection() {
-    Object id = editorModel.get(connection);
-    return id instanceof String string ? string : Connections.NONE;
+    String id = connectionForThisThread.get();
+    return id == null ? Connections.NONE : id;
   }
 
   public void putConnection(String id) {
-    editorModel.put(connection, id);
+    connectionForThisThread.set(id);
   }
 
   /**
@@ -109,6 +99,59 @@ public class EditorModelCoupler {
    */
   public Session session() {
     return Connections.session(getConnection());
+  }
+
+  /** The cursor of the session in play. See {@link #session()}. */
+  public int getCA() {
+    return session().getCA();
+  }
+
+  public void putCA(int ca) {
+    session().putCA(ca);
+  }
+
+  public int getCX() {
+    return session().getCX();
+  }
+
+  public void putCX(int cx) {
+    session().putCX(cx);
+  }
+
+  public int getCY() {
+    return session().getCY();
+  }
+
+  public void putCY(int cy) {
+    session().putCY(cy);
+  }
+
+  public int getSpan() {
+    return session().getSpan();
+  }
+
+  public void putSpan(int span) {
+    session().putSpan(span);
+  }
+
+  public Quantum getCursorQuantum() {
+    return (Quantum) session().getGlobalVar("cursorQuantum").getVal();
+  }
+
+  public void putCursorQuantum(Quantum cursorQuantum) {
+    session().putGlobalVar("cursorQuantum", ObjectVisurVar.make(cursorQuantum));
+  }
+
+  public Quantum getScopeQuantum() {
+    return (Quantum) session().getGlobalVar("scopeQuantum").getVal();
+  }
+
+  public void putScopeQuantum(Quantum scopeQuantum) {
+    session().putGlobalVar("scopeQuantum", ObjectVisurVar.make(scopeQuantum));
+  }
+
+  public void putPreviousSearchTarget(String previousSearchTarget) {
+    session().putGlobalVar("previousSearchTarget", ObjectVisurVar.make(previousSearchTarget));
   }
 
   public int getCanvasWidth() {
@@ -212,10 +255,6 @@ public class EditorModelCoupler {
     return (KeyToQuantumName) editorModel.get(keyToQuantumName);
   }
 
-  public Quantum getCursorQuantum() {
-    return (Quantum) getGlobalVar("cursorQuantum").getVal();
-  }
-
   public int getCursorQuantumStart() {
     return (int)editorModel.get(quantumStart);
   }
@@ -225,15 +264,6 @@ public class EditorModelCoupler {
 
   public boolean getIsAtQuantumStart() {
     return (boolean)editorModel.get(isAtQuantumStart);
-  }
-
-  public Quantum getScopeQuantum() {
-    return (Quantum) getGlobalVar("scopeQuantum").getVal();
-  }
-
-  public int getSpan() {
-    ObjectVisurVar spanVV = (ObjectVisurVar) getGlobalVar("span");
-    return (int)spanVV.getVal();
   }
 
   public void initializeEditorContent(String content) {
@@ -272,34 +302,12 @@ public class EditorModelCoupler {
     }
   }
 
-  public void putGlobalVar(String globalVarName, VisurVar globalVarValue) {
-    ecs.putGlobalVar(globalVarName, globalVarValue, editorModel);
-  }
-
   public void putLineWrapping(LineWrapping lw) {
     editorModel.put(lineWrapping, lw);
   }
 
   public void putVirtualCX(int vcx) {
     editorModel.put(virtualCX, vcx);
-  }
-
-  public void putCA(int ca) {
-    BrickVisurVar caBVV = (BrickVisurVar) getGlobalVar("ca");
-    caBVV.putVal(ca);
-    putGlobalVar("ca", caBVV);
-  }
-
-  public void putCX(int cx) {
-    BrickVisurVar cxBVV = (BrickVisurVar) getGlobalVar("cx");
-    cxBVV.putVal(cx);
-    putGlobalVar("cx", cxBVV);
-  }
-
-  public void putCY(int cy) {
-    BrickVisurVar cyBVV = (BrickVisurVar) getGlobalVar("cy");
-    cyBVV.putVal(cy);
-    putGlobalVar("cy", cyBVV);
   }
 
   public void updateNextLineIndices() {
@@ -335,11 +343,6 @@ public class EditorModelCoupler {
 
   public void putEditorSubmodeStack(Stack<EditorSubmode> submodeStack) {
     editorModel.put(editorSubmodeStack, submodeStack);
-  }
-
-  public void putPreviousSearchTarget(String pst) {
-    ObjectVisurVar ovv = ObjectVisurVar.make(pst);
-    putGlobalVar("previousSearchTarget", ovv);
   }
 
   public void putPreviousSearchDirectionWasForward(boolean prevSearchWasForward) {
@@ -380,11 +383,6 @@ public class EditorModelCoupler {
     editorModel.put(keyToQuantumName, keyToQName);
   }
 
-  public void putCursorQuantum(Quantum cq) {
-    ObjectVisurVar cursorQuantumVV = ObjectVisurVar.make(cq);
-    putGlobalVar("cursorQuantum", cursorQuantumVV);
-  }
-
   private void putCursorQuantumStart(int startBound) {
     editorModel.put(quantumStart, startBound);
   }
@@ -412,16 +410,6 @@ public class EditorModelCoupler {
 
   public void putIsAtQuantumStart(boolean isAtQStart) {
     editorModel.put(isAtQuantumStart, isAtQStart);
-  }
-
-  public void putScopeQuantum(Quantum q) {
-    ObjectVisurVar scopeQuantumVV = ObjectVisurVar.make(q);
-    putGlobalVar("scopeQuantum", scopeQuantumVV);
-  }
-
-  public void putSpan(int s) {
-    ObjectVisurVar spanVV = ObjectVisurVar.make(s);
-    putGlobalVar("span", spanVV);
   }
 
   public void incrementCanvasStart() {

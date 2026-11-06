@@ -15,11 +15,13 @@ import java.util.HashMap;
 import java.util.Stack;
 
 import static com.ple.visur.EditorMode.navigate;
-import static com.ple.visur.EditorModelKey.globalVariableMap;
 
 public class InitializerService {
 
   private final EditorModelCoupler emc;
+  private final String startingCursorQuantumName = "character";
+  private final String startingScopeQuantumName = "line";
+  private PrimitiveDataClassBrick newlineIndicesCell;
 
   public static InitializerService make(EditorModelCoupler editorModelCoupler) {
     return new InitializerService(editorModelCoupler);
@@ -31,9 +33,6 @@ public class InitializerService {
   }
 
   public void initializeEditorModel() {
-    VariableMap initialGvm = new VariableMap(new HashMap<>());
-    emc.editorModel.put(globalVariableMap, initialGvm);
-
     emc.session().openFresh();
 
     emc.putEditorMode(navigate);
@@ -101,7 +100,7 @@ public class InitializerService {
       "He has excited domestic insurrections amongst us, and has endeavoured to bring on the inhabitants of our frontiers, the merciless Indian Savages, whose known rule of warfare, is an undistinguished destruction of all ages, sexes and conditions.\n" +
       "\n";
 
-    initializeCursorPositionDCBsAndBVVs();
+    initializeNewlineIndicesCell();
 
     String content = startupContent();
     emc.initializeEditorContent(content);
@@ -110,7 +109,6 @@ public class InitializerService {
     emc.updateNextLineIndices();
     emc.putLineWrapping(LineWrapping.wrapped);
 
-    emc.putCA(0);
     emc.putVirtualCX(0);
     emc.putCanvasStart(0);
     emc.putFY(0);
@@ -119,59 +117,20 @@ public class InitializerService {
     emc.putCommandStateContent("");
     emc.putCommandCursor(emc.getCommandStateContent().length());
     emc.putPreviousSearchTarget("");
-    if(emc.getEditorContent().length() > 0) {
-      emc.putSpan(1);
-    } else {
-      emc.putSpan(0);
-    }
 
-    initializeQuantums();
+    initializeQuantumRegistry();
+
+    // After the registry, because a window starts on a quantum of the document and that is what the registry names.
+    startSession(emc.session());
 
     initializeKeymaps();
 
   }
 
-  private void initializeCursorPositionDCBsAndBVVs() {
-    CursorPositionDCHolder cursorPositionDCHolder = new CursorPositionDCHolder();
-    WholeNumberListDC wholeNumberListDC = cursorPositionDCHolder.wholeNumberListDC;
-    PrimitiveDataClassBrick nlDCB = wholeNumberListDC.makeBrick("nl", new ArrayList<>(), true);
-    CursorPositionDC cursorPositionDC = cursorPositionDCHolder.cursorPositionDC;
-    LayeredDataClassBrick cursorPositionDCB = cursorPositionDC.makeBrick(nlDCB);
-    CompoundDataClassBrick coordinatesDCB = cursorPositionDCB.getLayer(0);
-    CompoundDataClassBrick caAndNLDCB = (CompoundDataClassBrick) coordinatesDCB.getInner("caAndNL");
-    CompoundDataClassBrick cxcyAndNLDCB = (CompoundDataClassBrick) coordinatesDCB.getInner("cxcyAndNL");
-    PrimitiveDataClassBrick cxDCB = (PrimitiveDataClassBrick) cxcyAndNLDCB.getInner("cx");
-    PrimitiveDataClassBrick cyDCB = (PrimitiveDataClassBrick) cxcyAndNLDCB.getInner("cy");
-    PrimitiveDataClassBrick caDCB = (PrimitiveDataClassBrick) caAndNLDCB.getInner("ca");
-    caAndNLDCB.putInner("ca", caDCB);
-    caAndNLDCB.putInner("nl", nlDCB);
-    cxcyAndNLDCB.putInner("cx", cxDCB);
-    cxcyAndNLDCB.putInner("cy", cyDCB);
-    cxcyAndNLDCB.putInner("nl", nlDCB);
-    coordinatesDCB.putInner("caAndNL", caAndNLDCB);
-    coordinatesDCB.putInner("cxcyAndNL", cxcyAndNLDCB);
 
-    initializeBVVs(nlDCB, caDCB, cxDCB, cyDCB);
-
-  }
-
-  private void initializeBVVs(PrimitiveDataClassBrick nlDCB, PrimitiveDataClassBrick caDCB, PrimitiveDataClassBrick cxDCB, PrimitiveDataClassBrick cyDCB) {
-    BrickVisurVar nlBVV = BrickVisurVar.make(nlDCB);
-    BrickVisurVar caBVV = BrickVisurVar.make(caDCB);
-    BrickVisurVar cxBVV = BrickVisurVar.make(cxDCB);
-    BrickVisurVar cyBVV = BrickVisurVar.make(cyDCB);
-    emc.putGlobalVar("nl", nlBVV);
-    emc.putGlobalVar("ca", caBVV);
-    emc.putGlobalVar("cx", cxBVV);
-    emc.putGlobalVar("cy", cyBVV);
-  }
-
-  private void initializeQuantums() {
+  private void initializeQuantumRegistry() {
     EditorSpec editorSpec = EditorSpec.plaintext();
-    String startingCursorQuantumName = "character";
-    String startingScopeQuantumName = "line";
-    QuantumNameToQuantum quantumNameToQuantum = editorSpec.registry();
-    emc.putQuantumNameToQuantum(quantumNameToQuantum);
+    emc.putQuantumNameToQuantum(editorSpec.registry());
 
     KeyToQuantumName keyToQuantumName = new KeyToQuantumName();
     keyToQuantumName.put("q", "character");
@@ -180,16 +139,6 @@ public class InitializerService {
     keyToQuantumName.put("r", "document");
     editorSpec.validate(keyToQuantumName);
     emc.putKeyToQuantumName(keyToQuantumName);
-
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get(startingCursorQuantumName));
-    emc.putScopeQuantum(emc.getQuantumNameToQuantum().get(startingScopeQuantumName));
-    int realCA = emc.getCA();
-    int bounds[] = emc.getQuantumNameToQuantum().get(startingCursorQuantumName).getBoundaries(realCA, emc.getNextLineIndices(), emc.getSpan(), false);
-    emc.putCursorQuantumStartAndScroll(bounds[0]);
-    emc.putCursorQuantumEnd(bounds[1]);
-    emc.putIsAtQuantumStart(true);
-    System.out.println("start bound = " + bounds[0]);
-    System.out.println("end bound = " + bounds[1]);
   }
 
   /**
@@ -327,6 +276,38 @@ public class InitializerService {
     } catch (IOException e) {
       System.out.println("Failed to recover swap file: " + swapPath + " - " + e.getMessage());
     }
+  }
+
+  /**
+   * A window that has just been opened, whether it is the one the server booted with or a socket that arrived while
+   * it was running: it starts on the quantum the editor starts on, with its own cursor and its own variables.
+   *
+   * <p>Everything window-shaped that boot used to do to the single shared model belongs here, because a second client
+   * is a second window and starts where a first one started.
+   */
+  /**
+   * One mutable cell holding where every line in the document starts.
+   *
+   * <p>It lives with the document and every window's cursor is wired to it, because "which row is index 4,231 in" is a
+   * fact about the text: edit it and every window's cursor moves the same way. The data classes do that moving — they
+   * invalidate whatever derives from a cell when the cell is written — which is why this is one cell and not a copy
+   * per window.
+   */
+  private void initializeNewlineIndicesCell() {
+    newlineIndicesCell = new CursorPositionDCHolder().wholeNumberListDC.makeBrick("nl", new ArrayList<>(), true);
+    emc.putNewlineIndicesCell(BrickVisurVar.make(newlineIndicesCell));
+  }
+
+  public void startSession(Session session) {
+    session.installCursorCells(newlineIndicesCell);
+    session.putSpan(emc.getEditorContent().length() > 0 ? 1 : 0);
+    session.putCursorQuantum(emc.getQuantumNameToQuantum().get(startingCursorQuantumName));
+    session.putScopeQuantum(emc.getQuantumNameToQuantum().get(startingScopeQuantumName));
+    int bounds[] = emc.getQuantumNameToQuantum().get(startingCursorQuantumName)
+      .getBoundaries(session.getCA(), emc.getNextLineIndices(), session.getSpan(), false);
+    emc.putCursorQuantumStartAndScroll(bounds[0]);
+    emc.putCursorQuantumEnd(bounds[1]);
+    emc.putIsAtQuantumStart(true);
   }
 
   private void initializeKeymaps() {

@@ -10,7 +10,7 @@ public class YankSpanOp implements Operator {
     int[] extent = emc.getCursorQuantum().operatorExtent();
     String text = content.substring(extent[0], extent[1]);
     if (!text.isEmpty()) {
-      emc.putGlobalVar("yankRegister", ObjectVisurVar.make(text));
+      emc.session().putGlobalVar("yankRegister", ObjectVisurVar.make(text));
     }
   }
 }

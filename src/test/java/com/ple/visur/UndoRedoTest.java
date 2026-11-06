@@ -198,7 +198,7 @@ class UndoRedoTest {
   }
 
   private String register() {
-    return (String) emc.getGlobalVar("yankRegister").getVal();
+    return (String) emc.session().getGlobalVar("yankRegister").getVal();
   }
 
   private void type(String text) {

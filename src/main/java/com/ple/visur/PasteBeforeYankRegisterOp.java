@@ -12,7 +12,7 @@ public class PasteBeforeYankRegisterOp implements Operator {
   @Override
   public void execute(Object ignored) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    VisurVar register = emc.getGlobalVar("yankRegister");
+    VisurVar register = emc.session().getGlobalVar("yankRegister");
     if (register == null) return;
     String value = (String) register.getVal();
     String text = value.replace("\r\n", "\n");

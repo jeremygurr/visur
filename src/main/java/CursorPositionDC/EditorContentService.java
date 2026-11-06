@@ -1,6 +1,7 @@
 package CursorPositionDC;
 
 import com.ple.visur.*;
+
 import io.vertx.rxjava3.core.shareddata.LocalMap;
 
 import java.util.ArrayList;
@@ -17,27 +18,26 @@ public class EditorContentService {
     return (String)editorModel.get(editorContent);
   }
 
-  public CursorPositionDCHolder getCursorPositionDCHolder(LocalMap<EditorModelKey, Object> editorModel) {
-    return (CursorPositionDCHolder)editorModel.get(cursorPositionDCHolder);
-  }
-
-  public VisurVar getGlobalVar(String varName, LocalMap<EditorModelKey, Object> editorModel) {
-    VariableMap globalVarMap = getGlobalVarMap(editorModel);
-    return globalVarMap.get(varName);
-  }
-
-  public VariableMap getGlobalVarMap(LocalMap<EditorModelKey, Object> editorModel) {
-    return (VariableMap) editorModel.get(globalVariableMap);
-  }
-
   public int[] calcLongLineBoundaries(int realCA, ArrayList<Integer> newlineIndices, int span, boolean includeTail, LocalMap<EditorModelKey, Object> editorModel) {
     LineQuantum lineQuantum = new LineQuantum();
     return lineQuantum.getBoundaries(realCA, newlineIndices, span, false);
   }
 
+  /**
+   * Where every line in the document starts, which is a property of the content and of nothing else — no window, no
+   * width. Recomputed whenever the content changes, which is the only thing that can change it.
+   */
   public ArrayList<Integer> getNextLineIndices(LocalMap<EditorModelKey, Object> editorModel) {
-    BrickVisurVar nlBVV = (BrickVisurVar)getGlobalVar("nl", editorModel);
-    return (ArrayList<Integer>) nlBVV.getVal();
+    return (ArrayList<Integer>) newlineIndicesCell(editorModel).getVal();
+  }
+
+  /** One cell for the whole document: every window's cursor derives its row and column from these offsets. */
+  public void putNewlineIndicesCell(BrickVisurVar cell, LocalMap<EditorModelKey, Object> editorModel) {
+    editorModel.put(newlineIndices, new NewlineIndicesCell(cell));
+  }
+
+  private BrickVisurVar newlineIndicesCell(LocalMap<EditorModelKey, Object> editorModel) {
+    return ((NewlineIndicesCell) editorModel.get(newlineIndices)).cell();
   }
 
   public int calcNextNewlineIndexFromAbsPosition(int realCA, LocalMap<EditorModelKey, Object> editorModel) {
@@ -61,20 +61,6 @@ public class EditorContentService {
     updateNextLineIndices(editorModel);
   }
 
-  public void putCursorPositionDCHolder(CursorPositionDCHolder cpDCHolder, LocalMap<EditorModelKey, Object> editorModel) {
-    editorModel.put(cursorPositionDCHolder, cpDCHolder);
-  }
-
-  public void putGlobalVar(String globalVarName, VisurVar globalVarValue, LocalMap<EditorModelKey, Object> editorModel) {
-    VariableMap gvm = getGlobalVarMap(editorModel);
-    gvm.put(globalVarName, globalVarValue); //updates value that was previously at associated key
-    putGlobalVarMap(gvm, editorModel);
-  }
-
-  public void putGlobalVarMap(VariableMap gvm, LocalMap<EditorModelKey, Object> editorModel) {
-    editorModel.put(globalVariableMap, gvm);
-  }
-
   public void updateNextLineIndices(LocalMap<EditorModelKey, Object> editorModel) {
     String content = getEditorContent(editorModel);
     ArrayList<Integer> indices = new ArrayList<>();
@@ -87,9 +73,7 @@ public class EditorContentService {
         indices.add(i);
       }
     }
-    BrickVisurVar nlBVV = (BrickVisurVar) getGlobalVar("nl", editorModel);
-    nlBVV.putVal(indices);
-    putGlobalVar("nl", nlBVV, editorModel);
+    newlineIndicesCell(editorModel).putVal(indices);
   }
 
 
