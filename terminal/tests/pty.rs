@@ -585,6 +585,12 @@ fn a_resize_during_a_search_submode_keeps_the_search_and_repaints() {
   assert_eq!(terminal.quit().code(), Some(0), "ZQ should detach");
 }
 
+/// **Known failing on `HEAD`, and not because of what it tests.** It expects the document its `VISUR_CONTENT_BYTES`
+/// seed made, and gets whatever the shared server at `:8888` was last editing — these pty tests share one server and
+/// one document, so a previous run's paste is in the buffer it asserts against. It failed identically before and after
+/// ticket 02, which is the only reason it counts as known rather than new. The fix is a server per test on its own port
+/// with its own seed file, which is what the launch-argument ticket makes possible; until then, running it needs a
+/// server nobody else has touched, and `VISUR_E2E` unset means CI never sees it rot.
 #[test]
 fn live_multiline_paste_and_document_jumps() {
   if std::env::var("VISUR_E2E").is_err() {

@@ -181,6 +181,34 @@ that any command can leave words on, and two file commands read arguments out of
 05's grammar is where that gets settled, and `clearEDS` (used by exactly two commands today) is the precedent it will
 either generalize or throw away.
 
+## Known broken, nobody's ticket yet
+
+Found while working, verified, and left alone because nothing above owns it. Each entry says how it was seen, because
+"there is a test" is a different claim from "it happened on a real screen".
+
+- **`n` at the last match stops instead of wrapping**, and reports nothing. `beta one beta two beta three`: `f` `beta`
+  `Enter` → 9, `n` → 18, `n` → 18. Vim wraps; visur sits still and says nothing, so the second `n` is indistinguishable
+  from a search that found nothing. The silence is [01](issues/01-message-surface.md)'s rule unmet and the wrap is a
+  decision nobody has made. Seen in an in-process keypress test while checking whether `n` was dead (it is not).
+- **The pty end-to-end tests share one server and one document, and one of them fails on `HEAD`.**
+  `live_multiline_paste_and_document_jumps` expects a seeded 4000-byte document; it gets whatever the server at
+  `:8888` was last editing — the frame it failed on read `FM_PASTE_SECONDplain`, another run's paste sitting on top of
+  my scratch file. It fails identically with and without [02](issues/02-viewport-per-client.md)'s changes, which is how
+  it became a known failure rather than a regression. It is opt-in (`VISUR_E2E=1`), which is why it survives: a test
+  nobody runs cannot rot loudly. What it needs is what [07](issues/07-launch-argument.md) will make possible — a server
+  per test, its own port, its own seed file — so it is recorded at the test as well as here.
+- **Boot prints `operator previousSearchTarget not recognized.` twice.** The `n`/`N` keymap sentences are compiled once
+  at startup, `NativeOpWord` is tried before `RecallWord` and prints for any word it does not know, and the search target
+  is not a search target until a search has happened. Cosmetic at boot, but it is the same matcher-list shape 05 is
+  rewriting, so it is written on [05](issues/05-command-key-and-grammar.md) rather than fixed here.
+- **A keymap sentence cannot recall a per-session variable it does not have yet.** `RecallWord` consults
+  `session().getGlobalVarMap()` at *compile* time, and keymaps compile once at boot — before any client has a session.
+  `previousSearchTarget` survives only because a default var is installed during boot. Any keymap that recalls a var a
+  window might not have set compiles to nothing for the windows that matter, silently. This is
+  [03](issues/03-document-session-split.md)'s split having a consequence 03 did not look for, and it constrains what 05's
+  bare-path matcher may do: a word matcher that consults mutable state at compile time inherits the same order
+  dependence.
+
 ## Not yet specified
 
 - **Screens, tabs, and several documents in one view.** This map builds `Document` and `Session`; it does not decide what

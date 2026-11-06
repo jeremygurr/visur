@@ -64,5 +64,18 @@ say so, which is a rule about the matcher list rather than about these four comm
   server up", so `:q` has to say which of the two it means or it will strand or kill a server by accident.
 - `visur.js` has no test harness, which is why the prompt change is asserted in `screen.rs` and the wire contract, and
   why this ticket's own risk is the browser half.
+- **Three things the matcher list has to leave better than it found them**, all verified while 04 was being checked:
+  - `NativeOpWord` prints `operator X not recognized.` to stdout for any word it does not know, and it is tried before
+    `RecallWord`, so a legitimate recall prints noise on the way to working. It fires twice per boot from the `n`/`N`
+    keymaps. Ticket 01 made an invisible failure the bug; this one is invisible because it goes to a log nobody reads.
+    Whatever 05 decides about unknown words, the print either becomes the message or goes away.
+  - `RecallWord` reads `session().getGlobalVarMap()` while compiling. Keymaps compile at boot, so a keymap word naming a
+    per-session variable resolves against whichever session existed at boot, or not at all, and the compiled command is
+    empty for the windows that should have had it. A bare-path matcher must not do the same thing: match on shape,
+    resolve at execution.
+  - **The keymap analogue of the typo rule.** In the `changeScope` submode (`/`), any key that is not a quantum key pops
+    the submode and returns to navigate with no message: `/` `x` is a silent mode change, and the `x` is spent. Users
+    type `/foo` as vim search and land in whatever the letters happen to bind to next. 05's rule — a word that does not
+    match says so — is the same rule one level up, and the submodes need it as much as the command line does.
 - The command names are user-visible API. `:open` and not `:e` is the user's call, made deliberately, so that when `:e` is
   added someday it means something else rather than being a synonym nobody can remove.
