@@ -29,26 +29,70 @@ class CommandStateServiceTest {
   /**
    * The `;` is the door, not the first word of the sentence. Entering command state left the content empty and the
    * renderers draw the prompt themselves — but the keypress that opened command state fell through into the command
-   * line too, so a command typed from the keyboard began with a `;` nothing could compile. Every test in this file
-   * called the two halves separately and never saw it.
+   * line too, so a command typed from the keyboard began with a prompt character nothing could compile. Every test in
+   * this file called the two halves separately and never saw it.
+   *
+   * <p>It presses the key rather than calling {@code enterCommandStateIfRequested}, because the bug lived in the
+   * handoff between those two halves, not in either one.
    */
   @Test
   void theKeyThatOpensCommandStateIsNotPartOfTheCommand() {
     ServiceHolder.editorModelCoupler.session().putIsInCommandState(false);
     ServiceHolder.editorModelCoupler.session().putCommandStateContent("stale");
 
-    KeyWasPressedVerticle.press(ServiceHolder.editorModelCoupler, KeyPressed.from(";"), ";");
+    KeyWasPressedVerticle.press(ServiceHolder.editorModelCoupler, KeyPressed.from(":"), ":");
 
     assertTrue(ServiceHolder.editorModelCoupler.session().getIsInCommandState());
     assertEquals("", ServiceHolder.editorModelCoupler.session().getCommandStateContent(), "the prompt is drawn, not typed");
   }
 
+  /**
+   * `;` is gone rather than kept alongside: two keys for one door is two keys to draw, document and test forever. What
+   * it has to do is <em>nothing</em> — not open command state, and not fall through as a keystroke either, since a
+   * user with the old key in their fingers typing {@code ;w} should get the absence of a command rather than a `w` in
+   * whatever mode they were already standing in.
+   */
   @Test
-  void semicolonEntersOnlyFromNavigateSubmode() {
+  void theOldCommandKeyOpensNothingAndDoesNothing() {
+    ServiceHolder.editorModelCoupler.session().putIsInCommandState(false);
+    ServiceHolder.editorModelCoupler.session().putCommandStateContent("");
+
+    KeyWasPressedVerticle.press(ServiceHolder.editorModelCoupler, KeyPressed.from(";"), ";");
+
+    assertFalse(ServiceHolder.editorModelCoupler.session().getIsInCommandState(), "the old key is not a second door");
+    assertEquals("", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
+    assertEquals(EditorSubmode.navigate, ServiceHolder.editorModelCoupler.session().getEditorSubmode());
+  }
+
+  /**
+   * The history outlives the rename because it stores commands rather than keystrokes: {@code ArrowUp} hands back what
+   * was executed, and the `:` that opened the line was never part of it.
+   */
+  @Test
+  void historyRecallsACommandTypedWithTheNewKey() {
+    // The fixture has command state open with a sentence in it, because most of this file tests the line editor
+    // directly. This test wants a keyboard, so it starts where a keyboard starts: navigate mode, nothing typed.
+    ServiceHolder.editorModelCoupler.session().putIsInCommandState(false);
+    ServiceHolder.editorModelCoupler.session().putCommandStateContent("");
+    KeyWasPressedVerticle.press(ServiceHolder.editorModelCoupler, KeyPressed.from(":"), ":");
+    for (String key : new String[]{"c", "l", "e", "a", "r", "E", "D", "S"}) {
+      ServiceHolder.commandStateService.executeCommandState(KeyPressed.from(key));
+    }
+    ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("Enter"));
+
+    KeyWasPressedVerticle.press(ServiceHolder.editorModelCoupler, KeyPressed.from(":"), ":");
+    ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("ArrowUp"));
+
+    assertEquals("clearEDS", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
+    assertEquals(8, ServiceHolder.editorModelCoupler.session().getCommandCursor(), "recalled whole, cursor past the end");
+  }
+
+  @Test
+  void colonEntersOnlyFromNavigateSubmode() {
     ServiceHolder.editorModelCoupler.session().putCommandStateContent("stale");
     ServiceHolder.editorModelCoupler.session().putCommandCursor(5);
     ServiceHolder.editorModelCoupler.session().putIsInCommandState(false);
-    KeyWasPressedVerticle.enterCommandStateIfRequested(ServiceHolder.editorModelCoupler, ";");
+    KeyWasPressedVerticle.enterCommandStateIfRequested(ServiceHolder.editorModelCoupler, ":");
     assertEquals(true, ServiceHolder.editorModelCoupler.session().getIsInCommandState());
     assertEquals("", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
 
@@ -56,7 +100,7 @@ class CommandStateServiceTest {
     java.util.Stack<EditorSubmode> submodes = new java.util.Stack<>();
     submodes.push(EditorSubmode.insert);
     ServiceHolder.editorModelCoupler.session().putEditorSubmodeStack(submodes);
-    KeyWasPressedVerticle.enterCommandStateIfRequested(ServiceHolder.editorModelCoupler, ";");
+    KeyWasPressedVerticle.enterCommandStateIfRequested(ServiceHolder.editorModelCoupler, ":");
     assertFalse(ServiceHolder.editorModelCoupler.session().getIsInCommandState());
   }
 

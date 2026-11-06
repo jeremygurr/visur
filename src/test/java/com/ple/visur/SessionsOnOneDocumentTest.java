@@ -165,7 +165,8 @@ class SessionsOnOneDocumentTest {
       assertEquals("", second.message(), "nothing has gone wrong yet, in either window");
 
       // A load of a file that is not there, because it is the shortest thing that is certain to fail and say so.
-      first.types(";\"/it/is/not/here\" loadFile");
+      first.presses(":"); // the door is not part of the sentence
+      first.types("\"/it/is/not/here\" loadFile");
       first.presses("Enter");
 
       assertTrue(first.message().contains("not found"), "the window that asked for the file was told it is not there");
@@ -179,8 +180,8 @@ class SessionsOnOneDocumentTest {
          WireClient second = new WireClient(vertx, port, 40, 10)) {
       assertEquals(false, second.isInCommandState(), "neither window is being asked for a command");
 
-      first.presses(";");
-      assertEquals(true, first.isInCommandState(), "the window that pressed ; is being asked for a command");
+      first.presses(":");
+      assertEquals(true, first.isInCommandState(), "the window that pressed : is being asked for a command");
       assertEquals(false, second.isInCommandState(), "the other window was not asked, and is still editing");
     }
   }

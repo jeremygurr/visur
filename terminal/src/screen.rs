@@ -84,7 +84,7 @@ pub fn mode_line(view: &ViewUpdate, cols: usize) -> String {
 }
 
 fn command_line(view: &ViewUpdate) -> String {
-  let mut line = String::from(";");
+  let mut line = String::from(":");
   for (index, ch) in view.command_state_content.chars().enumerate() {
     if index as i64 == view.command_cursor {
       line.push('|');
@@ -345,7 +345,7 @@ mod tests {
     v.command_state_content = "write".to_string();
     v.command_cursor = 2;
     // The cursor is a bar *before* character 2, not a character of its own.
-    assert_eq!(mode_line(&v, 60), ";wr|ite");
+    assert_eq!(mode_line(&v, 60), ":wr|ite");
   }
 
   #[test]

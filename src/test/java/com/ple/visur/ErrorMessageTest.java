@@ -62,7 +62,8 @@ class ErrorMessageTest {
 
   /** The command state's own syntax, because `:open` does not exist yet; the load path is the same one either way. */
   private void load(String path) {
-    type(";\"" + path + "\" loadFile");
+    type(":"); // the door, and nothing else: the key that opens command state is not part of the sentence
+    type("\"" + path + "\" loadFile");
     KeyWasPressedVerticle.press(emc, KeyPressed.from("Enter"), "Enter");
   }
 

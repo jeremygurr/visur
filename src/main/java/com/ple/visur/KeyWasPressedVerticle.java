@@ -87,7 +87,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
 
   /** @return whether this keypress opened command state, so the caller knows the key is spent */
   static boolean enterCommandStateIfRequested(EditorModelCoupler emc, String key) {
-    if(!emc.session().getIsInCommandState() && key.equals(";") && emc.session().getEditorSubmode() == EditorSubmode.navigate) {
+    if(!emc.session().getIsInCommandState() && key.equals(":") && emc.session().getEditorSubmode() == EditorSubmode.navigate) {
       emc.session().putIsInCommandState(true);
       emc.session().putCommandStateContent("");
       emc.session().putCommandCursor(0);

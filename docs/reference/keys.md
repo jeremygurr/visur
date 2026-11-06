@@ -52,7 +52,7 @@ Quantum keys are shared by every command that takes one:
 | `P` | insert the yank register at the **start** of the selection without deleting anything; the selection keeps covering the same text, shifted right | `P` with three words selected puts the register in front and leaves those three selected |
 | `u` | undo **one command** — the whole command, so an insert session comes back with the line it opened, and everything a count repeated comes back at once. Movement is not an edit: `u` after `5 l` walks back to the last edit, cursor and all. Nothing to undo is a no-op | `s d` then `u`; `3 g`, type, `Escape`, then `u` |
 | `R` | redo one command. A new edit clears what `R` can walk forward to, and the top of the stack is a no-op | `u` then `R` |
-| `;` | open **command state**: type a raw command sentence and run it | `;` `"word" quantumStart` `Enter` |
+'| `:` | open **command state**: type a command and run it. `;` used to be this key and now does nothing at all | `:` `w` `Enter` |
 | `ZZ` | save the file | `ZZ` |
 
 `i`, `a`, `o`, `g` and `G` all stash the current span and cursor quantum, force the span to 0 and the quantum to
@@ -109,7 +109,7 @@ end in a line break those are different characters, and the second is what the q
 | `Enter` | run the search and return to navigate |
 | `Escape` | abandon the search and return to navigate |
 
-## Command state (after `;`)
+## Command state (after `:`)
 
 | key | does |
 |---|---|

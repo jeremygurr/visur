@@ -136,7 +136,7 @@ function clamp(value, low, high) {
 function drawModeLine() {
   document.getElementById("cursorQuantumDisplay").innerHTML = view.cursorQuantum.toUpperCase() + " QUANTUM"
   if(view.isInCommandState) {
-    let commandStateDisplay = ";"
+    let commandStateDisplay = ":"
     let commandCursorWasDrawn = false;
     for(let x = 0; x < view.commandStateContent.length; x++) {
       if(x == view.commandCursor) {
