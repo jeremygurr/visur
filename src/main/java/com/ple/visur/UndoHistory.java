@@ -59,7 +59,7 @@ public class UndoHistory implements Shareable {
   }
 
   void afterCommand(EditorModelCoupler emc) {
-    if(pending == null || emc.getEditorSubmode() != EditorSubmode.navigate) {
+    if(pending == null || emc.session().getEditorSubmode() != EditorSubmode.navigate) {
       return; // mid-session: the unit is not over yet
     }
     if(!pending.content.equals(emc.getEditorContent())) {

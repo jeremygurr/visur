@@ -176,7 +176,7 @@ class UndoRedoTest {
     press("d");
     assertEquals("two\n", emc.getEditorContent(), "an edit, so there is something to undo");
 
-    emc.putOnExecutionDataStack(file.toString());
+    emc.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 
     press("u");

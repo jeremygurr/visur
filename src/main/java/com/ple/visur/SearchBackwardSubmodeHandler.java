@@ -10,7 +10,7 @@ public class SearchBackwardSubmodeHandler implements KeymapHandler {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     CommandCompileService ccs = CommandCompileService.make();
     String key = keyPressed.getKey();
-    ExecutionDataStack eds = emc.getExecutionDataStack();
+    ExecutionDataStack eds = emc.session().getExecutionDataStack();
     if(key.length() == 1) {
       String searchTarget = "";
       if(eds.size() > 0) {
@@ -22,7 +22,7 @@ public class SearchBackwardSubmodeHandler implements KeymapHandler {
     } else if(key.equals("Enter")) {
       String searchTarget = (String)eds.peek();
       emc.putPreviousSearchTarget(searchTarget);
-      emc.putPreviousSearchDirectionWasForward(false);
+      emc.session().putPreviousSearchDirectionWasForward(false);
       return ccs.compile("searchBackward \"navigate\" pushSubmode");
     } else if(key.equals("Escape")) {
       return ccs.compile("\"navigate\" pushSubmode");

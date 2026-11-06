@@ -104,13 +104,13 @@ class SearchFenceTest {
 
   /** The keystroke {@code f} + target + {@code Enter}: the submode leaves the target on the stack and runs the op. */
   private void search(String target) {
-    emc.putOnExecutionDataStack(target);
+    emc.session().putOnExecutionDataStack(target);
     new SearchForwardOp().execute(null);
   }
 
   /** The keystroke {@code 5 s}: an operand on the stack outranks the count. */
   private void select(int span) {
-    emc.putOnExecutionDataStack(span);
+    emc.session().putOnExecutionDataStack(span);
     new SetSpanOp().execute(null);
   }
 

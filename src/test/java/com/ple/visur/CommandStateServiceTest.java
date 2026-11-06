@@ -55,7 +55,7 @@ class CommandStateServiceTest {
     ServiceHolder.editorModelCoupler.putIsInCommandState(false);
     java.util.Stack<EditorSubmode> submodes = new java.util.Stack<>();
     submodes.push(EditorSubmode.insert);
-    ServiceHolder.editorModelCoupler.putEditorSubmodeStack(submodes);
+    ServiceHolder.editorModelCoupler.session().putEditorSubmodeStack(submodes);
     KeyWasPressedVerticle.enterCommandStateIfRequested(ServiceHolder.editorModelCoupler, ";");
     assertFalse(ServiceHolder.editorModelCoupler.getIsInCommandState());
   }
@@ -85,7 +85,7 @@ class CommandStateServiceTest {
     ServiceHolder.editorModelCoupler.putCommandStateContent("1");
     ServiceHolder.editorModelCoupler.putCommandCursor(1);
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("Enter"));
-    assertEquals(1, ServiceHolder.editorModelCoupler.getExecutionDataStack().peek());
+    assertEquals(1, ServiceHolder.editorModelCoupler.session().getExecutionDataStack().peek());
     assertFalse(ServiceHolder.editorModelCoupler.getIsInCommandState());
   }
 

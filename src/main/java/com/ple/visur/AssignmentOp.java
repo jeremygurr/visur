@@ -12,7 +12,7 @@ public class AssignmentOp implements Operator {
   @Override
   public void execute(Object opInfo) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    ExecutionDataStack es = emc.getExecutionDataStack();
+    ExecutionDataStack es = emc.session().getExecutionDataStack();
     String nameToPut = (String)es.pop();
     String nameOfValueToRetrieve = (String)es.pop();
     VisurVar vvOfValueRetrieved = emc.session().getGlobalVar(nameOfValueToRetrieve);

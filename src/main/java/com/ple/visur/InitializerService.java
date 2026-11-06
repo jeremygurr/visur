@@ -35,14 +35,6 @@ public class InitializerService {
   public void initializeEditorModel() {
     emc.session().openFresh();
 
-    emc.putEditorMode(navigate);
-
-    Stack<EditorSubmode> editorSubmodeStack = new Stack<>();
-    editorSubmodeStack.push(EditorSubmode.navigate);
-    emc.putEditorSubmodeStack(editorSubmodeStack);
-
-    emc.putExecutionDataStack(new ExecutionDataStack());
-
     emc.putUndoHistory(new UndoHistory());
 
     final String initialEditorContent = "The unanimous Declaration of the thirteen united States of America, When in the Course of human events, it becomes necessary for one people to dissolve the political bands which have connected them with another, and to assume among the powers of the earth, the separate and equal station to which the Laws of Nature and of Nature’s God entitle them, a decent respect to the opinions of mankind requires that they should declare the causes which impel them to the separation.\n" +
@@ -107,8 +99,6 @@ public class InitializerService {
     // Recover from any swap files left by a crash.
     recoverFromSwapFiles();
     emc.updateNextLineIndices();
-    emc.putLineWrapping(LineWrapping.wrapped);
-
     emc.session().putVirtualCX(0);
     emc.session().putCanvasStart(0);
     emc.session().putFY(0);

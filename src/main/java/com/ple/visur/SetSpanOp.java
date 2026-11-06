@@ -20,7 +20,7 @@ public class SetSpanOp implements Operator {
    * {@code s} selects.
    */
   private static int spanRequested(EditorModelCoupler emc) {
-    ExecutionDataStack eds = emc.getExecutionDataStack();
+    ExecutionDataStack eds = emc.session().getExecutionDataStack();
     if(eds.size() > 0 && eds.peek() instanceof Integer) {
       return (int)eds.pop();
     }

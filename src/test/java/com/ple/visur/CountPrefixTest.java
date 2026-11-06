@@ -26,7 +26,7 @@ class CountPrefixTest {
     ServiceHolder.init(vertx.sharedData());
     emc = ServiceHolder.editorModelCoupler;
     emc.putIsInCommandState(false);
-    emc.putEditorSubmodeStack(navigate());
+    emc.session().putEditorSubmodeStack(navigate());
   }
 
   private static java.util.Stack<EditorSubmode> stackOf(EditorSubmode submode) {
@@ -95,7 +95,7 @@ class CountPrefixTest {
 
   @Test
   void aDigitTypedInInsertModeIsTextNotACount() {
-    emc.putEditorSubmodeStack(stackOf(EditorSubmode.insert));
+    emc.session().putEditorSubmodeStack(stackOf(EditorSubmode.insert));
     assertFalse(CountPrefix.record(emc, "7"));
     assertNull(emc.session().getPendingCount());
   }
@@ -103,7 +103,7 @@ class CountPrefixTest {
   @Test
   void aDigitTypedInASubmodeIsNotACountEither() {
     // [ and ] and search each hold their own submode; a digit there belongs to that submode
-    emc.putEditorSubmodeStack(stackOf(EditorSubmode.quantumEnd));
+    emc.session().putEditorSubmodeStack(stackOf(EditorSubmode.quantumEnd));
     assertFalse(CountPrefix.record(emc, "7"));
     assertNull(emc.session().getPendingCount());
   }
@@ -132,7 +132,7 @@ class CountPrefixTest {
     ServiceHolder.initializerService.initializeEditorModel();
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent("one two three four five six seven eight nine ten\n");
-    emc.putEditorSubmodeStack(navigate());
+    emc.session().putEditorSubmodeStack(navigate());
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
   }

@@ -112,7 +112,7 @@ public abstract class Quantum implements Shareable {
    * <p>This is not the model's {@code scopeQuantum}, which is the fence a search is confined to.
    */
   private Quantum[] getFrameAndCursorQuantums() {
-    ExecutionDataStack eds = emc.getExecutionDataStack();
+    ExecutionDataStack eds = emc.session().getExecutionDataStack();
     String otherQuantumName = (String)eds.pop();
     QuantumNameToQuantum quantumNameToQuantum = emc.getQuantumNameToQuantum();
     Quantum otherQuantum = quantumNameToQuantum.get(otherQuantumName);

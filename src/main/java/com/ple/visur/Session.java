@@ -6,6 +6,7 @@ import DataClass.LayeredDataClassBrick;
 import DataClass.PrimitiveDataClassBrick;
 
 import java.util.ArrayList;
+import java.util.Stack;
 import java.util.HashMap;
 
 /**
@@ -71,6 +72,12 @@ public class Session {
    */
   public void openFresh() {
     vars = new VariableMap(new HashMap<>());
+    editorMode = EditorMode.navigate;
+    editorSubmodeStack = new Stack<>();
+    editorSubmodeStack.push(EditorSubmode.navigate);
+    executionData.clear();
+    lineWrapping = LineWrapping.wrapped;
+    previousSearchDirectionWasForward = false;
     vars.put("span", ObjectVisurVar.make(0));
     pendingCount = null;
   }
@@ -299,6 +306,76 @@ public class Session {
     return (Quantum) getGlobalVar("cursorQuantum").getVal();
   }
 
+  public EditorMode getEditorMode() {
+    return editorMode;
+  }
+
+  public void putEditorMode(EditorMode mode) {
+    editorMode = mode;
+  }
+
+  public EditorSubmode getEditorSubmode() {
+    return editorSubmodeStack.peek();
+  }
+
+  public Stack<EditorSubmode> getEditorSubmodeStack() {
+    return editorSubmodeStack;
+  }
+
+  /**
+   * Push a submode, which is how a key sequence like {@code [} asks for another key. The stack is this window's, so
+   * the question is asked of one pair of hands and not of everybody.
+   */
+  public void putEditorSubmode(EditorSubmode submode) {
+    editorSubmodeStack.push(submode);
+  }
+
+  /**
+   * Take over a stack whole, which is what {@code u} does with a snapshot's.
+   *
+   * <p>The stack is taken, not copied into the one already here: a snapshot keeps the reference it captured, and
+   * clearing the live stack in front of a caller that is holding it empties it — which is what an aliased
+   * clear-then-addAll does to a snapshot restoring itself.
+   */
+  public void putEditorSubmodeStack(Stack<EditorSubmode> submodes) {
+    editorSubmodeStack = submodes;
+  }
+
+  public ExecutionDataStack getExecutionDataStack() {
+    return executionData;
+  }
+
+  public void putOnExecutionDataStack(Object element) {
+    executionData.push(element);
+  }
+
+  /**
+   * The text currently being searched for, or "" when nothing is.
+   *
+   * <p>The cursor that marks the end of the prompt used to be appended where the payload was assembled
+   * ({@code searchTarget += "_"}), which put a rendering decision in the serialiser and left one renderer able to
+   * show a caret the other could not. The caret belongs to the renderer now.
+   */
+  public String getSearchPrompt() {
+    return executionData.size() > 0 ? (String) executionData.peek() : "";
+  }
+
+  public LineWrapping getLineWrapping() {
+    return lineWrapping;
+  }
+
+  public void putLineWrapping(LineWrapping wrapping) {
+    lineWrapping = wrapping;
+  }
+
+  public boolean getPreviousSearchDirectionWasForward() {
+    return previousSearchDirectionWasForward;
+  }
+
+  public void putPreviousSearchDirectionWasForward(boolean searchWasForward) {
+    previousSearchDirectionWasForward = searchWasForward;
+  }
+
   public int getSpan() {
     return (int) ((ObjectVisurVar) vars.get("span")).getVal();
   }
@@ -306,6 +383,23 @@ public class Session {
   public void putSpan(int s) {
     vars.put("span", ObjectVisurVar.make(s));
   }
+
+  /**
+   * What mode and submode this window is in, and what the command running right now has pushed.
+   *
+   * <p>One window can be inserting while another is choosing a quantum, and a command in progress belongs to the key
+   * that started it, so none of this can be shared: a submode pushed by one client used to put every other client's
+   * next key into a keymap it never asked for.
+   */
+  private EditorMode editorMode;
+  private Stack<EditorSubmode> editorSubmodeStack = new Stack<>();
+  private final ExecutionDataStack executionData = new ExecutionDataStack();
+
+  /** Whether the editor wraps lines here, which is a window's: two windows cannot agree on one width. */
+  private LineWrapping lineWrapping;
+
+  /** The direction of the last search this window ran, so `n` means the same direction it just did. */
+  private boolean previousSearchDirectionWasForward;
 
   private int quantumStart;
   private int quantumEnd;

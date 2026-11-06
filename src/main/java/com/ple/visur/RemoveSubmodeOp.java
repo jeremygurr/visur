@@ -6,10 +6,10 @@ public class RemoveSubmodeOp implements Operator {
   @Override
   public void execute(Object opInfo) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    Stack<EditorSubmode> editorSubmodeStack = emc.getEditorSubmodeStack();
+    Stack<EditorSubmode> editorSubmodeStack = emc.session().getEditorSubmodeStack();
     if(editorSubmodeStack.size() > 1) {
       editorSubmodeStack.pop();
-      emc.putEditorSubmodeStack(editorSubmodeStack);
+      emc.session().putEditorSubmodeStack(editorSubmodeStack);
     }
   }
 }

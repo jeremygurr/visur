@@ -72,8 +72,8 @@ public record View(
       emc.session().getIsAtQuantumStart(),
       emc.getCursorQuantum().getName(),
       emc.getScopeQuantum().getName(),
-      emc.getEditorMode().name(),
-      emc.getEditorSubmode().name(),
+      emc.session().getEditorMode().name(),
+      emc.session().getEditorSubmode().name(),
       emc.getIsInCommandState(),
       emc.getCommandStateContent(),
       emc.getCommandCursor(),
@@ -99,9 +99,9 @@ public record View(
 
   /** The search prompt, or empty when nothing is being searched: the field is always present on the wire. */
   private static String searchTarget(EditorModelCoupler emc) {
-    EditorSubmode submode = emc.getEditorSubmode();
+    EditorSubmode submode = emc.session().getEditorSubmode();
     boolean searching = submode == EditorSubmode.searchForward || submode == EditorSubmode.searchBackward;
-    return searching ? emc.getSearchPrompt() : "";
+    return searching ? emc.session().getSearchPrompt() : "";
   }
 
   /**

@@ -34,7 +34,7 @@ class ViewPayloadTest {
     emc.putCA(0);
     java.util.Stack<EditorSubmode> submodes = new java.util.Stack<>();
     submodes.push(navigate);
-    emc.putEditorSubmodeStack(submodes);
+    emc.session().putEditorSubmodeStack(submodes);
     emc.putIsInCommandState(false);
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
     emc.putScopeQuantum(emc.getQuantumNameToQuantum().get("line"));

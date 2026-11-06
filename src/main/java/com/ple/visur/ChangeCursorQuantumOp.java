@@ -16,7 +16,7 @@ public class ChangeCursorQuantumOp implements Operator {
   }
 
   public String getQuantumName(EditorModelCoupler emc) {
-    String topElement = (String)emc.getExecutionDataStack().peek();
+    String topElement = (String)emc.session().getExecutionDataStack().peek();
     String qName;
     boolean topElementIsInvalidQuantumName = emc.getQuantumNameToQuantum().get(topElement) == null;
     if(topElementIsInvalidQuantumName) {
@@ -29,7 +29,7 @@ public class ChangeCursorQuantumOp implements Operator {
         return null;
       }
     } else {
-      qName = (String) emc.getExecutionDataStack().pop();;
+      qName = (String) emc.session().getExecutionDataStack().pop();;
     }
     return qName;
   }

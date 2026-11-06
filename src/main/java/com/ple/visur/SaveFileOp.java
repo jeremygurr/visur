@@ -19,7 +19,7 @@ public class SaveFileOp implements Operator {
   public void execute(Object opInfo) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     String content = emc.getEditorContent();
-    ExecutionDataStack eds = emc.getExecutionDataStack();
+    ExecutionDataStack eds = emc.session().getExecutionDataStack();
 
     // Pop optional path argument
     String targetPath = null;

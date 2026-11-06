@@ -16,7 +16,7 @@ public class CountPrefix {
    * @return whether the keypress was consumed as part of the count, so nothing else should run for it
    */
   static boolean record(EditorModelCoupler emc, String key) {
-    if (!isDigit(key) || emc.getIsInCommandState() || emc.getEditorSubmode() != EditorSubmode.navigate) {
+    if (!isDigit(key) || emc.getIsInCommandState() || emc.session().getEditorSubmode() != EditorSubmode.navigate) {
       return false;
     }
     int digit = key.charAt(0) - '0';
@@ -34,7 +34,7 @@ public class CountPrefix {
    * count in {@code 3 ] w} is typed three keypresses before the jump, so {@code ]} must not consume it.
    */
   static void retireUnlessDigit(EditorModelCoupler emc, String key) {
-    boolean sequenceStillInFlight = emc.getEditorSubmode() != EditorSubmode.navigate;
+    boolean sequenceStillInFlight = emc.session().getEditorSubmode() != EditorSubmode.navigate;
     if (!isDigit(key) && !sequenceStillInFlight) {
       emc.session().clearPendingCount();
     }

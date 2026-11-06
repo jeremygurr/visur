@@ -48,10 +48,6 @@ public class EditorModelCoupler {
     return ecs.getEditorContent(editorModel);
   }
 
-  public LineWrapping getLineWrapping() {
-    return (LineWrapping) editorModel.get(lineWrapping);
-  }
-
   public ArrayList<Integer> getNextLineIndices() {
     return ecs.getNextLineIndices(editorModel);
   }
@@ -150,29 +146,12 @@ public class EditorModelCoupler {
     session().putGlobalVar("previousSearchTarget", ObjectVisurVar.make(previousSearchTarget));
   }
 
-  public EditorMode getEditorMode() {
-    return (EditorMode)editorModel.get(editorMode);
-  }
-
-  public EditorSubmode getEditorSubmode() {
-    Stack<EditorSubmode> submodeStack = getEditorSubmodeStack();
-    return submodeStack.peek();
-  }
-
   public UndoHistory getUndoHistory() {
     return (UndoHistory) editorModel.get(undoHistory);
   }
 
   public void putUndoHistory(UndoHistory history) {
     editorModel.put(undoHistory, history);
-  }
-
-  public Stack<EditorSubmode> getEditorSubmodeStack() {
-    return (Stack<EditorSubmode>) editorModel.get(editorSubmodeStack);
-  }
-
-  public boolean getPreviousSearchDirectionWasForward() {
-    return (boolean) editorModel.get(previousSearchDirectionWasForward);
   }
 
   public KeymapMap getKeymapMap() {
@@ -198,15 +177,6 @@ public class EditorModelCoupler {
    * ({@code searchTarget += "_"}), which put a rendering decision in the serialiser and left one renderer able to
    * show a caret the other could not. The caret belongs to the renderer now.
    */
-  public String getSearchPrompt() {
-    ExecutionDataStack eds = getExecutionDataStack();
-    return eds.size() > 0 ? (String) eds.peek() : "";
-  }
-
-  public ExecutionDataStack getExecutionDataStack() {
-    return (ExecutionDataStack)editorModel.get(executionData);
-  }
-
   public QuantumNameToQuantum getQuantumNameToQuantum() {
     return (QuantumNameToQuantum)editorModel.get(quantumNameToQuantum);
   }
@@ -251,33 +221,11 @@ public class EditorModelCoupler {
     }
   }
 
-  public void putLineWrapping(LineWrapping lw) {
-    editorModel.put(lineWrapping, lw);
-  }
-
   public void updateNextLineIndices() {
     ecs.updateNextLineIndices(editorModel);
   }
 
   /** Resizes the connection in play. Tests use these to say "the window is this wide" without owning a socket. */
-  public void putEditorMode(EditorMode mode) {
-    editorModel.put(editorMode, mode);
-  }
-
-  public void putEditorSubmode(EditorSubmode submode) {
-    Stack<EditorSubmode> editorSubmodeStack = getEditorSubmodeStack();
-    editorSubmodeStack.push(submode);
-    putEditorSubmodeStack(editorSubmodeStack);
-  }
-
-  public void putEditorSubmodeStack(Stack<EditorSubmode> submodeStack) {
-    editorModel.put(editorSubmodeStack, submodeStack);
-  }
-
-  public void putPreviousSearchDirectionWasForward(boolean prevSearchWasForward) {
-    editorModel.put(previousSearchDirectionWasForward, prevSearchWasForward);
-  }
-
   public void putKeymapMap(KeymapMap keymapMap) {
     editorModel.put(modeToKeymap, keymapMap);
   }
@@ -292,16 +240,6 @@ public class EditorModelCoupler {
 
   public void putCommandCursor(int x) {
     editorModel.put(commandCursor, x);
-  }
-
-  public void putOnExecutionDataStack(Object element) {
-    ExecutionDataStack eds = (ExecutionDataStack) editorModel.get(executionData);
-    eds.push(element);
-    putExecutionDataStack(eds);
-  }
-
-  public void putExecutionDataStack(ExecutionDataStack stack) {
-    editorModel.put(executionData, stack);
   }
 
   public void putQuantumNameToQuantum(QuantumNameToQuantum qNameToQuantum) {

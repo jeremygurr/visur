@@ -47,7 +47,7 @@ class ChangeCursorQuantumOpTest {
 
   @Test
   void choosingAQuantumWithNoUnitHereKeepsTheSpanAndSelectsNothing() {
-    emc.putOnExecutionDataStack("word");
+    emc.session().putOnExecutionDataStack("word");
     new ChangeCursorQuantumOp().execute(null);
     assertEquals("word", emc.getCursorQuantum().getName());
     assertEquals(1, emc.getSpan());

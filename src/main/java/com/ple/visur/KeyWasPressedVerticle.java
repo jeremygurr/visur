@@ -51,7 +51,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
       ServiceHolder.commandStateService.executeCommandState(keyPressed);
     } else {
       KeymapMap keymapMap = emc.getKeymapMap();
-      Keymap keymap = keymapMap.get(emc.getEditorSubmode());
+      Keymap keymap = keymapMap.get(emc.session().getEditorSubmode());
       VisurCommand currentCommand = keymap.get(keyPressed);
       CommandExecutionService ces = ServiceHolder.commandExecutionService.make();
       if(currentCommand != null) {
@@ -77,7 +77,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
   static void pasteText(EditorModelCoupler emc, String text) {
     emc.session().clearPendingCount(); // typed text arrives without a keypress, so it retires a pending count the way one would
     emc.clearMessage(); // and it is a thing the user did, which is what retires a message
-    if (!emc.getIsInCommandState() && emc.getEditorSubmode() == EditorSubmode.navigate) {
+    if (!emc.getIsInCommandState() && emc.session().getEditorSubmode() == EditorSubmode.navigate) {
       UndoHistory history = emc.getUndoHistory();
       history.beforeCommand(emc);
       TextInsertion.insertAt(emc, text, emc.getCA());
@@ -87,7 +87,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
 
   /** @return whether this keypress opened command state, so the caller knows the key is spent */
   static boolean enterCommandStateIfRequested(EditorModelCoupler emc, String key) {
-    if(!emc.getIsInCommandState() && key.equals(";") && emc.getEditorSubmode() == EditorSubmode.navigate) {
+    if(!emc.getIsInCommandState() && key.equals(";") && emc.session().getEditorSubmode() == EditorSubmode.navigate) {
       emc.putIsInCommandState(true);
       emc.putCommandStateContent("");
       emc.putCommandCursor(0);

@@ -5,7 +5,7 @@ public class InsertCharOp implements Operator {
   @Override
   public void execute(Object opInfo) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    ExecutionDataStack eds = emc.getExecutionDataStack();
+    ExecutionDataStack eds = emc.session().getExecutionDataStack();
     String charToBeInserted = (String) eds.pop();
     String editorContent = emc.getEditorContent();
     int ca = emc.getCA();

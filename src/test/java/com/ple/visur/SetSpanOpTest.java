@@ -54,7 +54,7 @@ class SetSpanOpTest {
   }
 
   private void requestSpan(int span) {
-    emc.putOnExecutionDataStack(span);
+    emc.session().putOnExecutionDataStack(span);
     new SetSpanOp().execute(null);
   }
 
@@ -130,7 +130,7 @@ class SetSpanOpTest {
   void abindingThatNamesTheSpanIgnoresThePendingCount() {
     // i, a and o enter insert mode with "0 setSpan" compiled into the binding, which outranks a stray count
     emc.session().putPendingCount(5);
-    emc.putOnExecutionDataStack(0);
+    emc.session().putOnExecutionDataStack(0);
     new SetSpanOp().execute(null);
     assertEquals(0, emc.getSpan());
   }
@@ -152,8 +152,8 @@ class SetSpanOpTest {
   void movingAfterADeleteRederivesAWindowThatWide() {
     requestSpan(3);
     new DeleteCursorQuantumOp().execute(null);
-    emc.putOnExecutionDataStack(1);
-    emc.putOnExecutionDataStack(0);
+    emc.session().putOnExecutionDataStack(1);
+    emc.session().putOnExecutionDataStack(0);
     new RelativeMoveOp().execute(null);
     assertEquals(3, emc.getSpan());
     assertEquals(3, selectedWidth());
@@ -175,8 +175,8 @@ class SetSpanOpTest {
 
     List<Integer> wordsAtEachStep = new ArrayList<>();
     for (int step = 0; step < 5; step++) {
-      emc.putOnExecutionDataStack(-1); // one word back; the operator pops dy, then dx
-      emc.putOnExecutionDataStack(0);
+      emc.session().putOnExecutionDataStack(-1); // one word back; the operator pops dy, then dx
+      emc.session().putOnExecutionDataStack(0);
       new RelativeMoveOp().execute(null);
       wordsAtEachStep.add(wordsSelected());
     }

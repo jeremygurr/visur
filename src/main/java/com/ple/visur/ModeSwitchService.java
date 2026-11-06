@@ -10,11 +10,11 @@ public class ModeSwitchService implements OperatorService {
 
 
   private void enterEditingMode() { //Escape
-    ems.putEditorMode(EditorMode.navigate);
+    ems.session().putEditorMode(EditorMode.navigate);
   }
 
   private void enterInsertMode() { //i
-    ems.putEditorMode(EditorMode.insert);
+    ems.session().putEditorMode(EditorMode.insert);
   }
 
   @Override

@@ -81,14 +81,14 @@ class QuantumFrameTest {
   /** The keystroke {@code ] w}: the submode pushes the operand's name, and the cursor quantum runs the jump. */
   private void jumpToEndOfWord(int span) {
     emc.putSpan(span);
-    emc.putOnExecutionDataStack("word");
+    emc.session().putOnExecutionDataStack("word");
     character.quantumEnd();
   }
 
   /** The keystroke {@code [ w}. */
   private void jumpToStartOfWord(int span) {
     emc.putSpan(span);
-    emc.putOnExecutionDataStack("word");
+    emc.session().putOnExecutionDataStack("word");
     character.quantumStart();
   }
 
@@ -109,7 +109,7 @@ class QuantumFrameTest {
     emc.putCA(0);
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
     emc.putSpan(1);
-    emc.putOnExecutionDataStack("character");
+    emc.session().putOnExecutionDataStack("character");
     emc.getQuantumNameToQuantum().get("word").quantumEnd(); // the keystroke ] q, with words as the cursor quantum
     assertEquals("character", emc.getCursorQuantum().getName());
     assertEquals(1, emc.session().getCursorQuantumStart());
@@ -137,7 +137,7 @@ class QuantumFrameTest {
     emc.putCA(0);
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
     emc.putSpan(20);
-    emc.putOnExecutionDataStack("line");
+    emc.session().putOnExecutionDataStack("line");
     emc.getQuantumNameToQuantum().get("word").quantumEnd(); // the keystroke ] e, with words as the cursor quantum
     assertEquals("word", emc.getCursorQuantum().getName());
   }

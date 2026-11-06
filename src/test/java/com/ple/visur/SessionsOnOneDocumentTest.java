@@ -48,7 +48,7 @@ class SessionsOnOneDocumentTest {
     emc.putCA(0);
     Stack<EditorSubmode> submodes = new Stack<>();
     submodes.push(navigate);
-    emc.putEditorSubmodeStack(submodes);
+    emc.session().putEditorSubmodeStack(submodes);
     emc.putIsInCommandState(false);
     ViewportPerClientTest.awaitNoConnections();
   }
@@ -57,6 +57,18 @@ class SessionsOnOneDocumentTest {
   void stopTheServer() {
     // Blocking, so the server is gone before the next test asks for the port range back.
     vertx.close().blockingAwait();
+  }
+
+  @Test
+  void aSubmodeBelongsToTheWindowThatEnteredIt() {
+    try (WireClient first = new WireClient(vertx, port, 40, 10);
+         WireClient second = new WireClient(vertx, port, 40, 10)) {
+      assertEquals("navigate", second.submode(), "both windows start in navigate");
+
+      first.presses("[");
+      assertEquals("quantumStart", first.submode(), "the window that pressed [ is choosing where its range starts");
+      assertEquals("navigate", second.submode(), "the other window is not being asked to choose anything");
+    }
   }
 
   @Test

@@ -4,15 +4,15 @@ public class SearchNotInPreviousDirectionOp implements Operator {
   @Override
   public void execute(Object opInfo) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    boolean previousDirectionWasForward = emc.getPreviousSearchDirectionWasForward();
+    boolean previousDirectionWasForward = emc.session().getPreviousSearchDirectionWasForward();
     if(!previousDirectionWasForward) {
       SearchForwardOp searchForwardOp = new SearchForwardOp();
       searchForwardOp.execute(opInfo);
-      emc.putPreviousSearchDirectionWasForward(false);
+      emc.session().putPreviousSearchDirectionWasForward(false);
     } else {
       SearchBackwardOp searchBackwardOp = new SearchBackwardOp();
       searchBackwardOp.execute(opInfo);
-      emc.putPreviousSearchDirectionWasForward(true);
+      emc.session().putPreviousSearchDirectionWasForward(true);
     }
   }
 }

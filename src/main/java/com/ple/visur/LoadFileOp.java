@@ -20,7 +20,7 @@ public class LoadFileOp implements Operator {
   @Override
   public void execute(Object opInfo) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    ExecutionDataStack eds = emc.getExecutionDataStack();
+    ExecutionDataStack eds = emc.session().getExecutionDataStack();
 
     // loadFile requires a path argument
     if (eds.size() == 0) {

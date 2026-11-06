@@ -45,7 +45,7 @@ class ErrorMessageTest {
     emc.putCA(0);
     Stack<EditorSubmode> submodes = new Stack<>();
     submodes.push(navigate);
-    emc.putEditorSubmodeStack(submodes);
+    emc.session().putEditorSubmodeStack(submodes);
     emc.putIsInCommandState(false);
   }
 

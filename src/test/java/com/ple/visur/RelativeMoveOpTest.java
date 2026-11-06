@@ -81,8 +81,8 @@ class RelativeMoveOpTest {
   }
 
   private void move(int dx, int dy) {
-    emc.putOnExecutionDataStack(dx); // the operator pops dy, then dx
-    emc.putOnExecutionDataStack(dy);
+    emc.session().putOnExecutionDataStack(dx); // the operator pops dy, then dx
+    emc.session().putOnExecutionDataStack(dy);
     new RelativeMoveOp().execute(null);
   }
 }

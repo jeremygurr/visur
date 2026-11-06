@@ -53,7 +53,7 @@ class ViewportPerClientTest {
     emc.putCA(0);
     Stack<EditorSubmode> submodes = new Stack<>();
     submodes.push(navigate);
-    emc.putEditorSubmodeStack(submodes);
+    emc.session().putEditorSubmodeStack(submodes);
     emc.putIsInCommandState(false);
     // Connections is static and the test JVM is shared between classes, so a socket another class forgot, or had not
     // finished forgetting, would otherwise be counted here.

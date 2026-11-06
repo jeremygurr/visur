@@ -45,7 +45,7 @@ class FileIoTest {
   void saveFileToPathWritesExactBytes() throws IOException {
     Path target = tempDir.resolve("test.txt");
     ServiceHolder.editorModelCoupler.putEditorContent("hello\nworld");
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(target.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     new SaveFileOp().execute(null);
 
     byte[] written = Files.readAllBytes(target);
@@ -92,7 +92,7 @@ class FileIoTest {
     Path target = tempDir.resolve("renamed.txt");
     ServiceHolder.editorModelCoupler.putEditorContent("content");
     ServiceHolder.editorModelCoupler.setSourceFilePath(tempDir.resolve("old.txt").toString());
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(target.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     new SaveFileOp().execute(null);
 
     byte[] written = Files.readAllBytes(target);
@@ -104,7 +104,7 @@ class FileIoTest {
   void saveFileNoTrailingNewlinePreservesAbsence() throws IOException {
     Path target = tempDir.resolve("noNewline.txt");
     ServiceHolder.editorModelCoupler.putEditorContent("no trailing newline");
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(target.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     new SaveFileOp().execute(null);
 
     byte[] written = Files.readAllBytes(target);
@@ -117,7 +117,7 @@ class FileIoTest {
   void saveFileWithTrailingNewlinePreservesIt() throws IOException {
     Path target = tempDir.resolve("withNewline.txt");
     ServiceHolder.editorModelCoupler.putEditorContent("trailing\n");
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(target.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     new SaveFileOp().execute(null);
 
     byte[] written = Files.readAllBytes(target);
@@ -132,7 +132,7 @@ class FileIoTest {
     Files.write(file, content.getBytes(StandardCharsets.UTF_8));
 
     ServiceHolder.editorModelCoupler.putEditorContent("original");
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(file.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 
     assertEquals(content, ServiceHolder.editorModelCoupler.getEditorContent());
@@ -142,7 +142,7 @@ class FileIoTest {
   @Test
   void loadFileMissingFileLeavesDocumentUntouched() {
     ServiceHolder.editorModelCoupler.putEditorContent("stays");
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack("/nonexistent/path.txt");
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack("/nonexistent/path.txt");
     new LoadFileOp().execute(null);
 
     assertEquals("stays", ServiceHolder.editorModelCoupler.getEditorContent());
@@ -164,12 +164,12 @@ class FileIoTest {
     Path file = tempDir.resolve("roundtrip.txt");
     String original = "line 1\nline 2\nno trailing newline";
     ServiceHolder.editorModelCoupler.putEditorContent(original);
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(file.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new SaveFileOp().execute(null);
 
     // Now load it back
     ServiceHolder.editorModelCoupler.putEditorContent("REPLACED");
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(file.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 
     assertEquals(original, ServiceHolder.editorModelCoupler.getEditorContent());
@@ -180,7 +180,7 @@ class FileIoTest {
     Path file = tempDir.resolve("crlf.txt");
     String original = "windows\r\nline 2\r\n";
     ServiceHolder.editorModelCoupler.putEditorContent(original);
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(file.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new SaveFileOp().execute(null);
 
     // Verify the file has CRLF
@@ -191,7 +191,7 @@ class FileIoTest {
 
     // Load back
     ServiceHolder.editorModelCoupler.putEditorContent("REPLACED");
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(file.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 
     assertEquals(original, ServiceHolder.editorModelCoupler.getEditorContent());
@@ -206,7 +206,7 @@ class FileIoTest {
 
     // Overwrite to a path in tempDir
     ServiceHolder.editorModelCoupler.putEditorContent(newContent);
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(target.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     // This should succeed
     new SaveFileOp().execute(null);
 
@@ -219,7 +219,7 @@ class FileIoTest {
   void saveFileCreatesParentDirectories() throws IOException {
     Path target = tempDir.resolve("subdir/nested/file.txt");
     ServiceHolder.editorModelCoupler.putEditorContent("nested");
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(target.toString());
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     new SaveFileOp().execute(null);
 
     byte[] written = Files.readAllBytes(target);

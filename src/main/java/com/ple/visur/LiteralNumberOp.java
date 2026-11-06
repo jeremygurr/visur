@@ -7,6 +7,6 @@ public class LiteralNumberOp implements Operator {
 
   @Override
   public void execute(Object opInfo) {
-    ServiceHolder.editorModelCoupler.putOnExecutionDataStack(opInfo);
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(opInfo);
   }
 }

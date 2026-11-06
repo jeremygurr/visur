@@ -6,6 +6,10 @@ import java.util.Stack;
 
 public class ExecutionDataStack implements Shareable {
   Stack<Object> stack = new Stack<>();
+  public void clear() {
+    stack.clear();
+  }
+
   public Object peek() {
     return stack.peek();
   }
