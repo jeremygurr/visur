@@ -55,10 +55,15 @@ Facts established before a ticket was written, each of which changes how a ticke
   and only the terminal ever sends it — crossterm's `Event::Paste` (`main.rs:176-180`). So "paste text from another
   application into the browser page" does nothing today, and fixing it needs no new protocol: a `paste` event handler
   and one frame.
-- **The model conflates document and window.** Ticket [02](issues/02-viewport-per-client.md) took the first piece out —
-  the viewport is per connection now — and the rest of this ticket list is the rest of that argument.
-  `ServiceHolder.editorModelCoupler` is read in **60 places across 57 classes**, so [03](issues/03-document-session-split.md)
-  is not a refactor of one class — it is 57 classes learning which document and which session they mean.
+- **The model no longer conflates document and window.** [03](issues/03-document-session-split.md) landed: `Document`
+  is the text, its path, its undo ring and its line offsets; `Session` is the cursor, selection, count, submode, scroll
+  window, command line and message of one connection; `EditorModelCoupler` is a 94-line locator that hands out
+  `document()` and `session()`. `EditorModelKey` and its shared `LocalMap` are deleted, and so is
+  `EditorContentService`, which existed to read that map on behalf of a caller holding it.
+  **Consequence for the rest of this map: there is a place to put a field, and it is a question with an answer.**
+  Dirty baseline ([04](issues/04-dirty-tracking.md)) is the document's; the selected register
+  ([09](issues/09-register-model.md)) is the map's decision to put in `Registers`, which 03 did not create because
+  nothing writes one yet.
 - **No document has an unsaved-work concept.** There is no dirty flag, no `isDirty`, nothing `modified`; and the swap
   file is named after `sourceFilePath`, so **a document that has never been saved gets no swap at all** — the one case
   where losing work is most likely has no safety net.
@@ -144,7 +149,7 @@ Facts established before a ticket was written, each of which changes how a ticke
 |---|---|---|
 | ~~01~~ [closed](issues/01-message-surface.md) | Errors reach the screen: a message slot in the view, retired by any keypress or paste | — |
 | ~~02~~ [closed](issues/02-viewport-per-client.md) | Viewport per client: `canvasWidth`/`canvasHeight` stop being global; fixes a live two-client bug | — |
-| [03](issues/03-document-session-split.md) | The split: `Document` owns content/path/baseline/undo/swap, `Session` owns cursor/quantum/span/viewport/register | 02 |
+| ~~03~~ [closed](issues/03-document-session-split.md) | The split: `Document` owns content/path/undo/swap, `Session` owns cursor/quantum/span/viewport/mode/command line | 02 |
 | [04](issues/04-dirty-tracking.md) | Dirty is a comparison against the saved baseline; `*` in the mode line; undo back to saved clears it | 03 |
 | [05](issues/05-command-key-and-grammar.md) | `:` replaces `;`, bare paths, `:w` `:open` `:q` `:q!`, and the keypress test `;` never had | 01, 04 |
 | [06](issues/06-swap-files.md) | Swap files: nameless pool, browser state dir, never overwrite, delete on save, vim's three-way prompt for named files | 01, 04, 05 |
@@ -158,6 +163,14 @@ keypress; the user overrode it — any key or paste retires any message — so t
 there is no stickiness anywhere in the design. 01 also found that `press` handed the `;` that opens command state to the
 command line it had just emptied, so **no command typed from a keyboard had ever compiled**, and fixed it; that is why 05
 now finds its keypress test already written.
+
+**03 changed one thing about this table while it was open.** It did not create `Registers`. The map decided the
+selected register is global rather than per window, so it is neither of the two owners 03 made, and inventing a third
+module with one field in it would have been a decision about rotation disguised as a class; [09](issues/09-register-model.md)
+creates it with the rotation rules that justify it. 03 also found that `MainVerticle.start` completed when the verticle
+was constructed rather than when the port was listening, which is a load-dependent "connection refused" in any test that
+deploys the server and connects; that is fixed, and it is the same hole [07](issues/07-launch-argument.md) reports
+through.
 
 ## Not yet specified
 

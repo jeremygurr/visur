@@ -121,6 +121,10 @@ final class WireClient implements AutoCloseable {
     return text.toString();
   }
 
+  String cursorQuantum() {
+    return view().getString("cursorQuantum");
+  }
+
   int cursorCol() {
     return view().getInteger("cursorCol");
   }

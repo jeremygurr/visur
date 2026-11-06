@@ -37,19 +37,22 @@ unchanged and that the two-viewport test from [02](02-viewport-per-client.md) st
 
 ## Done when
 
-- Every `EditorModelKey` value is classified `Document`, `Session`, or *derived cache*, in a table written into this
+- [x] Every `EditorModelKey` value is classified `Document`, `Session`, or *derived cache*, in a table written into this
   issue as a `## Result` before the code lands. Ambiguity resolved, not shelved.
-- `EditorModelCoupler` no longer exposes document state and session state through the same `getX`/`putX` surface for any
+- [x] `EditorModelCoupler` no longer exposes document state and session state through the same `getX`/`putX` surface for any
   of the fields above; `EditorModelKey` itself goes away or is split in the same way.
-- Two sessions on one document: different cursor quantum, different span, different scroll position, **same content**,
+- [x] Two sessions on one document: different cursor quantum, different span, different scroll position, **same content**,
   and an edit in one visible to the other through the same undo ring. This is the test that proves the split is real and
   not a renaming.
-- `SessionText`'s global vars (`tempCount`, `tempInsertSeparator`, `tempTypedText`) live with the session, and the
+- [x] `SessionText`'s global vars (`tempCount`, `tempInsertSeparator`, `tempTypedText`) live with the session, and the
   insert-repeat tests pass with two sessions open.
-- `UndoHistory` lives with the document, and `loadingAFileEmptiesBothStacks` still passes because `:open` creates a new
-  document.
-- The 57 classes are counted in the commit message, and the number is 57 or an explanation of the difference is given.
-- `CODING_STANDARDS.md`'s "one key owns each piece of state" paragraph is rewritten for two owners, since it currently
+- [x] `UndoHistory` lives with the document, and `loadingAFileEmptiesBothStacks` still passes because `:open` creates a new
+  document. **Half-true, and the half that is false matters:** there is no new document, because there is still exactly
+  one per process. The test passes because `LoadFileOp` clears the ring it is holding, and the ring it is holding is now
+  unambiguously the document's. When the screens map makes documents a collection, `:open` onto a document that is
+  already loaded must find the existing one — and its undo ring — instead of clearing a second ring over the same text.
+- [x] The 57 classes are counted in the commit message, and the number is 57 or an explanation of the difference is given.
+- [x] `CODING_STANDARDS.md`'s "one key owns each piece of state" paragraph is rewritten for two owners, since it currently
   asserts a single mutable model and is now wrong.
 
 ## Result (the classification, written before the code lands)
@@ -173,3 +176,65 @@ the tests are edited too, mechanically, accessor by accessor, against the table 
   one most likely to be quietly abandoned half-refactored, at which point the 57 classes are worse than they were.
   A half-split — `Document` extracted, session state still in the coupler — is a **failed** outcome for this ticket,
   because the two-projects-same-state bug it exists to prevent survives.
+
+## What landed
+
+Six commits, `44e8189`…`175e597`, 89 files, +2277/−1795.
+
+**Two owners.** [`Document`](../../src/main/java/com/ple/visur/Document.java) (127 lines) is the content, the path, the
+undo ring, the line-offsets cell, and the swap write that hangs off `putContent` — the ticket's own note said the swap
+writer should read the document rather than the model, and putting it there is what makes `:open` and `:w` and a load
+three lines of [06](06-swap-files.md)'s problem rather than a new hook.
+[`Session`](../../src/main/java/com/ple/visur/Session.java) (520 lines) is the variable map (`ca`, `cx`, `cy`, `span`,
+`cursorQuantum`, `scopeQuantum`, `yankRegister`, `previousSearchTarget`, `includeSeparators`, the three `SessionText`
+temps), the scroll window (`quantumStart`/`End`, `canvasStart`, `fy`, `virtualCX`, `isAtQuantumStart`), the viewport
+from ticket 02, the pending count, `editorMode`, the submode stack, the execution stack, `lineWrapping`, the search
+direction `n` repeats, the command line, and the message.
+[`EditorModelCoupler`](../../src/main/java/com/ple/visur/EditorModelCoupler.java) is 94 lines: `document()`,
+`session()`, the adopted connection, and the three things built at boot and only read after (keymaps, quantum registry,
+key-to-quantum-name).
+
+**The enum is gone, and taking it deleted a class.** `EditorModelKey` (31 values, 10 of them never used as a map key)
+and the shared `LocalMap` go; `EditorContentService` goes with them, being eight methods that read and wrote that map on
+behalf of a caller that already had it. `ServiceHolder` no longer needs `SharedData`. `Session.openFresh` is the one
+place that says what a window starts with, so a client that joins later cannot get a different answer from the first one.
+
+**Call sites.** 56 main classes now reach state through an owner (`git diff --name-only 2b7c587..HEAD -- src/main/java`
+is 65 files, two of them deletions). Against the ticket's "57 classes": the inventory counted 57 readers of
+`editorModelCoupler` plus the two classes being deleted; 56 remain and all 56 name an owner. The difference is
+`EditorContentService` and `EditorModelKey`, which are gone rather than converted.
+
+**The proving test is on the wire.** [`SessionsOnOneDocumentTest`](../../src/test/java/com/ple/visur/SessionsOnOneDocumentTest.java),
+10 tests over two real sockets at different widths: cursor position *and cursor quantum* — one window moving words while
+the other still moves characters — selection, typed count, submode, scroll window, command line, message and
+what-to-repeat belong to the window; content and the undo ring do not — B presses `u` and A's edit
+goes away. Every one of those fails if `session()` returns one shared object, and `static` mutations of the session's
+variable map and submode stack were each used to confirm that they do.
+
+**Seam 2 was not written.** The ticket proposed also testing one `Document` and two `Sessions` with no verticles. It
+would have been cheap — `Session.installCursorCells(document.lineOffsetsCell())` is the whole setup — and it was
+skipped, not forgotten: every assertion it would make about independence the wire test makes through the real boot path,
+and a second harness invites the two to disagree about what a fresh window is. If a per-session bug ever hides where
+the wire cannot see it, that harness is the first thing to add.
+
+**Existing tests: changed in call site, unchanged in assertion**, as the ticket asked — with two exceptions, both
+because a test had been *seeding* state the boot path now owns (`emc.putUndoHistory(new UndoHistory())`,
+`initializeNewlineIndicesCell`) and one assertion in `UndoRedoTest` that reached `editorModel` directly.
+
+## Found on the way
+
+- **`putEditorSubmodeStack` emptied the stack it was given.** Undo snapshots the submode stack, keeps the reference, and
+  hands it back; a `clear(); addAll(sameStack)` restore therefore cleared the very stack the snapshot was holding, and
+  the next keypress threw `EmptyStackException`. The take-the-reference version reproduces what the map did before. A
+  snapshot that restores itself is a caller you must not mutate in place.
+- **`MainVerticle.start` completed when the verticle was constructed, not when the port was listening.** Every test that
+  deploys the server and connected lost that race under load — "connection refused" in a full run, green in isolation.
+  `start` now takes the `Promise` and completes it from `listen`. The comment in that method about consumers existing
+  before the port opens was already telling the truth about the intent and lying about the implementation.
+- **`operator previousSearchTarget not recognized.` on every keypress**, from the keymap compiling
+  `previousSearchTarget searchInPreviousDirection` and `NativeOpWord` trying the first word as an operator. Pre-existing
+  (identical at `2b7c587`), and it is [05](05-command-key-and-grammar.md)'s grammar that decides what a variable word in
+  a compiled command is.
+- **`Registers` does not exist yet**, deliberately: the selected register is global by the map's decision, so it belongs
+  to neither owner, and a module with one field in it is a decision about rotation in disguise.
+  [09](09-register-model.md) makes it with the rotation rules that justify it.

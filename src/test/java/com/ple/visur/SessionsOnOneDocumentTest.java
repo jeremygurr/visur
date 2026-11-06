@@ -180,6 +180,12 @@ class SessionsOnOneDocumentTest {
       first.presses("l");
       assertEquals(3, first.cursorQuantumStart(), "the window that moved right three times is three characters in");
       assertEquals(0, second.cursorQuantumStart(), "the other window has not moved, and will not until its own keys arrive");
+
+      // Not just where the cursor is: what the cursor *is*. One window moving a word at a time while the other is
+      // still moving a character at a time is the whole reason the quantum cannot be a property of the document.
+      first.presses("w");
+      assertEquals("word", first.cursorQuantum(), "the window that pressed w moves words now");
+      assertEquals("character", second.cursorQuantum(), "the other window never asked for that, and is not moving words");
     }
   }
 
