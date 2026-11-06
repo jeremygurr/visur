@@ -72,7 +72,11 @@ pub fn mode_line(view: &ViewUpdate, cols: usize) -> String {
       count
     )
   };
-  pad(&format!("{label}{tail}"), cols)
+  // An error is the only thing on this line that is about what just happened rather than about what mode you are in,
+  // so it takes the whole tail and leaves the mode word standing: at forty columns you can have the mode or the span,
+  // and the span is not what reads a failed save.
+  let body = if view.message.is_empty() { tail } else { format!("! {}", view.message) };
+  pad(&format!("{label}{body}"), cols)
 }
 
 fn command_line(view: &ViewUpdate) -> String {
@@ -256,6 +260,22 @@ mod tests {
     let v = navigate_view();
     assert_eq!(mode_line(&v, 40).trim_end(), " NAVIGATE MODE  WORD QUANTUM  SCOPE=LINE");
     assert_eq!(mode_line(&v, 40).chars().count(), 40, "padded out to the width it was asked for");
+  }
+
+  /// An error takes the tail of the line. At forty columns there is room for the mode or for the quantum, and the mode
+  /// is the thing you want when something has just gone wrong — you cannot read "SPAN=3" into a saved file. The message
+  /// is what clips, at the right, like everything else on the line.
+  #[test]
+  fn an_error_takes_the_tail_of_the_mode_line_and_clips_at_the_right() {
+    let mut v = navigate_view();
+    v.message = "loadFile: file not found: /tmp/gone.txt".to_string();
+    assert_eq!(
+      mode_line(&v, 80).trim_end(),
+      " NAVIGATE MODE ! loadFile: file not found: /tmp/gone.txt",
+      "the error is drawn where the quantum, fence, span and count were"
+    );
+    assert!(mode_line(&v, 40).starts_with(" NAVIGATE MODE ! loadFile"), "the mode outlives the clip");
+    assert_eq!(mode_line(&v, 40).chars().count(), 40, "padded to the width it was asked for");
   }
 
   #[test]

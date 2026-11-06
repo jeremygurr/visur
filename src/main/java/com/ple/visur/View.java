@@ -35,7 +35,8 @@ public record View(
   String commandStateContent,
   int commandCursor,
   String searchTarget,
-  int pendingCount
+  int pendingCount,
+  String message
 ) {
 
   /**
@@ -77,7 +78,8 @@ public record View(
       emc.getCommandStateContent(),
       emc.getCommandCursor(),
       searchTarget(emc),
-      pendingCount(emc)
+      pendingCount(emc),
+      emc.getMessage()
     );
   }
 
@@ -137,6 +139,7 @@ public record View(
     payload.put("commandCursor", commandCursor);
     payload.put("searchTarget", searchTarget);
     payload.put("pendingCount", pendingCount);
+    payload.put("message", message);
     return payload;
   }
 

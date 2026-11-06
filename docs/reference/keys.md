@@ -141,3 +141,12 @@ bounds only: span, cursor quantum and search are untouched by the toggle.
 
 Counting already means four things, and vim has all four: it multiplies a span (`3 s`), repeats a motion or jump
 (`3 l`, `3 ] e`), multiplies an operator's extent (`3 d`), and repeats an insert session (`3 g`).
+
+## Errors
+
+**When something you asked for fails, the mode line says so**, prefixed with `!`: `! loadFile: file not found: /tmp/gone.txt`.
+It is the only thing on that line that describes what just happened rather than what mode you are in, so in the terminal it
+takes the tail — the quantum, `SCOPE=`, `SEP=` and `SPAN=` make room for it, and the mode word stays. A message is retired
+by the next keypress or paste, including after a failed save: it reports the last thing you asked for, and once you ask for
+something else it is stale. Nothing is reported by any other channel; the server log still has the same text, for a bug
+report rather than for you.

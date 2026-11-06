@@ -32,6 +32,13 @@ pending snapshot survives an insert session and `g`, the typing and the count's 
 undo exists — that is what keeps a command's boundary from being gotten wrong once per operator. `undo` and `redo` clear
 the pending snapshot themselves, which is how they decline to count as an edit.
 
+`reportError` is how an operator tells the user something failed, and it has exactly two destinations: the model, where a
+renderer can draw it, and stdout, where the log keeps a copy for a bug report. Nothing else prints a problem, and nothing
+else draws one — the message is one string on the view payload, not a severity, not a code, not a second message. It is
+retired at the top of `press`, before the key runs, because a message describes what the last thing the user asked for did:
+clearing it afterwards would erase the message that very key reported, and leaving it past the next keypress would leave a
+stale complaint on screen.
+
 ## Document types are declared, not hardcoded
 
 A quantum and the facts about it — its name, what separates it from the next quantum, how coarse it is — belong to an

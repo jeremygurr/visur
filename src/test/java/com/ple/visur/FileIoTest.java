@@ -65,6 +65,16 @@ class FileIoTest {
     assertEquals(content, new String(written, StandardCharsets.UTF_8));
   }
 
+  /**
+   * What each of the three tests below asserts now, and did not before: that a message exists at all. Asserting only
+   * that the document is unchanged was a test that passed with {@code reportError} doing nothing but printing, which is
+   * how every file error in this editor stayed invisible to the person it was for.
+   */
+  private void assertReportedSomethingWorthReading() {
+    String message = ServiceHolder.editorModelCoupler.getMessage();
+    assertFalse(message.isBlank(), "an error the screen does not show is an error that did not happen");
+  }
+
   @Test
   void saveFileWithoutPathOrSourceReportsError() throws IOException {
     ServiceHolder.editorModelCoupler.putEditorContent("no source");
@@ -74,6 +84,7 @@ class FileIoTest {
 
     // Document is unchanged
     assertEquals("no source", ServiceHolder.editorModelCoupler.getEditorContent());
+    assertReportedSomethingWorthReading();
   }
 
   @Test
@@ -135,6 +146,8 @@ class FileIoTest {
     new LoadFileOp().execute(null);
 
     assertEquals("stays", ServiceHolder.editorModelCoupler.getEditorContent());
+    assertTrue(ServiceHolder.editorModelCoupler.getMessage().contains("/nonexistent/path.txt"),
+      "an error that does not name the file it failed on tells the user nothing");
   }
 
   @Test
@@ -143,6 +156,7 @@ class FileIoTest {
     new LoadFileOp().execute(null);
 
     assertEquals("stays", ServiceHolder.editorModelCoupler.getEditorContent());
+    assertReportedSomethingWorthReading();
   }
 
   @Test

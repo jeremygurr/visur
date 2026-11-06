@@ -31,6 +31,8 @@ pub struct ViewUpdate {
   pub search_target: String,
   /// The count typed in front of a key and not yet spent; zero when none was typed (spec §5.9).
   pub pending_count: i64,
+  /// What went wrong the last time the user asked for something; empty when nothing did.
+  pub message: String,
 }
 
 fn string(body: &Value, key: &str) -> String {
@@ -89,6 +91,7 @@ pub fn parse(frame: &str) -> Option<ViewUpdate> {
     command_cursor: number(&body, "commandCursor"),
     search_target: string(&body, "searchTarget"),
     pending_count: number(&body, "pendingCount"),
+    message: string(&body, "message"),
   })
 }
 
@@ -103,7 +106,8 @@ mod tests {
     "span":1,"cursorQuantumStart":13,"cursorQuantumEnd":14,"cursorRow":2,"cursorCol":7,
     "isAtQuantumStart":true,"cursorQuantum":"character","scopeQuantum":"line",
     "editorMode":"navigate","editorSubmode":"character","isInCommandState":false,
-    "commandStateContent":"","commandCursor":0,"searchTarget":"necess","pendingCount":4}}"#;
+    "commandStateContent":"","commandCursor":0,"searchTarget":"necess","pendingCount":4,
+    "message":"loadFile: file not found: /tmp/gone.txt"}}"#;
 
   #[test]
   fn decodes_every_field_of_the_view_payload() {
@@ -130,6 +134,7 @@ mod tests {
     assert_eq!(view.command_cursor, 0);
     assert_eq!(view.search_target, "necess");
     assert_eq!(view.pending_count, 4);
+    assert_eq!(view.message, "loadFile: file not found: /tmp/gone.txt");
   }
 
   #[test]
@@ -155,6 +160,7 @@ mod tests {
     assert_eq!(view.span, 0);
     assert_eq!(view.search_target, "");
     assert_eq!(view.pending_count, 0, "no count typed is no count shown");
+    assert_eq!(view.message, "", "nothing reported draws nothing");
     assert!(!view.full);
   }
 }

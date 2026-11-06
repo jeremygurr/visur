@@ -36,7 +36,7 @@ characters in it is, and those three characters have never been anywhere except 
 - A document loaded from disk is clean. A document saved to a *new* path via `:w other.txt` is clean and its baseline is
   now that file.
 - An empty unnamed document is clean; the same document with one character typed is dirty.
-- Saving to an unwritable path leaves the document **dirty** and raises [01](01-message-surface.md)'s sticky message. A
+- Saving to an unwritable path leaves the document **dirty** and raises [01](01-message-surface.md)'s message. A
   failed save that clears the marker is the worst bug this ticket could ship.
 - The marker survives the 40-column clip, asserted by extending the existing clip test rather than a new one.
 - `:open` and `:q` read this and nothing else — no second notion of unsaved-ness appears in [05](05-command-key-and-grammar.md).

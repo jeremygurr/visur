@@ -33,10 +33,17 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
    * {@link CountPrefixTest} needs to show {@code 12 s} reaching the model.
    */
   static void press(EditorModelCoupler emc, KeyPressed keyPressed, String key) {
+    // Before the key runs, not after: a message reports what the last thing the user asked for did, and the key they
+    // are pressing now is what makes it stale. Clearing afterwards would erase the message this very key reports.
+    emc.clearMessage();
     if(CountPrefix.record(emc, key)) {
       return; // a digit in navigate mode is the count for the next key, not a command of its own
     }
-    enterCommandStateIfRequested(emc, key);
+    if(enterCommandStateIfRequested(emc, key)) {
+      // The prompt is drawn by the renderers, and a command line that began with the `;` that opened it compiled to
+      // nothing, so this key opens command state and does nothing else.
+      return;
+    }
     if(emc.getIsInCommandState()) {
       ServiceHolder.commandStateService.executeCommandState(keyPressed);
     } else {
@@ -64,6 +71,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
   /** A pasted block arrives on the bus rather than as a key; static for the same reason {@link #press} is. */
   static void pasteText(EditorModelCoupler emc, String text) {
     emc.clearPendingCount(); // typed text arrives without a keypress, so it retires a pending count the way one would
+    emc.clearMessage(); // and it is a thing the user did, which is what retires a message
     if (!emc.getIsInCommandState() && emc.getEditorSubmode() == EditorSubmode.navigate) {
       UndoHistory history = emc.getUndoHistory();
       history.beforeCommand(emc);
@@ -72,12 +80,15 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
     }
   }
 
-  static void enterCommandStateIfRequested(EditorModelCoupler emc, String key) {
+  /** @return whether this keypress opened command state, so the caller knows the key is spent */
+  static boolean enterCommandStateIfRequested(EditorModelCoupler emc, String key) {
     if(!emc.getIsInCommandState() && key.equals(";") && emc.getEditorSubmode() == EditorSubmode.navigate) {
       emc.putIsInCommandState(true);
       emc.putCommandStateContent("");
       emc.putCommandCursor(0);
+      return true;
     }
+    return false;
   }
 
 }

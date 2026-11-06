@@ -84,9 +84,10 @@ Facts established before a ticket was written, each of which changes how a ticke
 
 <!-- settled in the grilling session of 2026-11-09, before any ticket was written -->
 
-- **Errors surface on screen.** A message slot in the view, cleared by the next keypress — except a **failed save, which
-  survives until the user acts**, because "your save failed and you now have unsaved work" must not scroll away under
-  more typing. One surface, two lifetimes.
+- **Errors surface on screen.** A message slot in the view, cleared by **any keypress or paste** — including a failed
+  save. One surface, one lifetime: the message says what went wrong the last time the user asked for something, and the
+  moment they ask for anything else it is stale. There is deliberately no sticky message, because the key that would
+  clear it is the key the user is pressing anyway.
 - **The document/session split is this map's own ticket**, because dirty baseline, path, swap identity, undo history and
   the selected register are all per-document or per-window state and every one of them is added by this map. Bolting them
   onto the singleton means the screens map deletes them later. Accepted cost: 57 classes.
@@ -129,7 +130,7 @@ Facts established before a ticket was written, each of which changes how a ticke
 
 | # | ticket | blocked by |
 |---|---|---|
-| [01](issues/01-message-surface.md) | Errors reach the screen: a message slot in the view, next-keypress-cleared, with failed saves surviving | — |
+| ~~01~~ [closed](issues/01-message-surface.md) | Errors reach the screen: a message slot in the view, retired by any keypress or paste | — |
 | [02](issues/02-viewport-per-client.md) | Viewport per client: `canvasWidth`/`canvasHeight` stop being global; fixes a live two-client bug | — |
 | [03](issues/03-document-session-split.md) | The split: `Document` owns content/path/baseline/undo/swap, `Session` owns cursor/quantum/span/viewport/register | 02 |
 | [04](issues/04-dirty-tracking.md) | Dirty is a comparison against the saved baseline; `*` in the mode line; undo back to saved clears it | 03 |
@@ -139,6 +140,12 @@ Facts established before a ticket was written, each of which changes how a ticke
 | [08](issues/08-clipboard-transport.md) | Clipboard transport: outbound write request, inbound contents, server-side cache, one write per command; `/eventbus` loopback check | 01 |
 | [09](issues/09-register-model.md) | `|` selects a register: `|0` clipboard, `|1`–`|9` rotation, `|a`–`|z` named, freeze toggle | 03, 08 |
 | [10](issues/10-browser-clipboard.md) | Browser clipboard both ways: the `paste` event visur never wired, `writeText`, `readText` | 08 |
+
+**01 changed one thing about this table while it was open.** The map decided a failed save should outlive the next
+keypress; the user overrode it — any key or paste retires any message — so the message is one string with one lifetime and
+there is no stickiness anywhere in the design. 01 also found that `press` handed the `;` that opens command state to the
+command line it had just emptied, so **no command typed from a keyboard had ever compiled**, and fixed it; that is why 05
+now finds its keypress test already written.
 
 ## Not yet specified
 

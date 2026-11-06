@@ -66,4 +66,18 @@ class ViewPayloadTest {
     KeyWasPressedVerticle.press(emc, KeyPressed.from("2"), "2");
     assertEquals(312, View.of(emc).render().getInteger("pendingCount"), "digits accumulate into one count");
   }
+
+  /**
+   * An error the user cannot see is an error that never happened: a failed load and an unbound key look identical on
+   * screen. So the message travels to the renderer like any other mode-line field, and an editor that has reported
+   * nothing shows nothing.
+   */
+  @Test
+  void aReportedErrorTravelsToThePayloadAndAnEditorThatReportedNothingShowsNothing() {
+    assertEquals("", View.of(emc).render().getString("message"), "nothing reported is nothing shown");
+
+    emc.reportError("loadFile: file not found: /tmp/gone.txt");
+
+    assertEquals("loadFile: file not found: /tmp/gone.txt", View.of(emc).render().getString("message"));
+  }
 }

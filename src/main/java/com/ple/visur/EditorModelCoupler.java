@@ -437,8 +437,26 @@ public class EditorModelCoupler {
     }
   }
 
+  /**
+   * Tell the user something went wrong: on the screen, and in the log.
+   *
+   * <p>The screen half is what makes an error an error — before it, a failed load and an unbound key were
+   * indistinguishable to anyone not reading the server log. The log half stays because a message on screen is gone on
+   * the next keypress and a bug report outlives it.
+   */
   public void reportError(String message) {
     System.out.println(message);
+    editorModel.put(EditorModelKey.message, message);
+  }
+
+  /** The message to draw, or empty when there is none: the field is always present on the wire. */
+  public String getMessage() {
+    Object val = editorModel.get(message);
+    return val == null ? "" : (String) val;
+  }
+
+  public void clearMessage() {
+    editorModel.remove(message);
   }
 
   public String getSourceFilePath() {

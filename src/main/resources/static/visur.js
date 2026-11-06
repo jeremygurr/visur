@@ -162,6 +162,10 @@ function drawModeLine() {
       document.getElementById("currentEditorModeDisplay").innerHTML += "; COUNT = " + view.pendingCount
     }
   }
+  // Last, because it is about what just happened rather than what mode you are in, and it is drawn in every mode.
+  if(view.message) {
+    document.getElementById("currentEditorModeDisplay").innerHTML += "; ! " + view.message
+  }
 }
 
 function toXContent(x) {

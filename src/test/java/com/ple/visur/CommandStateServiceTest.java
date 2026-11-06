@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CommandStateServiceTest {
   private Vertx vertx;
@@ -23,6 +24,23 @@ class CommandStateServiceTest {
   @AfterEach
   void tearDown() {
     vertx.close();
+  }
+
+  /**
+   * The `;` is the door, not the first word of the sentence. Entering command state left the content empty and the
+   * renderers draw the prompt themselves — but the keypress that opened command state fell through into the command
+   * line too, so a command typed from the keyboard began with a `;` nothing could compile. Every test in this file
+   * called the two halves separately and never saw it.
+   */
+  @Test
+  void theKeyThatOpensCommandStateIsNotPartOfTheCommand() {
+    ServiceHolder.editorModelCoupler.putIsInCommandState(false);
+    ServiceHolder.editorModelCoupler.putCommandStateContent("stale");
+
+    KeyWasPressedVerticle.press(ServiceHolder.editorModelCoupler, KeyPressed.from(";"), ";");
+
+    assertTrue(ServiceHolder.editorModelCoupler.getIsInCommandState());
+    assertEquals("", ServiceHolder.editorModelCoupler.getCommandStateContent(), "the prompt is drawn, not typed");
   }
 
   @Test

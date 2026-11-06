@@ -18,7 +18,7 @@ because two keys for one entry point is two keys to document and test forever.
 
 **`:` then `w`, `open`, `q`, `q!`.** `:w` writes the remembered path; `:w path` writes there and adopts it as the path
 (this is `saveFile`'s existing "explicit path updates source" behaviour, already tested); `:open path` loads a file.
-`:q` refuses when [04](04-dirty-tracking.md) says dirty, and the refusal is [01](01-message-surface.md)'s sticky message
+`:q` refuses when [04](04-dirty-tracking.md) says dirty, and the refusal is [01](01-message-surface.md)'s message
 naming what to type instead. `:q!` quits and **discards the nameless `.sw*`** of the current document
 ([06](06-swap-files.md) owns that file's life; this ticket owns the command that ends it). `ZZ` survives as a key — a key
 and a command are different surfaces, not a dual binding. `:e`, `:saveas`, `:wq` and the rest stay out.
@@ -36,9 +36,10 @@ say so, which is a rule about the matcher list rather than about these four comm
 ## Done when
 
 - `:` opens command state and both clients draw `:` as the prompt. `;` opens nothing, and it is gone from `keys.md`.
-- **A keypress test presses the key.** `CommandStateServiceTest` calls `executeCommandState` directly, so the key that
-  opens command state has never been tested — the same hole `\` shipped through, bound to a two-character token while
-  every client sent one.
+- **A keypress test presses the key.** `CommandStateServiceTest.theKeyThatOpensCommandStateIsNotPartOfTheCommand` exists
+  since ticket 01 and presses it for real — it is what caught `press` handing the `;` to the command line it had just
+  emptied, so every command typed from a keyboard compiled to nothing. Retarget it at `:` and keep pressing the key, rather
+  than going back to calling `executeCommandState` directly.
 - `:w`, `:w path`, `:open path`, `:q`, `:q!` each have a test at the seam a human uses: the sentence goes through
   `CommandCompileService`, not into an operator by hand. Every existing `FileIoTest` test builds its command directly,
   which is how the bare-path breakage stayed invisible.
