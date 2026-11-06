@@ -142,6 +142,18 @@ bounds only: span, cursor quantum and search are untouched by the toggle.
 Counting already means four things, and vim has all four: it multiplies a span (`3 s`), repeats a motion or jump
 (`3 l`, `3 ] e`), multiplies an operator's extent (`3 d`), and repeats an insert session (`3 g`).
 
+## The mode line
+
+The last row names the mode and then the state the keys are working on: the cursor quantum, `SCOPE=`, `SEP=`, `SPAN=`,
+and `COUNT=` while a count is pending. **A `*` stuck to the mode word means the text holds work no file has**:
+`NAVIGATE MODE*`. It arrives when you type and leaves when you save — including when an `u` puts back exactly what the
+file already had, which is why it compares against the saved text rather than remembering that you edited. It is glued
+to the mode word because everything right of it is what a narrow window clips and what an error message overwrites, and
+an unsaved file is the last thing a window should be made to stop saying.
+
+There is no key for the marker and there must not be one: it states a fact about the data, and a fact the user can
+toggle is a fact the user will disbelieve.
+
 ## Errors
 
 **When something you asked for fails, the mode line says so**, prefixed with `!`: `! loadFile: file not found: /tmp/gone.txt`.

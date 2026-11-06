@@ -88,6 +88,11 @@ final class WireClient implements AutoCloseable {
     return view().getInteger("pendingCount");
   }
 
+  /** The mode line's unsaved marker: this window's copy of a fact about the document. */
+  boolean isDirty() {
+    return view().getBoolean("isDirty");
+  }
+
   int span() {
     return view().getInteger("span");
   }

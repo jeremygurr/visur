@@ -11,7 +11,7 @@ use tungstenite::{connect, Message, WebSocket};
 const URL: &str = "ws://127.0.0.1:8888/ws";
 /// The payload contract (spec §1.2). A frame that does not have exactly this many fields is a wire change, and the
 /// harness says so rather than quietly averaging a different message.
-const FIELDS: usize = 17;
+const FIELDS: usize = 21;
 const BUDGET_BYTES: usize = 8 * 1024;
 
 type Socket = WebSocket<MaybeTlsStream<TcpStream>>;

@@ -48,10 +48,14 @@ pub fn mode_line(view: &ViewUpdate, cols: usize) -> String {
   if view.is_in_command_state {
     return clip(&command_line(view), cols);
   }
+  // The unsaved marker belongs to the mode word rather than to the tail, because the tail is what a narrow window
+  // clips and what the error message overwrites: at forty columns, or straight after a failed save, "you have work
+  // you have not written" is the one thing still on the line.
+  let marker = if view.is_dirty { "*" } else { "" };
   let label = if view.editor_mode == view.editor_submode {
-    format!(" {} MODE ", view.editor_mode.to_uppercase())
+    format!(" {} MODE{} ", view.editor_mode.to_uppercase(), marker)
   } else {
-    format!(" {} SUBMODE ", view.editor_submode.to_uppercase())
+    format!(" {} SUBMODE{} ", view.editor_submode.to_uppercase(), marker)
   };
   let searching = view.editor_submode == "searchForward" || view.editor_submode == "searchBackward";
   let sep = if view.include_separators { "SEP=ON" } else { "SEP=OFF" };
@@ -260,6 +264,40 @@ mod tests {
     let v = navigate_view();
     assert_eq!(mode_line(&v, 40).trim_end(), " NAVIGATE MODE  WORD QUANTUM  SCOPE=LINE");
     assert_eq!(mode_line(&v, 40).chars().count(), 40, "padded out to the width it was asked for");
+
+    // The dirty marker is on the mode word, so the clip that eats the span never eats it: an unsaved file is the
+    // thing a narrow window most needs to be told.
+    let mut dirty = navigate_view();
+    dirty.is_dirty = true;
+    assert!(mode_line(&dirty, 40).starts_with(" NAVIGATE MODE*"), "the marker outlives the clip");
+    assert_eq!(mode_line(&dirty, 40).chars().count(), 40, "and the line is still exactly the width it was asked for");
+  }
+
+  /// The marker is the one item on this line that is not about the mode but about what happened to the data, so it is
+  /// glued to the mode word: everything right of it clips, and a forty-column window still says the text is unsaved.
+  /// A clean document shows nothing at all, which is the assertion that stops the marker becoming decoration.
+  #[test]
+  fn the_dirty_marker_sits_on_the_mode_word_in_every_mode() {
+    let mut v = navigate_view();
+    assert_eq!(
+      mode_line(&v, 80).trim_end(),
+      " NAVIGATE MODE  WORD QUANTUM  SCOPE=LINE  SEP=ON  SPAN=3",
+      "nothing unsaved, nothing marked"
+    );
+    v.is_dirty = true;
+    assert_eq!(
+      mode_line(&v, 80).trim_end(),
+      " NAVIGATE MODE*  WORD QUANTUM  SCOPE=LINE  SEP=ON  SPAN=3",
+      "the star is part of the mode word, not a column of its own"
+    );
+
+    // Insert is where the work is being done, and a search where the mode word becomes a submode word: the marker
+    // rides along with the label in both.
+    v.editor_mode = "insert".to_string();
+    v.editor_submode = "insert".to_string();
+    assert!(mode_line(&v, 80).starts_with(" INSERT MODE*"), "insert mode carries the marker too");
+    v.editor_submode = "searchForward".to_string();
+    assert!(mode_line(&v, 80).starts_with(" SEARCHFORWARD SUBMODE*"), "and so does a submode");
   }
 
   /// An error takes the tail of the line. At forty columns there is room for the mode or for the quantum, and the mode

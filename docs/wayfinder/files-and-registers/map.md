@@ -150,7 +150,7 @@ Facts established before a ticket was written, each of which changes how a ticke
 | ~~01~~ [closed](issues/01-message-surface.md) | Errors reach the screen: a message slot in the view, retired by any keypress or paste | — |
 | ~~02~~ [closed](issues/02-viewport-per-client.md) | Viewport per client: `canvasWidth`/`canvasHeight` stop being global; fixes a live two-client bug | — |
 | ~~03~~ [closed](issues/03-document-session-split.md) | The split: `Document` owns content/path/undo/swap, `Session` owns cursor/quantum/span/viewport/mode/command line | 02 |
-| [04](issues/04-dirty-tracking.md) | Dirty is a comparison against the saved baseline; `*` in the mode line; undo back to saved clears it | 03 |
+| ~~04~~ [closed](issues/04-dirty-tracking.md) | Dirty is a comparison against the saved baseline; `*` in the mode line; undo back to saved clears it | 03 |
 | [05](issues/05-command-key-and-grammar.md) | `:` replaces `;`, bare paths, `:w` `:open` `:q` `:q!`, and the keypress test `;` never had | 01, 04 |
 | [06](issues/06-swap-files.md) | Swap files: nameless pool, browser state dir, never overwrite, delete on save, vim's three-way prompt for named files | 01, 04, 05 |
 | [07](issues/07-launch-argument.md) | `visur /path/to/file`, with a warning when a server is already running | 05 |
@@ -171,6 +171,15 @@ creates it with the rotation rules that justify it. 03 also found that `MainVert
 was constructed rather than when the port was listening, which is a load-dependent "connection refused" in any test that
 deploys the server and connects; that is fixed, and it is the same hole [07](issues/07-launch-argument.md) reports
 through.
+
+**04 found a bug while it was being checked live, and it is not a dirty bug.** `ZZ` had never saved anything after an
+insert session: the op that restores the saved cursor quantum peeked at the command stack instead of popping, and
+`SaveFileOp` — which takes its path argument off that same stack — cast the leftover to a filename, failed on a null
+parent, and died in the verticle without a repaint or a message. Fixed at the op; the live check is now a test. The
+lesson for [05](issues/05-command-key-and-grammar.md) is the design under it: **the execution stack is shared scratch
+that any command can leave words on, and two file commands read arguments out of it**, so any leftover is a filename.
+05's grammar is where that gets settled, and `clearEDS` (used by exactly two commands today) is the precedent it will
+either generalize or throw away.
 
 ## Not yet specified
 

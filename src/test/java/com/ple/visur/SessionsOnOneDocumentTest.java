@@ -4,11 +4,16 @@ import io.vertx.rxjava3.core.Vertx;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Stack;
 
 import static com.ple.visur.EditorSubmode.navigate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -57,6 +62,46 @@ class SessionsOnOneDocumentTest {
   void stopTheServer() {
     // Blocking, so the server is gone before the next test asks for the port range back.
     vertx.close().blockingAwait();
+  }
+
+  /**
+   * Whether the text has unsaved work is the document's answer, so a window that typed nothing is warned anyway —
+   * and one write takes the warning off both, because after it neither pair of hands holds anything the file lacks.
+   *
+   * <p>The typing is a real insert session and the save is the real key, because that sequence is where the marker
+   * earns its keep: leaving insert mode hands the command's scratch stack back, and a save that reads an argument
+   * out of it was reading the previous command's leftovers. A document {@code putContentAsSaved} is the ticket's
+   * "loaded from disk is clean", and the `x` is the ticket's "one character typed is dirty".
+   */
+  @Test
+  void theUnsavedMarkerShowsInEveryWindowAndOneSaveClearsItEverywhere(@TempDir Path tempDir) throws IOException {
+    Path file = tempDir.resolve("work.txt");
+    emc.document().setSourceFilePath(file.toString());
+    emc.document().putContentAsSaved(CONTENT);
+
+    try (WireClient first = new WireClient(vertx, port, 40, 10);
+         WireClient second = new WireClient(vertx, port, 40, 10)) {
+      assertFalse(first.isDirty(), "the text is the file's text, so there is nothing to warn about");
+      assertFalse(second.isDirty(), "and neither window has anything the other does not");
+
+      first.presses("i");
+      first.types("x");
+      first.presses("Escape");
+
+      assertTrue(first.isDirty(), "this window typed a character");
+      assertTrue(second.isDirty(), "and the window that watched is warned too: the work is the document's");
+
+      first.presses("ZZ");
+
+      // Both windows before the file: reading a view is what waits for the save to have been handled, since a frame
+      // is rendered after the command runs. Asserting the file first would race the bus.
+      boolean firstAfter = first.isDirty();
+      boolean secondAfter = second.isDirty();
+
+      assertEquals("x" + CONTENT, Files.readString(file), "the save wrote what one window typed");
+      assertFalse(firstAfter, "the window that saved is clean");
+      assertFalse(secondAfter, "and so is the window that only watched");
+    }
   }
 
   @Test

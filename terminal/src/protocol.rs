@@ -30,6 +30,9 @@ pub struct ViewUpdate {
   pub command_cursor: i64,
   pub search_target: String,
   /// The count typed in front of a key and not yet spent; zero when none was typed (spec §5.9).
+  /// Whether this text holds work no file has. The document answers it, so two clients on one document draw the same
+  /// marker.
+  pub is_dirty: bool,
   pub pending_count: i64,
   /// What went wrong the last time the user asked for something; empty when nothing did.
   pub message: String,
@@ -90,6 +93,7 @@ pub fn parse(frame: &str) -> Option<ViewUpdate> {
     command_state_content: string(&body, "commandStateContent"),
     command_cursor: number(&body, "commandCursor"),
     search_target: string(&body, "searchTarget"),
+    is_dirty: flag(&body, "isDirty"),
     pending_count: number(&body, "pendingCount"),
     message: string(&body, "message"),
   })
@@ -107,7 +111,7 @@ mod tests {
     "isAtQuantumStart":true,"cursorQuantum":"character","scopeQuantum":"line",
     "editorMode":"navigate","editorSubmode":"character","isInCommandState":false,
     "commandStateContent":"","commandCursor":0,"searchTarget":"necess","pendingCount":4,
-    "message":"loadFile: file not found: /tmp/gone.txt"}}"#;
+    "message":"loadFile: file not found: /tmp/gone.txt","isDirty":true}}"#;
 
   #[test]
   fn decodes_every_field_of_the_view_payload() {
@@ -133,6 +137,7 @@ mod tests {
     assert_eq!(view.command_state_content, "");
     assert_eq!(view.command_cursor, 0);
     assert_eq!(view.search_target, "necess");
+    assert!(view.is_dirty);
     assert_eq!(view.pending_count, 4);
     assert_eq!(view.message, "loadFile: file not found: /tmp/gone.txt");
   }

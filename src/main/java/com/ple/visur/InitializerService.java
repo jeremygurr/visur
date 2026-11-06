@@ -89,7 +89,13 @@ public class InitializerService {
       "\n";
 
     String content = startupContent();
-    emc.document().putContent(content);
+    if (emc.document().getSourceFilePath() != null) {
+      // The text came off that file, so it is not unsaved work. Without a startup file the content is either empty or
+      // a benchmark seed, and seed text that has never been written anywhere earns the marker like any other typing.
+      emc.document().putContentAsSaved(content);
+    } else {
+      emc.document().putContent(content);
+    }
     // Recover from any swap files left by a crash.
     recoverFromSwapFiles();
     emc.document().updateNextLineIndices();
@@ -217,11 +223,14 @@ public class InitializerService {
    *   recovered but with a separate report.
    * - After recovery, delete the swap file to avoid repeated prompts on future starts.
    *
+   * <p>Package-private so the recovery's dirty behaviour is testable: ticket 04 needs the case where text arrives
+   * from a file on disk and is still unsaved, and no other caller reaches it before the port opens.
+   *
    * <p>A swap file is identifiable as stale by its {@code .visur-swap} extension and by
    * checking whether the source file exists. A purely orphaned swap (no source path
    * at all) is recovered as an unnamed document.
    */
-  private void recoverFromSwapFiles() {
+  void recoverFromSwapFiles() {
     String sourcePath = emc.document().getSourceFilePath();
     if (sourcePath == null || sourcePath.isEmpty()) {
       // No source path: look for orphaned swap files in the working directory.

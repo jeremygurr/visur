@@ -29,6 +29,16 @@ public class Document {
   private static final long SWAP_DEBOUNCE_MS = 500;
 
   private String content = "";
+
+  /**
+   * The text as it last matched the file: loaded from it, or written to it. Dirty is {@code content} differing from
+   * this, never a flag set on edit — an undo that puts the saved text back makes the document clean again, and that
+   * sequence is the common case rather than a corner case.
+   *
+   * <p>A reference rather than a copy, because content is immutable and replaced wholesale.
+   */
+  private String savedContent = "";
+
   private String sourceFilePath;
   private final UndoHistory undoHistory = new UndoHistory();
 
@@ -56,6 +66,34 @@ public class Document {
     content = newContent;
     updateNextLineIndices();
     writeSwapFileDebounced(newContent);
+  }
+
+  /**
+   * Text that came off the file, as opposed to text the user made: the buffer and the disk then hold the same thing,
+   * so nothing is unsaved. {@code LoadFileOp} and the startup load are the two callers; swap recovery is deliberately
+   * not one, since a swap is what survives a crash and its text has provably never reached the file.
+   */
+  public void putContentAsSaved(String newContent) {
+    putContent(newContent);
+    savedContent = content;
+  }
+
+  /**
+   * The write succeeded, so whatever is in memory is on disk now — including after {@code ;"other.txt" saveFile},
+   * where the baseline moves to a file that did not exist a moment ago.
+   *
+   * <p>The name says what the caller has achieved, not what this does: it moves the baseline, it does not set a flag.
+   */
+  public void markSaved() {
+    savedContent = content;
+  }
+
+  /**
+   * Whether this text has work in it that no file has. Compared rather than remembered, so that {@code d} then
+   * {@code u} reads as clean: see {@link #savedContent}.
+   */
+  public boolean isDirty() {
+    return !content.equals(savedContent);
   }
 
   /** The single character a one-character search would match from here, forwards or back. */

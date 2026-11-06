@@ -55,7 +55,10 @@ Every `viewWasChanged` message is a **complete description of what a renderer sh
   "isInCommandState": false,        // bool
   "commandStateContent": "",        // string
   "commandCursor": 0,               // int
-  "searchTarget": ""                // string. always present; "" when not searching
+  "searchTarget": "",               // string. always present; "" when not searching
+  "pendingCount": 0,                // int.   count typed and not spent; 0 is none, so nothing is drawn
+  "message": "",                    // string. what just went wrong; "" when nothing did
+  "isDirty": false                  // bool.  text holds work no file has; drawn as "*" on the mode word
 }
 ```
 

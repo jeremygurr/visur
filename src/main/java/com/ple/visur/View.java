@@ -36,7 +36,8 @@ public record View(
   int commandCursor,
   String searchTarget,
   int pendingCount,
-  String message
+  String message,
+  boolean isDirty
 ) {
 
   /**
@@ -79,7 +80,8 @@ public record View(
       emc.session().getCommandCursor(),
       searchTarget(emc),
       pendingCount(emc),
-      emc.session().getMessage()
+      emc.session().getMessage(),
+      emc.document().isDirty()
     );
   }
 
@@ -140,6 +142,7 @@ public record View(
     payload.put("searchTarget", searchTarget);
     payload.put("pendingCount", pendingCount);
     payload.put("message", message);
+    payload.put("isDirty", isDirty);
     return payload;
   }
 

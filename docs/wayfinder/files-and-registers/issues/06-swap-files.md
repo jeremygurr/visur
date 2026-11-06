@@ -72,5 +72,11 @@ in the read-only case, and in both cases the user was told first.
   user to see it does not file it as corruption.
 - The browser directory does not exist yet and must be created on demand; the alternative, `~/.local/state/visur/` with a
   marker per client, is the same ticket's decision made differently. Note in the `## Result` which won.
+- **Observed while [04](04-dirty-tracking.md) was being checked live:** a server killed while a document was dirty leaves
+  `<file>.visur-swap`, the next boot recovers it into the buffer *without being asked*, writes
+  `<file>.visur-recovery` beside the file, and leaves that copy there forever — a later run found `plai!n text` in the
+  buffer with the file itself still holding `plain text`. The recovered document is now at least marked dirty, but the
+  swap is only ever deleted by a successful save, so the resurrection happens on the *next* boot after a crash rather
+  than the one during it. Whatever this ticket decides about staleness, the recovery copy needs a lifetime.
 - If `.visur-swap`/`.visur-recovery` and the `.sw*` pool both ship, there are three naming schemes on disk. The old two
   are deleted in this ticket — no compatibility window, and a swap file nobody can name is a swap file nobody recovers.

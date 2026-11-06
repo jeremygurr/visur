@@ -152,10 +152,13 @@ function drawModeLine() {
     }
     document.getElementById("currentEditorModeDisplay").innerHTML = commandStateDisplay
   } else if(view.editorMode == view.editorSubmode) {
-    document.getElementById("currentEditorModeDisplay").innerHTML = view.editorMode.toUpperCase() + " MODE"
+    document.getElementById("currentEditorModeDisplay").innerHTML = view.editorMode.toUpperCase() + " MODE" + (view.isDirty ? "*" : "")
   } else {
-    document.getElementById("currentEditorModeDisplay").innerHTML = view.editorSubmode.toUpperCase() + " SUBMODE";
+    document.getElementById("currentEditorModeDisplay").innerHTML = view.editorSubmode.toUpperCase() + " SUBMODE" + (view.isDirty ? "*" : "")
   }
+  // The star is glued to the mode word rather than listed with the span: it is the one item that is about the data
+  // rather than the mode, and the browser's line overflows and drops its right-hand items long before the mode does.
+
   // The fence and the span travel together in every mode but command state: the fence is what a search looks inside,
   // and it moves on its own whenever a selection needs more room than it has.
   if(view.editorSubmode == "searchForward" || view.editorSubmode == "searchBackward") {

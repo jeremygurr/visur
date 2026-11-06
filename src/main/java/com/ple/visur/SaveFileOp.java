@@ -39,7 +39,9 @@ public class SaveFileOp implements Operator {
     Path tempFile = null;
     try {
       Path target = Paths.get(filePath);
-      Path parent = target.getParent();
+      // Absolute first: a bare name like `notes.txt` has no parent to write its temp file beside, and the working
+      // directory is where vim would have put it.
+      Path parent = target.toAbsolutePath().getParent();
       if (parent != null) {
         Files.createDirectories(parent);
       }
@@ -61,6 +63,9 @@ public class SaveFileOp implements Operator {
       try { Files.delete(swapPath); } catch (IOException ignored) {}
       // Update remembered source path
       emc.document().setSourceFilePath(filePath);
+      // The text in memory is now the text in that file, so the mode line stops saying otherwise. Only here: the
+      // catch below reports and returns, and a save that failed has not made anything safe.
+      emc.document().markSaved();
     } catch (IOException e) {
       if (tempFile != null) {
         try { Files.deleteIfExists(tempFile); } catch (IOException ignored) {}

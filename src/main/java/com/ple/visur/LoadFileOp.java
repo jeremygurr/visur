@@ -41,8 +41,8 @@ public class LoadFileOp implements Operator {
       }
       byte[] bytes = Files.readAllBytes(path);
       String content = new String(bytes, StandardCharsets.UTF_8);
-      // Replace the document content
-      emc.document().putContent(content);
+      // Replace the document content. As-saved: this text is what the file holds, so it is not unsaved work.
+      emc.document().putContentAsSaved(content);
 
       // Reset cursor to (0,0)
       emc.session().putCA(0);

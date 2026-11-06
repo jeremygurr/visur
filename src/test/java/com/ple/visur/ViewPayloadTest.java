@@ -72,6 +72,21 @@ class ViewPayloadTest {
    * screen. So the message travels to the renderer like any other mode-line field, and an editor that has reported
    * nothing shows nothing.
    */
+  /**
+   * The mode line's one field that is not about the mode: whether this text holds work no file has. It is the
+   * document's answer rather than the session's, which is why two windows on one document show the same marker, and
+   * it travels on the payload for the reason the span does — a field in Java that is not on the wire is a marker that
+   * never appears on screen.
+   */
+  @Test
+  void thePayloadCarriesWhetherTheTextHasUnsavedWork() {
+    assertEquals(true, View.of(emc).render().getValue("isDirty"),
+      "the set-up typed text that has never been written to a file");
+
+    emc.document().markSaved();
+    assertEquals(false, View.of(emc).render().getValue("isDirty"), "the text is on disk, so there is nothing to warn about");
+  }
+
   @Test
   void aReportedErrorTravelsToThePayloadAndAnEditorThatReportedNothingShowsNothing() {
     assertEquals("", View.of(emc).render().getString("message"), "nothing reported is nothing shown");
