@@ -25,7 +25,7 @@ public class StashCountOp implements Operator {
   @Override
   public void execute(Object ignored) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    Integer count = emc.getPendingCount();
+    Integer count = emc.session().getPendingCount();
     if (count == null || count <= 1) {
       SessionText.discard(emc);
       return;
@@ -34,7 +34,7 @@ public class StashCountOp implements Operator {
     // The count belongs to this key, and the session outlives it: retireUnlessDigit leaves a pending count alone
     // while a mode other than navigate is open, so `3 i` would otherwise go on spending its three on every character
     // typed — 3 to the right, and 3 deleted by a backspace.
-    emc.clearPendingCount();
+    emc.session().clearPendingCount();
     SessionText.begin(emc, separator);
   }
 }

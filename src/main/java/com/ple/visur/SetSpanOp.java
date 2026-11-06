@@ -24,7 +24,7 @@ public class SetSpanOp implements Operator {
     if(eds.size() > 0 && eds.peek() instanceof Integer) {
       return (int)eds.pop();
     }
-    Integer count = emc.getPendingCount();
+    Integer count = emc.session().getPendingCount();
     return count == null ? 1 : count;
   }
 }

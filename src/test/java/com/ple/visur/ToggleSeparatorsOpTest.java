@@ -49,7 +49,7 @@ class ToggleSeparatorsOpTest {
   }
 
   private void press(String key) {
-    ServiceHolder.editorModelCoupler.clearPendingCount();
+    ServiceHolder.editorModelCoupler.session().clearPendingCount();
     KeyWasPressedVerticle.press(ServiceHolder.editorModelCoupler, KeyPressed.from(key), key);
   }
 

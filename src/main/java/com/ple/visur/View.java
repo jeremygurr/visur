@@ -114,7 +114,7 @@ public record View(
   }
 
   private static int pendingCount(EditorModelCoupler emc) {
-    Integer count = emc.getPendingCount();
+    Integer count = emc.session().getPendingCount();
     return count == null ? 0 : count;
   }
 

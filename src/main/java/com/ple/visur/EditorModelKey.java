@@ -33,7 +33,6 @@ public enum EditorModelKey {
   canvasStart,
   fy,
   sourceFilePath,
-  pendingCount,
   undoHistory,
   message,
 }

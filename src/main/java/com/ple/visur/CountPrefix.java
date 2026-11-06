@@ -20,8 +20,8 @@ public class CountPrefix {
       return false;
     }
     int digit = key.charAt(0) - '0';
-    Integer pending = emc.getPendingCount();
-    emc.putPendingCount(pending == null ? digit : pending * 10 + digit);
+    Integer pending = emc.session().getPendingCount();
+    emc.session().putPendingCount(pending == null ? digit : pending * 10 + digit);
     return true;
   }
 
@@ -36,13 +36,13 @@ public class CountPrefix {
   static void retireUnlessDigit(EditorModelCoupler emc, String key) {
     boolean sequenceStillInFlight = emc.getEditorSubmode() != EditorSubmode.navigate;
     if (!isDigit(key) && !sequenceStillInFlight) {
-      emc.clearPendingCount();
+      emc.session().clearPendingCount();
     }
   }
 
   /** What a key sees when no count was typed: one. Zero is a count, not the absence of one. */
   static int countOrOne(EditorModelCoupler emc) {
-    Integer pending = emc.getPendingCount();
+    Integer pending = emc.session().getPendingCount();
     return pending == null ? 1 : pending;
   }
 

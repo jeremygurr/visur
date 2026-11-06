@@ -75,7 +75,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
 
   /** A pasted block arrives on the bus rather than as a key; static for the same reason {@link #press} is. */
   static void pasteText(EditorModelCoupler emc, String text) {
-    emc.clearPendingCount(); // typed text arrives without a keypress, so it retires a pending count the way one would
+    emc.session().clearPendingCount(); // typed text arrives without a keypress, so it retires a pending count the way one would
     emc.clearMessage(); // and it is a thing the user did, which is what retires a message
     if (!emc.getIsInCommandState() && emc.getEditorSubmode() == EditorSubmode.navigate) {
       UndoHistory history = emc.getUndoHistory();

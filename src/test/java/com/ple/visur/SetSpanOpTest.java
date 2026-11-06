@@ -105,7 +105,7 @@ class SetSpanOpTest {
 
   @Test
   void thePendingCountBecomesTheSpan() {
-    emc.putPendingCount(12);
+    emc.session().putPendingCount(12);
     new SetSpanOp().execute(null);
     assertEquals(12, emc.getSpan());
     assertEquals(12, selectedWidth());
@@ -120,7 +120,7 @@ class SetSpanOpTest {
   @Test
   void aPendingCountOfZeroCollapsesTheSelection() {
     requestSpan(3);
-    emc.putPendingCount(0);
+    emc.session().putPendingCount(0);
     new SetSpanOp().execute(null);
     assertEquals(0, emc.getSpan());
     assertEquals(0, selectedWidth());
@@ -129,7 +129,7 @@ class SetSpanOpTest {
   @Test
   void abindingThatNamesTheSpanIgnoresThePendingCount() {
     // i, a and o enter insert mode with "0 setSpan" compiled into the binding, which outranks a stray count
-    emc.putPendingCount(5);
+    emc.session().putPendingCount(5);
     emc.putOnExecutionDataStack(0);
     new SetSpanOp().execute(null);
     assertEquals(0, emc.getSpan());
@@ -170,7 +170,7 @@ class SetSpanOpTest {
     emc.putEditorContent(TWENTY_FIVE_WORDS);
     emc.putCA(TWENTY_FIVE_WORDS.lastIndexOf(' ') + 1); // the last word, with one word left to select
     requestSpan(5);
-    emc.clearPendingCount(); // the keypress path retires the count once spent; this test drives the operators directly
+    emc.session().clearPendingCount(); // the keypress path retires the count once spent; this test drives the operators directly
     assertEquals(5, emc.getSpan());
 
     List<Integer> wordsAtEachStep = new ArrayList<>();

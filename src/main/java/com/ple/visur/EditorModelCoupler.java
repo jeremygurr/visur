@@ -100,13 +100,23 @@ public class EditorModelCoupler {
     editorModel.put(connection, id);
   }
 
-  /** The grid of {@link #getConnection()}. A viewport is never the document's, so this reads the connection registry. */
+  /**
+   * The hands currently at this keyboard: the session of {@link #getConnection()}.
+   *
+   * <p>Cursor, selection, typed count, submode, scroll position — everything a window owns rather than a document.
+   * Asking is the only way to get one: there is no current session to reach for, which is how a second client ended up
+   * typing into the first client's count.
+   */
+  public Session session() {
+    return Connections.session(getConnection());
+  }
+
   public int getCanvasWidth() {
-    return Connections.viewport(getConnection()).cols();
+    return session().getCanvasWidth();
   }
 
   public int getCanvasHeight() {
-    return Connections.viewport(getConnection()).rows();
+    return session().getCanvasHeight();
   }
 
   public int getCanvasStart() {
@@ -491,20 +501,4 @@ public class EditorModelCoupler {
     }
   }
 
-  /**
-   * The count typed in front of a key ({@code 12 s}), or null when none is pending. Absence is a state of its own, so
-   * that a count of zero can mean zero rather than "no count".
-   */
-  public Integer getPendingCount() {
-    Object val = editorModel.get(pendingCount);
-    return val == null ? null : (Integer) val;
-  }
-
-  public void putPendingCount(int count) {
-    editorModel.put(pendingCount, count);
-  }
-
-  public void clearPendingCount() {
-    editorModel.remove(pendingCount);
-  }
 }

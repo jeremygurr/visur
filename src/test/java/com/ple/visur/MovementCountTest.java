@@ -140,14 +140,14 @@ class MovementCountTest {
     chooseCursorQuantum("character");
     press("3");
     press("l");
-    assertNull(emc.getPendingCount(), "a count is spent by the key it belonged to");
+    assertNull(emc.session().getPendingCount(), "a count is spent by the key it belonged to");
   }
 
   @Test
   void aCountSurvivesTheKeyThatOpensASubmode() {
     press("3");
     press("]");
-    assertEquals(3, emc.getPendingCount(), "] and w are one command; the count is for the pair");
+    assertEquals(3, emc.session().getPendingCount(), "] and w are one command; the count is for the pair");
   }
 
   @Test

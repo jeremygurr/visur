@@ -40,8 +40,27 @@ public class MainVerticle extends AbstractVerticle {
       .flatMap(ignored -> vertx.deployVerticle(new ViewportWasChangedVerticle()))
       .flatMap(ignored -> vertx.deployVerticle(new ModelWasChangedVerticle()))
       .subscribe(
-        ignored -> vertx.createHttpServer().requestHandler(router()).listen(serverPort()),
+        ignored -> vertx.createHttpServer().requestHandler(router()).listen(serverPort())
+          .subscribe(listening -> { }, this::couldNotListen),
         error -> LOGGER.error("could not deploy the verticles", error));
+  }
+
+  /**
+   * A server that is not listening is not a server, and the alternative is a process that never serves anybody and
+   * never says why: {@code listen} completes successfully for the verticle either way, so the failure used to vanish
+   * into a debug log while the JVM sat there holding a port it did not have. Orphan servers piled up that way, and
+   * tests failed by connecting to somebody else's server.
+   */
+  private void couldNotListen(Throwable failure) {
+    System.err.printf("visur cannot serve on port %d: %s%n", serverPort(), String.valueOf(failure.getMessage()));
+    Runtime.getRuntime().halt(1);
+  }
+
+  @Override
+  public void stop() {
+    // A socket dropped by a shutdown never reports a close, so this is the difference between a connection registry
+    // that lives as long as the server and one that outlives it.
+    Connections.closeAll();
   }
 
   private static int serverPort() {

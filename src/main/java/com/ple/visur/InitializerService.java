@@ -34,6 +34,8 @@ public class InitializerService {
     VariableMap initialGvm = new VariableMap(new HashMap<>());
     emc.editorModel.put(globalVariableMap, initialGvm);
 
+    emc.session().openFresh();
+
     emc.putEditorMode(navigate);
 
     Stack<EditorSubmode> editorSubmodeStack = new Stack<>();

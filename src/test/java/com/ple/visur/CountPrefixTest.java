@@ -47,57 +47,57 @@ class CountPrefixTest {
   @Test
   void aDigitBecomesThePendingCount() {
     assertTrue(CountPrefix.record(emc, "3"));
-    assertEquals(3, emc.getPendingCount());
+    assertEquals(3, emc.session().getPendingCount());
   }
 
   @Test
   void digitsAccumulateLeftToRight() {
     CountPrefix.record(emc, "3");
     CountPrefix.record(emc, "4");
-    assertEquals(34, emc.getPendingCount());
+    assertEquals(34, emc.session().getPendingCount());
   }
 
   @Test
   void aLeadingZeroKeepsCountingRatherThanRestarting() {
     CountPrefix.record(emc, "0");
     CountPrefix.record(emc, "5");
-    assertEquals(5, emc.getPendingCount());
+    assertEquals(5, emc.session().getPendingCount());
   }
 
   @Test
   void zeroIsACountAndNotTheAbsenceOfOne() {
     CountPrefix.record(emc, "0");
-    assertEquals(0, emc.getPendingCount());
+    assertEquals(0, emc.session().getPendingCount());
   }
 
   @Test
   void aKeyThatIsNotADigitIsNotConsumedByTheCount() {
     CountPrefix.record(emc, "3");
     assertFalse(CountPrefix.record(emc, "s"));
-    assertEquals(3, emc.getPendingCount(), "the count is still for the key about to run");
+    assertEquals(3, emc.session().getPendingCount(), "the count is still for the key about to run");
   }
 
   @Test
   void aKeyThatIsNotADigitRetiresTheCountOnceItHasRun() {
     CountPrefix.record(emc, "3");
     CountPrefix.retireUnlessDigit(emc, "s");
-    assertNull(emc.getPendingCount());
+    assertNull(emc.session().getPendingCount());
     CountPrefix.retireUnlessDigit(emc, "s"); // retiring twice is not an error
-    assertNull(emc.getPendingCount());
+    assertNull(emc.session().getPendingCount());
   }
 
   @Test
   void aDigitTypedWhileTypingACommandIsCommandTextNotACount() {
     emc.putIsInCommandState(true);
     assertFalse(CountPrefix.record(emc, "7"));
-    assertNull(emc.getPendingCount());
+    assertNull(emc.session().getPendingCount());
   }
 
   @Test
   void aDigitTypedInInsertModeIsTextNotACount() {
     emc.putEditorSubmodeStack(stackOf(EditorSubmode.insert));
     assertFalse(CountPrefix.record(emc, "7"));
-    assertNull(emc.getPendingCount());
+    assertNull(emc.session().getPendingCount());
   }
 
   @Test
@@ -105,7 +105,7 @@ class CountPrefixTest {
     // [ and ] and search each hold their own submode; a digit there belongs to that submode
     emc.putEditorSubmodeStack(stackOf(EditorSubmode.quantumEnd));
     assertFalse(CountPrefix.record(emc, "7"));
-    assertNull(emc.getPendingCount());
+    assertNull(emc.session().getPendingCount());
   }
 
   @Test
@@ -115,7 +115,7 @@ class CountPrefixTest {
     press("2");
     press("s");
     assertEquals(12, emc.getSpan());
-    assertNull(emc.getPendingCount(), "the key it belonged to used it up");
+    assertNull(emc.session().getPendingCount(), "the key it belonged to used it up");
   }
 
   @Test
@@ -123,7 +123,7 @@ class CountPrefixTest {
     bootNavigateMode();
     press("3");
     press("q"); // q changes the cursor quantum to character, and takes no count
-    assertNull(emc.getPendingCount());
+    assertNull(emc.session().getPendingCount());
     assertEquals("character", emc.getCursorQuantum().getName());
   }
 
@@ -150,7 +150,7 @@ class CountPrefixTest {
     assertEquals(1, emc.getSpan(), "bare s is one quantum");
     press("3");
     assertEquals(1, emc.getSpan(), "the digit is the start of the next count, not a revision of the last key");
-    assertEquals(3, emc.getPendingCount());
+    assertEquals(3, emc.session().getPendingCount());
   }
 
   @Test
