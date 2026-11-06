@@ -21,7 +21,9 @@ public class CommandStateService {
       exitCommandState();
     } else if(commandStateKeyPressed.equals("Enter")) {
       String command = ems.session().getCommandStateContent();
-      VisurCommand visurCommand = ServiceHolder.commandCompileService.compile(command);
+      // The `:` grammar, not the sentence grammar: the command line is a command language, and a word in it that is
+      // not a command says so rather than compiling to nothing.
+      VisurCommand visurCommand = ServiceHolder.commandCompileService.compileCommandLine(command);
       ServiceHolder.commandExecutionService.execute(visurCommand);
       if(!command.isEmpty()) {
         history.add(command);

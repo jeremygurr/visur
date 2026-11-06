@@ -32,7 +32,8 @@ public class SaveFileOp implements Operator {
       filePath = emc.document().getSourceFilePath();
     }
     if (filePath == null || filePath.isEmpty()) {
-      emc.session().reportError("saveFile: no path — neither an argument nor a remembered (source) file.");
+      // The wording the map asked for, quoted exactly: someone who hits this searches for the string.
+      emc.session().reportError("Error writing: No filename provided");
       return;
     }
 

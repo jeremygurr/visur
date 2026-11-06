@@ -52,7 +52,7 @@ Quantum keys are shared by every command that takes one:
 | `P` | insert the yank register at the **start** of the selection without deleting anything; the selection keeps covering the same text, shifted right | `P` with three words selected puts the register in front and leaves those three selected |
 | `u` | undo **one command** — the whole command, so an insert session comes back with the line it opened, and everything a count repeated comes back at once. Movement is not an edit: `u` after `5 l` walks back to the last edit, cursor and all. Nothing to undo is a no-op | `s d` then `u`; `3 g`, type, `Escape`, then `u` |
 | `R` | redo one command. A new edit clears what `R` can walk forward to, and the top of the stack is a no-op | `u` then `R` |
-'| `:` | open **command state**: type a command and run it. `;` used to be this key and now does nothing at all | `:` `w` `Enter` |
+'| `:` | open **command state**: type a command and run it — `:w`, `:open path`. `;` used to be this key and now does nothing at all | `:` `w` `Enter` |
 | `ZZ` | save the file | `ZZ` |
 
 `i`, `a`, `o`, `g` and `G` all stash the current span and cursor quantum, force the span to 0 and the quantum to
@@ -110,6 +110,24 @@ end in a line break those are different characters, and the second is what the q
 | `Escape` | abandon the search and return to navigate |
 
 ## Command state (after `:`)
+
+Two commands today:
+
+| command | does |
+|---|---|
+| `:w` | write the file the document came from |
+| `:w path` | write there, and make it the file the document came from |
+| `:open path` | load a file. Refused while there is unsaved work — `:w` first |
+
+**A path is the rest of the line.** No quotes, no escaping: `:open ~/notes/ideas.txt` is one path. Quotes still work and
+now mean exactly one thing — keep this space, including at the end — so a path whose last character is a space cannot be
+typed without them. Trailing spaces you did not mean are trimmed, because a file called `notes.txt ` is a bug report.
+
+A word that is not a command says so on the mode line, naming itself. It used to compile to nothing at all, which looked
+exactly like a command that had worked. `:w` with nothing to write to says `Error writing: No filename provided`.
+
+**The raw sentence door is gone.** `;` used to take an editor sentence — `;"word" quantumStart` — and the four commands
+above are a language of their own instead. Keys are the rest of the interface.
 
 | key | does |
 |---|---|

@@ -9,9 +9,10 @@ import java.nio.file.Paths;
 /**
  * Loads a file and replaces the document body with it.
  *
- * <p>Requires a quoted string argument: {@code ;"path" loadFile}.
- * A read failure (missing, undecodable) reports to the server console and leaves
- * the current document untouched — a failed load never destroys in-memory work.
+ * <p>Takes its path from the command stack, which {@code :open path} fills.
+ *
+ * <p>Refuses while the document has unsaved work, and a read failure (missing, undecodable) leaves the current document
+ * untouched — a load never destroys in-memory work, whether it was refused or failed.
  *
  * <p>On success: cursor to (0,0), line indices recomputed, canvas/focus reset,
  * the file becomes the remembered source file.
@@ -22,9 +23,16 @@ public class LoadFileOp implements Operator {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     ExecutionDataStack eds = emc.session().getExecutionDataStack();
 
-    // loadFile requires a path argument
+    // Loading replaces the buffer, so it is the one command that would destroy work nobody has saved. Visur has no
+    // question to ask — a question needs an answer, and the message slot has never had one — so it refuses and names the
+    // way round it. The check lives here rather than in the grammar because this is the only door in.
+    if (emc.document().isDirty()) {
+      emc.session().reportError(":open refused: unsaved work. :w saves it first.");
+      return;
+    }
+
     if (eds.size() == 0) {
-      emc.session().reportError("loadFile requires a path argument: ;\"path\" loadFile");
+      emc.session().reportError(":open needs a path: :open /path/to/file");
       return;
     }
 

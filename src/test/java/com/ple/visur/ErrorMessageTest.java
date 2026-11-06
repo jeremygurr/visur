@@ -38,7 +38,7 @@ class ErrorMessageTest {
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
     emc.document().setSourceFilePath("");
-    emc.document().putContent(CONTENT);
+    emc.document().putContentAsSaved(CONTENT); // a document with unsaved work would be refused rather than failed
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     emc.session().putCanvasStart(0);
@@ -60,10 +60,13 @@ class ErrorMessageTest {
     }
   }
 
-  /** The command state's own syntax, because `:open` does not exist yet; the load path is the same one either way. */
+  /**
+   * The way a person loads a file: `:open`, typed. It used to type the raw sentence `;"path" loadFile`, which is how
+   * this test kept passing after the sentence stopped compiling at all — it was testing the operator through a door no
+   * user has.
+   */
   private void load(String path) {
-    type(":"); // the door, and nothing else: the key that opens command state is not part of the sentence
-    type("\"" + path + "\" loadFile");
+    type(":open " + path);
     KeyWasPressedVerticle.press(emc, KeyPressed.from("Enter"), "Enter");
   }
 

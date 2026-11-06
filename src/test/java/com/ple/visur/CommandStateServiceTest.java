@@ -124,12 +124,23 @@ class CommandStateServiceTest {
     assertEquals("", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
   }
 
+  /**
+   * Enter is the run key, and leaving command state is part of running. What it runs is a `:` command now rather than a
+   * raw editor sentence — the door and the grammar changed together — so this asserts the mechanics of Enter (it ran, it
+   * said something on screen, the line closed) and leaves the grammar to {@link CommandLineTest}, which types the keys.
+   */
   @Test
   void enterCompilesAndExecutesCommand() {
-    ServiceHolder.editorModelCoupler.session().putCommandStateContent("1");
-    ServiceHolder.editorModelCoupler.session().putCommandCursor(1);
+    ServiceHolder.editorModelCoupler.session().putCommandStateContent("frobnicate");
+    ServiceHolder.editorModelCoupler.session().putCommandCursor("frobnicate".length());
+    ServiceHolder.editorModelCoupler.session().getExecutionDataStack().clear();
+
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("Enter"));
-    assertEquals(1, ServiceHolder.editorModelCoupler.session().getExecutionDataStack().peek());
+
+    assertTrue(ServiceHolder.editorModelCoupler.session().getMessage().contains("frobnicate"),
+      "the command ran far enough to say what it was: " + ServiceHolder.editorModelCoupler.session().getMessage());
+    assertEquals(0, ServiceHolder.editorModelCoupler.session().getExecutionDataStack().size(),
+      "and a command nothing matched pushed no arguments onto the stack");
     assertFalse(ServiceHolder.editorModelCoupler.session().getIsInCommandState());
   }
 

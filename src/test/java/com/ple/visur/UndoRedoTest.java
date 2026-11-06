@@ -175,6 +175,7 @@ class UndoRedoTest {
     Files.write(file, "loaded\n".getBytes(StandardCharsets.UTF_8));
     press("d");
     assertEquals("two\n", emc.document().getContent(), "an edit, so there is something to undo");
+    emc.document().markSaved(); // loading over unsaved work is refused, and this test is about what a load does to history
 
     emc.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);

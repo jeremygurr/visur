@@ -131,7 +131,9 @@ class FileIoTest {
     String content = "loaded content\nwith lines";
     Files.write(file, content.getBytes(StandardCharsets.UTF_8));
 
-    ServiceHolder.editorModelCoupler.document().putContent("original");
+    // As-saved, because loading over unsaved work is refused, and this test is about what a load replaces rather than
+    // about the refusal. Every load in this file says the same thing for the same reason.
+    ServiceHolder.editorModelCoupler.document().putContentAsSaved("original");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 
@@ -141,7 +143,7 @@ class FileIoTest {
 
   @Test
   void loadFileMissingFileLeavesDocumentUntouched() {
-    ServiceHolder.editorModelCoupler.document().putContent("stays");
+    ServiceHolder.editorModelCoupler.document().putContentAsSaved("stays");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack("/nonexistent/path.txt");
     new LoadFileOp().execute(null);
 
@@ -152,11 +154,12 @@ class FileIoTest {
 
   @Test
   void loadFileNoArgumentReportsError() {
-    ServiceHolder.editorModelCoupler.document().putContent("stays");
+    ServiceHolder.editorModelCoupler.document().putContentAsSaved("stays");
     new LoadFileOp().execute(null);
 
     assertEquals("stays", ServiceHolder.editorModelCoupler.document().getContent());
-    assertReportedSomethingWorthReading();
+    assertEquals(":open needs a path: :open /path/to/file", ServiceHolder.editorModelCoupler.session().getMessage(),
+      "the complaint names the command a person would type, not the operator they have never heard of");
   }
 
   /**
@@ -211,7 +214,7 @@ class FileIoTest {
   void loadingAFileIsNotUnsavedWork() throws IOException {
     Path file = tempDir.resolve("clean-load.txt");
     Files.write(file, "from disk\n".getBytes(StandardCharsets.UTF_8));
-    ServiceHolder.editorModelCoupler.document().putContent("something else entirely");
+    ServiceHolder.editorModelCoupler.document().putContentAsSaved("something else entirely");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
 
     new LoadFileOp().execute(null);
@@ -247,8 +250,8 @@ class FileIoTest {
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new SaveFileOp().execute(null);
 
-    // Now load it back
-    ServiceHolder.editorModelCoupler.document().putContent("REPLACED");
+    // Now load it back, from a buffer holding something else that nobody has to save first
+    ServiceHolder.editorModelCoupler.document().putContentAsSaved("REPLACED");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 
@@ -270,7 +273,7 @@ class FileIoTest {
     assertEquals(original, new String(bytes, StandardCharsets.UTF_8));
 
     // Load back
-    ServiceHolder.editorModelCoupler.document().putContent("REPLACED");
+    ServiceHolder.editorModelCoupler.document().putContentAsSaved("REPLACED");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 

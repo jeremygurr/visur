@@ -160,13 +160,14 @@ class SessionsOnOneDocumentTest {
 
   @Test
   void aMessageIsShownToTheWindowThatEarnedIt() {
+    emc.document().putContentAsSaved(CONTENT); // a load over unsaved work is refused, and this is the load that fails
     try (WireClient first = new WireClient(vertx, port, 60, 10);
          WireClient second = new WireClient(vertx, port, 60, 10)) {
       assertEquals("", second.message(), "nothing has gone wrong yet, in either window");
 
       // A load of a file that is not there, because it is the shortest thing that is certain to fail and say so.
-      first.presses(":"); // the door is not part of the sentence
-      first.types("\"/it/is/not/here\" loadFile");
+      first.presses(":"); // the door is not part of the command
+      first.types("open /it/is/not/here");
       first.presses("Enter");
 
       assertTrue(first.message().contains("not found"), "the window that asked for the file was told it is not there");
