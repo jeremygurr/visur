@@ -44,6 +44,9 @@ replaced by a swap nobody chose.
 - `VISUR_FILE` is gone: no reader, no documentation, no test. `README.adoc`/`keys.md` gain `visur path`.
 - A path that looks like a flag (`visur --help`, `visur -x`) does not become a filename. One test, whatever the answer
   turns out to be.
+- Starting a second server against a busy port **ends the second process**, with the reason on its own output. Asserted by
+  starting two and counting the JVMs afterwards, because "it exits" is the difference between an orphan and a pile of
+  watchers that no `lsof` can find.
 
 ## Notes
 
@@ -55,6 +58,16 @@ replaced by a swap nobody chose.
   argument** rather than an environment variable is the point.
 - The launcher's fallback path is `./gradlew run`; a file argument needs to reach the JVM through *both* start paths or the
   bug will only appear for whoever takes the fallback.
+- **Servers pile up, and `lsof` cannot see most of them.** Found 2026-11-05: nine visur JVMs on a machine, four of them
+  `--redeploy` watchers from Mon/Wed, one listener. `MainVerticle.start` calls `listen(serverPort())` and never looks at
+  the result (`:43`), so a server that cannot open 8888 starts no HTTP server, says nothing, and — because `gradlew run
+  --redeploy` keeps a JVM alive to watch `src/**` — sits there forever burning CPU (45 CPU-minutes each in that `ps`).
+  `probe()` then succeeds against the *real* server, so `./visur` reports "using the server already on :8888" and connects
+  to whoever owns the port while the corpses accumulate. `stop_owned` kills `$owned` plus `lsof -ti tcp:$PORT`, which
+  reaches the listener only: the watchers have no socket. So the fix is upstream of the script — **a server that cannot
+  bind its port must exit**, which makes every one of these orphans impossible rather than killable — and the launcher
+  wants a way to stop a server it does not own (`visur stop`, or refusing to start a second server when asked for one).
+  For a human today: `lsof -ti tcp:8888 | xargs kill` then `pkill -f com.ple.visur.MainVerticle`.
 - **Future, deliberately not this ticket:** `visur path` with a server running is obviously "open a window/screen on this
   document", which is the multi-document-in-one-view fog. The warning is the placeholder for that feature, and it is
   written so that replacing it later changes one message and not a protocol.
