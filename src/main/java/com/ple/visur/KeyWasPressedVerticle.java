@@ -17,6 +17,9 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
     final String key = keyJson.getString("key");
     KeyPressed keyPressed = KeyPressed.from(key);
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
+    // Before the key runs: wrapping, the scroll window and the cursor column are all the asking client's geometry,
+    // and an operator forty calls down reads them off the model rather than being handed them.
+    emc.putConnection(Connections.headerOf(event));
     try {
       press(emc, keyPressed, key);
     } finally {
@@ -64,7 +67,9 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
 
   private void handlePaste(Message event) {
     JsonObject body = jsonBody(event);
-    pasteText(ServiceHolder.editorModelCoupler, body.getString("text", ""));
+    EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
+    emc.putConnection(Connections.headerOf(event)); // a paste wraps text at the width the client asked to be wrapped at
+    pasteText(emc, body.getString("text", ""));
     bus.send(BusEvent.modelWasChanged.name(), null);
   }
 

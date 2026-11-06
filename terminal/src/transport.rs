@@ -50,7 +50,8 @@ fn send(socket: &mut Socket, address: &str, body: Value) {
   }
 }
 
-/// The viewport declaration. One is enough: the server does not open its port until its bus consumers exist.
+/// The viewport declaration. Once at attach is enough: the server binds it to this socket and remembers it until
+/// the socket closes, and another client declaring a different window no longer moves this one's lines.
 pub fn declare(socket: &mut Socket, cols: usize, rows: usize) {
   send(socket, "viewportWasChanged", json!({ "cols": cols, "rows": rows }));
 }

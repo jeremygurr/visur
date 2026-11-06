@@ -266,8 +266,8 @@ impl Terminal {
 }
 
 impl Drop for Terminal {
-  /// A failed assertion must not leave a client attached: the server keeps the viewport in one global slot, and a
-  /// stray socket is somebody else's confusing failure later.
+  /// A failed assertion must not leave a client attached: every open socket has a viewport the server remembers, so
+  /// a stray one is a connection nobody is going to close and a render nobody is going to look at.
   fn drop(&mut self) {
     if let Ok(path) = std::env::var("VISUR_DUMP") {
       std::fs::write(path, self.seen.lock().unwrap().as_slice()).ok();

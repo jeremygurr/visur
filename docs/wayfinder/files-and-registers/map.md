@@ -51,11 +51,12 @@ Facts established before a ticket was written, each of which changes how a ticke
 - **No server→client channel exists.** `viewWasChanged` is the only outbound address (`MainVerticle.java:58`), it carries
   no command field, and the Rust client *drops* any frame whose address is not it (`protocol.rs:60-62`). Copy-out needs a
   new address in both directions, plus a client-side dispatcher.
-- **The browser sends no paste at all.** `visur.js` has one `keydown` listener (`:65-67`). `pasteWasReceived` exists and
-  is bridged inbound, and only the terminal ever sends it — crossterm's `Event::Paste` (`main.rs:176-180`). So "paste
-  text from another application into the browser page" does nothing today, and fixing it needs no new protocol.
-- **The model conflates document and window, and it is already a live bug.** `canvasWidth`/`canvasHeight` live in the
-  shared model (`EditorContentService.java:56,104`), so the last client to resize decides everyone's line wrapping.
+- **The browser sends no paste at all.** `visur.js` listens for `keydown` and nothing else. `pasteWasReceived` exists,
+  and only the terminal ever sends it — crossterm's `Event::Paste` (`main.rs:176-180`). So "paste text from another
+  application into the browser page" does nothing today, and fixing it needs no new protocol: a `paste` event handler
+  and one frame.
+- **The model conflates document and window.** Ticket [02](issues/02-viewport-per-client.md) took the first piece out —
+  the viewport is per connection now — and the rest of this ticket list is the rest of that argument.
   `ServiceHolder.editorModelCoupler` is read in **60 places across 57 classes**, so [03](issues/03-document-session-split.md)
   is not a refactor of one class — it is 57 classes learning which document and which session they mean.
 - **No document has an unsaved-work concept.** There is no dirty flag, no `isDirty`, nothing `modified`; and the swap
@@ -72,9 +73,10 @@ Facts established before a ticket was written, each of which changes how a ticke
   Whatever character wins, it gets a keypress test.
 - **`[` and `]` are submodes, not key pairs** (`"quantumStart" pushSubmode`), so `|` + digit follows an existing
   precedent: a submode whose keymap binds `1`–`9`, where a digit cannot be misread as a count.
-- **Loopback is checked on one path only.** `/ws` refuses non-loopback peers; `/eventbus` — the browser path — does not,
-  and the server binds all interfaces. Harmless while a remote browser could only edit text; not harmless once a page
-  can push text into your clipboard.
+- **One path in, and it checks loopback.** `/ws` refuses non-loopback peers, and since ticket
+  [02](issues/02-viewport-per-client.md) the browser uses that same socket: the SockJS bridge that did not check is
+  deleted. What is left for [08](issues/08-clipboard-transport.md) is the policy question — whether loopback is still
+  the right boundary once a socket can write the user's clipboard — not a missing check.
 - **Skills to consult**: `tdd` throughout — 01, 02 and 04 are small at existing seams, 03 is the one where the suite is
   the only test, 08 and 10 need the two clients. `codebase-design` for 03, which is a pure interface question: what is a
   `Document` that a `Session` is not, and does anything in the current 57 call sites disagree with the answer.
@@ -91,6 +93,16 @@ Facts established before a ticket was written, each of which changes how a ticke
 - **The document/session split is this map's own ticket**, because dirty baseline, path, swap identity, undo history and
   the selected register are all per-document or per-window state and every one of them is added by this map. Bolting them
   onto the singleton means the screens map deletes them later. Accepted cost: 57 classes.
+- **Per-client state is adopted at dispatch, not threaded through it.** A connection is a socket, the server mints its
+  id, and the socket stamps that id on every frame it relays; the handler that runs the frame adopts it
+  (`emc.putConnection(Connections.headerOf(event))`) so an operator deep in a command reads the geometry of the client
+  whose key it is handling. Ticket [02](issues/02-viewport-per-client.md) found the pattern with two fields at stake;
+  [03](issues/03-document-session-split.md) extends it to the rest of the session. It is dynamic scope, and what keeps
+  it honest is that the ambient thing is an id and the registry has no argument-less getter.
+- **One transport: `/ws`, for the browser too.** The SockJS bridge at `/eventbus` could not carry a connection id, so
+  the page moved to the socket the terminal already used and the bridge was deleted — which also closed the server's
+  only unauthenticated way in. Clipboard work in
+  [08](issues/08-clipboard-transport.md) therefore has one protocol to grow, not two.
 - **Multiple OS windows are out of scope; in-app screens are the goal.** Registers are therefore **global**, because
   there is one terminal emulator. Sessions exist so the viewport and the cursor stop fighting, not to give each window
   its own clipboard.
@@ -123,21 +135,21 @@ Facts established before a ticket was written, each of which changes how a ticke
   a `.<name>.sw*` counterpart gets vim's three-way prompt: recover, delete it, or open read-only.
 - **`visur path` passes the path only when the launcher starts the server**, and warns when a server was already running.
   Telling a live server to load a file is how an idle background server eats an unrelated document.
-- **`/eventbus` gets the loopback check `/ws` already has**, and SSH is documented as the way to be remote — the client
-  connects over SSH; the server is not exposed to the network.
+- **SSH is how you are remote**: the client connects over SSH; the server is not exposed to the network. See the one
+  transport above for what made that true of the browser too.
 
 ## Tickets
 
 | # | ticket | blocked by |
 |---|---|---|
 | ~~01~~ [closed](issues/01-message-surface.md) | Errors reach the screen: a message slot in the view, retired by any keypress or paste | — |
-| [02](issues/02-viewport-per-client.md) | Viewport per client: `canvasWidth`/`canvasHeight` stop being global; fixes a live two-client bug | — |
+| ~~02~~ [closed](issues/02-viewport-per-client.md) | Viewport per client: `canvasWidth`/`canvasHeight` stop being global; fixes a live two-client bug | — |
 | [03](issues/03-document-session-split.md) | The split: `Document` owns content/path/baseline/undo/swap, `Session` owns cursor/quantum/span/viewport/register | 02 |
 | [04](issues/04-dirty-tracking.md) | Dirty is a comparison against the saved baseline; `*` in the mode line; undo back to saved clears it | 03 |
 | [05](issues/05-command-key-and-grammar.md) | `:` replaces `;`, bare paths, `:w` `:open` `:q` `:q!`, and the keypress test `;` never had | 01, 04 |
 | [06](issues/06-swap-files.md) | Swap files: nameless pool, browser state dir, never overwrite, delete on save, vim's three-way prompt for named files | 01, 04, 05 |
 | [07](issues/07-launch-argument.md) | `visur /path/to/file`, with a warning when a server is already running | 05 |
-| [08](issues/08-clipboard-transport.md) | Clipboard transport: outbound write request, inbound contents, server-side cache, one write per command; `/eventbus` loopback check | 01 |
+| [08](issues/08-clipboard-transport.md) | Clipboard transport: outbound write request, inbound contents, server-side cache, one write per command | 01 |
 | [09](issues/09-register-model.md) | `|` selects a register: `|0` clipboard, `|1`–`|9` rotation, `|a`–`|z` named, freeze toggle | 03, 08 |
 | [10](issues/10-browser-clipboard.md) | Browser clipboard both ways: the `paste` event visur never wired, `writeText`, `readText` | 08 |
 

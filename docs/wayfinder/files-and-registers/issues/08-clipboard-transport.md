@@ -43,9 +43,11 @@ quiet `p` that pastes a stale clipboard is the one outcome worse than an error.
 at OSC 52 spam and every write replaces the user's real clipboard, so the coalescing is a feature, and the test asserts
 one write where three were issued.
 
-**`/eventbus` gets the loopback check `/ws` already has** (`MainVerticle.java:87-90,110-115`), and SSH is documented as
-the way to be remote. Today a remote browser could drive a local editor; once a page can push text into a clipboard, that
-is not a theoretical problem.
+**The loopback question is already closed.** This ticket used to require `/eventbus` get the check `/ws` had, because a
+remote browser could drive a local editor and a page that can push text into a clipboard makes that a real problem.
+Ticket [02](02-viewport-per-client.md) deleted the bridge: the browser speaks `/ws` now, so there is one way in and it
+already refuses non-loopback peers. SSH stays the way to be remote, and what is left here is the **policy** question —
+whether loopback is the right boundary once a socket can write the user's clipboard — not a missing check.
 
 ## Done when
 
@@ -58,7 +60,9 @@ is not a theoretical problem.
 - A read failure produces the message and **no paste**. Asserted explicitly: the document is unchanged and the message
   names the clipboard.
 - The cache is correct: after a yank, `p` from `|0` works with the client offering no read at all.
-- `/eventbus` refuses a non-loopback peer, asserted the way `/ws`'s check is asserted.
+- The transport that carries a clipboard request refuses a non-loopback peer, asserted the way `/ws`'s check is
+  asserted. (Closed before this ticket opened: ticket
+  [02](02-viewport-per-client.md) left `/ws` as the only way in.)
 - The documented reality is in `docs/reference/keys.md` and the README: **copy out works over SSH on mainstream
   emulators; pulling text copied outside visur works in visur's own emulator and in the browser, and not on a third-party
   terminal that has no OSC 52 read.** Naming the limit is what stops it being filed as a regression.

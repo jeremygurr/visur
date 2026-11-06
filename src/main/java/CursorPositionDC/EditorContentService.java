@@ -52,14 +52,6 @@ public class EditorContentService {
     return nextNewlineIndex;
   }
 
-  public int getCanvasWidth(LocalMap<EditorModelKey, Object> editorModel) {
-    return (int)editorModel.get(canvasWidth);
-  }
-
-  public int getCanvasHeight(LocalMap<EditorModelKey, Object> editorModel) {
-    return (int) editorModel.get(canvasHeight);
-  }
-
   public void initializeEditorContent(String contentLines, LocalMap<EditorModelKey, Object> editorModel) {
     editorModel.put(editorContent, contentLines);
   }
@@ -100,12 +92,5 @@ public class EditorContentService {
     putGlobalVar("nl", nlBVV, editorModel);
   }
 
-  public void putCanvasWidth(int cw, LocalMap<EditorModelKey, Object> editorModel) {
-    editorModel.put(canvasWidth, cw);
-  }
-
-  public void putCanvasHeight(int height, LocalMap<EditorModelKey, Object> editorModel) {
-    editorModel.put(canvasHeight, height);
-  }
 
 }

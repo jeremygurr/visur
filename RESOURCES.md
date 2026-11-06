@@ -26,10 +26,9 @@ behaviour Visur imitates, never for claims about this codebase.
   (`isComplete`, `putWhenComplete`, `getOrCalc`, `setOuters`) when prose is
   ambiguous. This is the only test suite in the repo.
 - [`src/main/resources/static/visur.js`](src/main/resources/static/visur.js) +
-  [`visur.html`](src/main/resources/static/visur.html) +
-  [`browser_input_service-proxy.js`](src/main/resources/static/browser_input_service-proxy.js)
-  — the production browser client (Canvas 2D, sockJS + Vert.x EventBus bridge).
-  Use for: Lesson 9 and any server↔browser question.
+  [`visur.html`](src/main/resources/static/visur.html) — the production
+  browser client (Canvas 2D, native `WebSocket` on `/ws`, bus envelope in
+  both directions). Use for: Lesson 9 and any server↔browser question.
 - [`frontEnd/editingScreen.js`](frontEnd/editingScreen.js) +
   [`editingScreen.html`](frontEnd/editingScreen.html) — a standalone prototype
   (h/j/k/l navigation, no EventBus, not wired to the server). Use for: comparison
@@ -83,9 +82,11 @@ behaviour Visur imitates, never for claims about this codebase.
 - Vert.x 4.4.4 source, for behaviour Visur depends on and never states:
   [`EventBusImpl`](https://github.com/eclipse-vertx/vert.x/blob/4.4.4/src/main/java/io/vertx/core/eventbus/impl/EventBusImpl.java)
   (`send` is point-to-point; one handler chosen round-robin — Lesson 9 §4) and
-  [`EventBusBridgeImpl`](https://github.com/eclipse-vertx/vert.x/blob/4.4.4/vertx-web/src/main/java/io/vertx/ext/web/handler/sockjs/impl/EventBusBridgeImpl.java)
-  (a browser `registerHandler` on an outbound-permitted address becomes a real
-  local consumer). Use for: why `modelWasChanged` can reach the browser.
+  `publish` versus `send` (a published message reaches every consumer, a sent
+  one exactly one — the difference ticket
+  [02](docs/wayfinder/files-and-registers/issues/02-viewport-per-client.md) hangs per-client views on). Use for: why one
+  model change can reach every client. The SockJS bridge this used to cite is
+  gone: the browser speaks `/ws` now.
 - [Vim documentation](https://vimhelp.org/) — `motion.txt` and `change.txt`
   (movements, text objects, registers, search), plus `options.txt` for
   `'virtualedit'` and wrapping. Use for: the behaviour Visur imitates (desired

@@ -39,6 +39,8 @@ retired at the top of `press`, before the key runs, because a message describes 
 clearing it afterwards would erase the message that very key reported, and leaving it past the next keypress would leave a
 stale complaint on screen.
 
+A viewport belongs to a connection, not to a document. [`Connections`](src/main/java/com/ple/visur/Connections.java) holds one content grid per open socket and the model holds the id of the connection the code *currently executing* is working for. Every inbound handler adopts that id before it runs anything — `emc.putConnection(Connections.headerOf(event))` — which is how an operator forty calls down reads the geometry of the client whose key it is handling without anybody in the call chain taking a parameter. It is safe because one command runs at a time: each verticle is deployed once, so its consumers are serialised on one context and a command never yields between adopting and finishing. Anything else that turns out to be per-client (the cursor, the quantum, the span — see [the split ticket](docs/wayfinder/files-and-registers/issues/03-document-session-split.md)) follows the same shape. What may not happen is putting per-client state back in the shared model behind a singleton getter, which is the two-clients-one-window bug with better naming.
+
 ## Document types are declared, not hardcoded
 
 A quantum and the facts about it — its name, what separates it from the next quantum, how coarse it is — belong to an
@@ -82,6 +84,8 @@ A submode is a `KeymapHandler` bound with `holdKey`, entered by `PushSubmodeOp` 
 Changing a key or a wire field means deleting the old path in the same commit — no dual bindings, no compatibility window.
 
 ## The wire
+
+One socket for every client. `/ws` carries the bus envelope `{"address": …, "body": …}` in both directions and the browser page speaks the same frames as the terminal client; the SockJS bridge at `/eventbus` is gone, along with the page's two CDN scripts and the server's only unauthenticated way in. Accepting a socket is how a connection gets its id: the socket stamps that id on everything the client relays, and forwards back only the views stamped for it — so `View.of` is rendered once per connection, because rows, cursor column and the mode line's clip are all the asking client's width's business.
 
 [`View`](src/main/java/com/ple/visur/View.java) is the only projection the renderers read. A new field lands in three places at once: `View`, [`visur.js`](src/main/resources/static/visur.js), and [`protocol.rs`](terminal/src/protocol.rs) plus its consumer [`screen.rs`](terminal/src/screen.rs). Both renderers draw the selection only when span is above 0, and both treat `[start, end)` as inclusive-start, exclusive-end.
 

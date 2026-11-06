@@ -83,12 +83,30 @@ public class EditorModelCoupler {
     return ecs.getNextLineIndices(editorModel);
   }
 
+  /**
+   * The connection the code currently executing is working for.
+   *
+   * <p>Set once at the top of every inbound message, which is how an operator forty calls deep reaches the geometry
+   * of the client whose key it is handling without anybody in the call chain taking a parameter. It is safe because
+   * one command runs at a time: every verticle here is deployed once, so its consumers are serialised on one context
+   * and a command never yields between adopting a connection and finishing.
+   */
+  public String getConnection() {
+    Object id = editorModel.get(connection);
+    return id instanceof String string ? string : Connections.NONE;
+  }
+
+  public void putConnection(String id) {
+    editorModel.put(connection, id);
+  }
+
+  /** The grid of {@link #getConnection()}. A viewport is never the document's, so this reads the connection registry. */
   public int getCanvasWidth() {
-    return ecs.getCanvasWidth(editorModel);
+    return Connections.viewport(getConnection()).cols();
   }
 
   public int getCanvasHeight() {
-    return ecs.getCanvasHeight(editorModel);
+    return Connections.viewport(getConnection()).rows();
   }
 
   public int getCanvasStart() {
@@ -278,12 +296,13 @@ public class EditorModelCoupler {
     ecs.updateNextLineIndices(editorModel);
   }
 
+  /** Resizes the connection in play. Tests use these to say "the window is this wide" without owning a socket. */
   public void putCanvasWidth(int width) {
-    ecs.putCanvasWidth(width, editorModel);
+    Connections.resize(getConnection(), width, getCanvasHeight());
   }
 
   public void putCanvasHeight(int height) {
-    ecs.putCanvasHeight(height, editorModel);
+    Connections.resize(getConnection(), getCanvasWidth(), height);
   }
 
   public void putCanvasStart(int cs) {

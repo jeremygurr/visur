@@ -54,6 +54,19 @@ unchanged and that the two-viewport test from [02](02-viewport-per-client.md) st
 
 ## Notes
 
+- **Ticket [02](02-viewport-per-client.md) closed and left you the pattern.** The model now carries the id of the
+  connection currently executing, adopted at the top of every inbound handler
+  (`emc.putConnection(Connections.headerOf(event))`), and `Connections` holds what is per connection. Extending the split
+  means moving a field's *home* from the shared model into the per-connection entry and leaving the adoption where it is;
+  it does not mean threading a parameter through the operators, and it must not mean a `Session.current()` singleton
+  getter, which is the two-clients-one-window bug wearing the ticket's own vocabulary.
+- **Start with the three that are already per-client in behaviour:** the scroll window (`canvasStart`, `fy`) and
+  `virtualCX`. They are derived from the viewport and written during a command through the same `getCanvasWidth` calls
+  ticket 02 rerouted, so today a second client's cursor math reads the first client's scroll window. They are also the
+  first fields where "per session" and "per document" are genuinely contested — a scroll window is where this *window* is
+  looking, which is the argument for session — so settle them first and let the answer decide the rest of the list.
+
+
 - **Use `codebase-design` on this ticket.** It is an interface question with a measurable answer: a `Document` whose only
   operations are content, path, baseline and undo is deep; a `Document` that also has `getSpan` because one operator
   wanted it is the same mess with a class diagram.

@@ -1,18 +1,19 @@
 package com.ple.visur;
 
 public enum BusEvent {
-  //sent in js in eb.onopen, consumed by CanvasWasChangedVerticle
+  //sent by a client when its window changes size; consumed by ViewportWasChangedVerticle
   viewportWasChanged,
 
-  //sent in js in keyDown event listener, consumed by KeyWasPressedVerticle
+  //sent by a client for every key; consumed by KeyWasPressedVerticle
   keyWasPressed,
 
+  //sent by a client that received a bracketed paste; consumed by KeyWasPressedVerticle
   pasteWasReceived,
 
-  //sent in KeyWasPressedVerticle and in visur.js in eb.onopen, consumed by ModelWasChangedVerticle
+  //sent by anything that changed the model; consumed by ModelWasChangedVerticle
   modelWasChanged,
 
-  //sent in ModelWasChangedVerticle, consumed in visur.js in eventbus.onopen
+  //sent by ModelWasChangedVerticle once per connection, and relayed to that connection's client by its socket
   viewWasChanged
 }
 

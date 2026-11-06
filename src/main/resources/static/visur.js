@@ -34,32 +34,47 @@ function refreshEditor() {
 
 document.getElementById("visurEditor").onload = function() { refreshEditor() }
 
-var eb = new EventBus('http://localhost:8888/eventbus');
-eb.onopen = function() {
-  console.log("connection established with js' event bus")
-  eb.registerHandler('viewWasChanged', (error, message) => {
-    // Nothing here caches rows, so "full: true" (discard cached rows, do not diff) holds by construction.
-    view = message["body"]
-    console.log("origin = " + view.origin + ", " + view.rows.length + " rows")
-    drawView()
-    drawModeLine()
-  })
+/* The socket is a pipe to the server's event bus, and the frame in both directions is {"address": …, "body": …} — the
+   same thing the terminal client speaks. So the page is a connection like any other: the server mints its id, binds
+   its viewport to it, and sends it the view rendered at its own width. There is nothing here to name ourselves with,
+   which is the point: a page that could claim another tab's id could claim another tab's window size.
 
+   The address is relative to wherever this page was served from, not to a port written into the source: the same page
+   on a machine running visur on another port is the same page. */
+const socket = new WebSocket(`${window.location.protocol == "https:" ? "wss" : "ws"}://${window.location.host}/ws`)
+
+socket.onopen = function() {
   // Cells, not pixels, and content rows only: the last canvas row is chrome. The server lays out that many rows.
-  let canvasInfo = {
+  send("viewportWasChanged", {
     cols: (canvas.width - cxContentOffset) / cellWidth + 1,
     rows: (canvas.height - cyContentOffset) / cellHeight
-  };
-  eb.send("viewportWasChanged", canvasInfo);
+  })
+}
+
+socket.onmessage = function(received) {
+  const frame = JSON.parse(received.data)
+  if (frame.address != "viewWasChanged") {
+    return
+  }
+  // One viewWasChanged message is one complete viewport, so nothing here caches rows and nothing here diffs them.
+  view = frame.body
+  console.log("origin = " + view.origin + ", " + view.rows.length + " rows")
+  drawView()
+  drawModeLine()
+}
+
+/* A socket that has closed does not reopen itself: the page reloads, and a page whose server is down sits there
+   instead of reloading itself forever. */
+socket.onclose = function() {
+  console.log("the server closed this page's socket; reload to reconnect")
+}
+
+function send(address, body) {
+  socket.send(JSON.stringify({address: address, body: body}))
 }
 
 function sendKeyPressedEvent(keyPressed) {
-  console.log("keyPressed = " + keyPressed)
-  let keyPressedInfo = {
-    key: keyPressed
-  }
-  eb.send("keyWasPressed", keyPressedInfo)
-  console.log(keyPressedInfo.key + " key was pressed")
+  send("keyWasPressed", {key: keyPressed})
 }
 
 document.addEventListener('keydown', (event) => {

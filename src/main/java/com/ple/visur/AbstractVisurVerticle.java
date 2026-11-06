@@ -14,7 +14,7 @@ public abstract class AbstractVisurVerticle extends AbstractVerticle {
     bus = vertx.eventBus();
   }
 
-  /** The same message arrives as a JsonObject from /ws and as a JSON string from the SockJS bridge. */
+  /** A /ws frame arrives with its body as a JsonObject; a client that double-encodes it arrives with a String. */
   static JsonObject jsonBody(Message<?> message) {
     Object body = message.body();
     return body instanceof JsonObject json ? json : new JsonObject((String) body);

@@ -1,5 +1,6 @@
 package com.ple.visur;
 
+import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.json.JsonObject;
 import io.vertx.rxjava3.core.eventbus.Message;
 
@@ -22,10 +23,22 @@ public class ModelWasChangedVerticle extends AbstractVisurVerticle {
 
   /** The trigger may ask for a full repaint; a keystroke changes no layout, so it does not. */
   public void handleChange(Message<Object> event) {
-    // publish, not send: a view is state addressed to every renderer, not a job for one of them. `send` picks a
-    // single consumer per message, so a renderer attached a moment ago -- or one whose socket died without
-    // unregistering -- silently swallows the views meant for the others. Every renderer paints its own copy.
-    vertx.eventBus().publish(BusEvent.viewWasChanged.name(), View.of(emc, isFull(event.body())).render());
+    // One render per connection, because what a document looks like depends on the grid it is being painted into:
+    // the rows, where they start, the cursor's column and the clip of the mode line are all width's business. Two
+    // clients means two renders and three means three; at the number of clients a text editor has, rendering is
+    // cheaper than reasoning about a cache of them would be.
+    boolean full = isFull(event.body());
+    for (String connection : Connections.ids()) {
+      // The same adoption a keypress does, so the render sees this connection's geometry and nothing downstream of
+      // View.of has to be told which client it is drawing for.
+      emc.putConnection(connection);
+      // publish, not send: a view is state addressed to every renderer, not a job for one of them. `send` picks a
+      // single consumer per message, so a renderer attached a moment ago -- or one whose socket died without
+      // unregistering -- silently swallows the views meant for the others. The header says whose copy it is; a
+      // socket forwards it to its client only when that header names it, and drops the rest.
+      vertx.eventBus().publish(BusEvent.viewWasChanged.name(), View.of(emc, full).render(),
+        new DeliveryOptions().addHeader(Connections.HEADER, connection));
+    }
   }
 
   private static boolean isFull(Object trigger) {
