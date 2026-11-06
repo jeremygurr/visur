@@ -15,23 +15,31 @@ public class ChangeCursorQuantumOp implements Operator {
     }
   }
 
+  /**
+   * The quantum this word names, either directly ({@code "word"}) or by the session variable that holds it
+   * ({@code "tempCursorQuantum"}, the way a command restores what it saved before an insert session).
+   *
+   * <p>The word is <em>popped</em>, whichever way the lookup goes. It used to be peeked, so the variable branch left it
+   * on the stack: Escape from insert mode parked {@code tempCursorQuantum} there, and the next command to take an
+   * argument got that instead — which is how {@code ZZ} came to be told to save a file named
+   * {@code tempCursorQuantum}, and why saving after typing had never worked. A command's scratch stack is not its
+   * argument's mailbox.
+   *
+   * <p>Null means the word named no quantum, and {@link #execute} then changes nothing, as before.
+   */
   public String getQuantumName(EditorModelCoupler emc) {
-    String topElement = (String)emc.session().getExecutionDataStack().peek();
-    String qName;
-    boolean topElementIsInvalidQuantumName = emc.getQuantumNameToQuantum().get(topElement) == null;
-    if(topElementIsInvalidQuantumName) {
-      boolean quantumGlobalVarExistsWithTopElementName = emc.session().getGlobalVar(topElement).getVal() instanceof Quantum;
-      if(quantumGlobalVarExistsWithTopElementName) {
-        ObjectVisurVar qOVV = (ObjectVisurVar) emc.session().getGlobalVar(topElement);
-        Quantum q = (Quantum)qOVV.getVal();
-        qName = q.getName();
-      } else {
-        return null;
-      }
-    } else {
-      qName = (String) emc.session().getExecutionDataStack().pop();;
+    ExecutionDataStack eds = emc.session().getExecutionDataStack();
+    if(eds.size() == 0) {
+      return null;
     }
-    return qName;
+    String word = (String) eds.pop();
+    Quantum namedQuantum = emc.getQuantumNameToQuantum().get(word);
+    if(namedQuantum != null) {
+      return namedQuantum.getName();
+    }
+    VisurVar var = emc.session().getGlobalVar(word);
+    Object value = var == null ? null : var.getVal();
+    return value instanceof Quantum ? ((Quantum) value).getName() : null;
   }
 
 }
