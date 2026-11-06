@@ -57,29 +57,29 @@ public record View(
   public static View of(EditorModelCoupler emc, boolean full) {
     int origin = emc.session().getCanvasStart();
     int height = Math.max(emc.session().getCanvasHeight(), 0); // declared rows are content rows: no chrome to subtract
-    List<Viewport.Row> rows = Viewport.rows(emc.getEditorContent(), emc.session().getCanvasWidth(), origin, height);
+    List<Viewport.Row> rows = Viewport.rows(emc.document().getContent(), emc.session().getCanvasWidth(), origin, height);
     Viewport.Position cursor = Viewport.position(rows, cursorIndex(emc));
     return new View(
       full,
       origin,
       rows,
-      emc.getSpan(),
+      emc.session().getSpan(),
       includeSeparators(emc),
       emc.session().getCursorQuantumStart(),
       emc.session().getCursorQuantumEnd(),
       cursor.row(),
       cursor.col(),
       emc.session().getIsAtQuantumStart(),
-      emc.getCursorQuantum().getName(),
-      emc.getScopeQuantum().getName(),
+      emc.session().getCursorQuantum().getName(),
+      emc.session().getScopeQuantum().getName(),
       emc.session().getEditorMode().name(),
       emc.session().getEditorSubmode().name(),
-      emc.getIsInCommandState(),
-      emc.getCommandStateContent(),
-      emc.getCommandCursor(),
+      emc.session().getIsInCommandState(),
+      emc.session().getCommandStateContent(),
+      emc.session().getCommandCursor(),
       searchTarget(emc),
       pendingCount(emc),
-      emc.getMessage()
+      emc.session().getMessage()
     );
   }
 
@@ -91,7 +91,7 @@ public record View(
    * way, and a renderer told only {@code cursorRow}/{@code cursorCol} could not work that out for itself.
    */
   private static int cursorIndex(EditorModelCoupler emc) {
-    if (emc.getSpan() == 0 && !emc.session().getIsAtQuantumStart()) {
+    if (emc.session().getSpan() == 0 && !emc.session().getIsAtQuantumStart()) {
       return emc.session().getCursorQuantumEnd();
     }
     return emc.session().getCursorQuantumStart();

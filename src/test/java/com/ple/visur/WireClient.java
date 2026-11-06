@@ -92,6 +92,17 @@ final class WireClient implements AutoCloseable {
     return view().getInteger("span");
   }
 
+  /** Type a run of characters, one keypress each, as a keyboard would. */
+  void types(String text) {
+    for (String character : text.split("")) {
+      presses(character);
+    }
+  }
+
+  boolean isInCommandState() {
+    return view().getBoolean("isInCommandState");
+  }
+
   int origin() {
     return view().getInteger("origin");
   }

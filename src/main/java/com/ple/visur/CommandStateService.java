@@ -15,12 +15,12 @@ public class CommandStateService {
 
   public void executeCommandState(KeyPressed keyPressed) {
     EditorModelCoupler ems = ServiceHolder.editorModelCoupler;
-    int commandCursor = ems.getCommandCursor();
+    int commandCursor = ems.session().getCommandCursor();
     String commandStateKeyPressed = keyPressed.getKey();
     if(commandStateKeyPressed.equals("Escape")) {
       exitCommandState();
     } else if(commandStateKeyPressed.equals("Enter")) {
-      String command = ems.getCommandStateContent();
+      String command = ems.session().getCommandStateContent();
       VisurCommand visurCommand = ServiceHolder.commandCompileService.compile(command);
       ServiceHolder.commandExecutionService.execute(visurCommand);
       if(!command.isEmpty()) {
@@ -39,8 +39,8 @@ public class CommandStateService {
       if(historyCursor < history.size()) {
         historyCursor++;
         if(historyCursor == history.size()) {
-          ems.putCommandStateContent("");
-          ems.putCommandCursor(0);
+          ems.session().putCommandStateContent("");
+          ems.session().putCommandCursor(0);
         } else {
           recall(ems, historyCursor);
         }
@@ -50,50 +50,50 @@ public class CommandStateService {
         case "ArrowLeft":
           if(commandCursor > 0) {
             commandCursor--;
-            ems.putCommandCursor(commandCursor);
+            ems.session().putCommandCursor(commandCursor);
           }
           break;
         case "ArrowRight":
-          if(commandCursor < ems.getCommandStateContent().length()) {
+          if(commandCursor < ems.session().getCommandStateContent().length()) {
             commandCursor++;
-            ems.putCommandCursor(commandCursor);
+            ems.session().putCommandCursor(commandCursor);
           }
           break;
         default:
-          ems.reportError("unexpected error in switch statement for arrow movement in command state");
+          ems.session().reportError("unexpected error in switch statement for arrow movement in command state");
       }
     } else if(commandStateKeyPressed.equals("Backspace")) {
-      String commandStateContent = ems.getCommandStateContent();
+      String commandStateContent = ems.session().getCommandStateContent();
       if(commandCursor > 0) {
         String substrBeforeDeletedChar = commandStateContent.substring(0, commandCursor - 1);
         String substrAfterDeletedChar = commandStateContent.substring(commandCursor);
         String newCommandStateContent = substrBeforeDeletedChar + substrAfterDeletedChar;
-        ems.putCommandStateContent(newCommandStateContent);
-        ems.putCommandCursor(--commandCursor);
+        ems.session().putCommandStateContent(newCommandStateContent);
+        ems.session().putCommandCursor(--commandCursor);
       }
     } else if(commandStateKeyPressed.length() == 1) {
-      String oldCommandStateContent = ems.getCommandStateContent();
+      String oldCommandStateContent = ems.session().getCommandStateContent();
       char charToInsert = commandStateKeyPressed.charAt(0);
       String substrBeforeInsertedChar = oldCommandStateContent.substring(0, commandCursor);
       String substrAfterInsertedChar = oldCommandStateContent.substring(commandCursor);
       String newCommandStateContent = substrBeforeInsertedChar + charToInsert + substrAfterInsertedChar;
 
-      ems.putCommandStateContent(newCommandStateContent);
-      ems.putCommandCursor(commandCursor + 1);
+      ems.session().putCommandStateContent(newCommandStateContent);
+      ems.session().putCommandCursor(commandCursor + 1);
     }
   }
 
   private void recall(EditorModelCoupler ems, int index) {
     String command = history.get(index);
-    ems.putCommandStateContent(command);
-    ems.putCommandCursor(command.length());
+    ems.session().putCommandStateContent(command);
+    ems.session().putCommandCursor(command.length());
   }
 
   private void exitCommandState() {
     EditorModelCoupler ems = ServiceHolder.editorModelCoupler;
-    ems.putIsInCommandState(false);
-    ems.putCommandStateContent("");
-    ems.putCommandCursor(0);
+    ems.session().putIsInCommandState(false);
+    ems.session().putCommandStateContent("");
+    ems.session().putCommandCursor(0);
     System.out.println("Is out of command state");
   }
 

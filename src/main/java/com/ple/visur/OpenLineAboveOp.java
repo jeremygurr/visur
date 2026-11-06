@@ -14,12 +14,12 @@ public class OpenLineAboveOp implements Operator {
   @Override
   public void execute(Object ignored) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    String content = emc.getEditorContent();
-    ArrayList<Integer> nl = emc.getNextLineIndices();
-    int cy = emc.getCY();
+    String content = emc.document().getContent();
+    ArrayList<Integer> nl = emc.document().getNextLineIndices();
+    int cy = emc.session().getCY();
     int lineStart = cy > 0 ? nl.get(cy - 1) : 0;
-    emc.putEditorContent(content.substring(0, lineStart) + "\n" + content.substring(lineStart));
+    emc.document().putContent(content.substring(0, lineStart) + "\n" + content.substring(lineStart));
     // The index the newline went in at is the start of the line that just appeared, because it is that newline.
-    emc.putCA(lineStart);
+    emc.session().putCA(lineStart);
   }
 }

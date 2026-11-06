@@ -15,10 +15,10 @@ class CommandStateServiceTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
-    ServiceHolder.editorModelCoupler.putIsInCommandState(true);
-    ServiceHolder.editorModelCoupler.putCommandStateContent("clearEDS");
-    ServiceHolder.editorModelCoupler.putCommandCursor("clearEDS".length());
+    ServiceHolder.init();
+    ServiceHolder.editorModelCoupler.session().putIsInCommandState(true);
+    ServiceHolder.editorModelCoupler.session().putCommandStateContent("clearEDS");
+    ServiceHolder.editorModelCoupler.session().putCommandCursor("clearEDS".length());
   }
 
   @AfterEach
@@ -34,74 +34,74 @@ class CommandStateServiceTest {
    */
   @Test
   void theKeyThatOpensCommandStateIsNotPartOfTheCommand() {
-    ServiceHolder.editorModelCoupler.putIsInCommandState(false);
-    ServiceHolder.editorModelCoupler.putCommandStateContent("stale");
+    ServiceHolder.editorModelCoupler.session().putIsInCommandState(false);
+    ServiceHolder.editorModelCoupler.session().putCommandStateContent("stale");
 
     KeyWasPressedVerticle.press(ServiceHolder.editorModelCoupler, KeyPressed.from(";"), ";");
 
-    assertTrue(ServiceHolder.editorModelCoupler.getIsInCommandState());
-    assertEquals("", ServiceHolder.editorModelCoupler.getCommandStateContent(), "the prompt is drawn, not typed");
+    assertTrue(ServiceHolder.editorModelCoupler.session().getIsInCommandState());
+    assertEquals("", ServiceHolder.editorModelCoupler.session().getCommandStateContent(), "the prompt is drawn, not typed");
   }
 
   @Test
   void semicolonEntersOnlyFromNavigateSubmode() {
-    ServiceHolder.editorModelCoupler.putCommandStateContent("stale");
-    ServiceHolder.editorModelCoupler.putCommandCursor(5);
-    ServiceHolder.editorModelCoupler.putIsInCommandState(false);
+    ServiceHolder.editorModelCoupler.session().putCommandStateContent("stale");
+    ServiceHolder.editorModelCoupler.session().putCommandCursor(5);
+    ServiceHolder.editorModelCoupler.session().putIsInCommandState(false);
     KeyWasPressedVerticle.enterCommandStateIfRequested(ServiceHolder.editorModelCoupler, ";");
-    assertEquals(true, ServiceHolder.editorModelCoupler.getIsInCommandState());
-    assertEquals("", ServiceHolder.editorModelCoupler.getCommandStateContent());
+    assertEquals(true, ServiceHolder.editorModelCoupler.session().getIsInCommandState());
+    assertEquals("", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
 
-    ServiceHolder.editorModelCoupler.putIsInCommandState(false);
+    ServiceHolder.editorModelCoupler.session().putIsInCommandState(false);
     java.util.Stack<EditorSubmode> submodes = new java.util.Stack<>();
     submodes.push(EditorSubmode.insert);
     ServiceHolder.editorModelCoupler.session().putEditorSubmodeStack(submodes);
     KeyWasPressedVerticle.enterCommandStateIfRequested(ServiceHolder.editorModelCoupler, ";");
-    assertFalse(ServiceHolder.editorModelCoupler.getIsInCommandState());
+    assertFalse(ServiceHolder.editorModelCoupler.session().getIsInCommandState());
   }
 
   @Test
   void escapeExitsAndClearsTheCommandLine() {
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("Escape"));
-    assertFalse(ServiceHolder.editorModelCoupler.getIsInCommandState());
-    assertEquals("", ServiceHolder.editorModelCoupler.getCommandStateContent());
+    assertFalse(ServiceHolder.editorModelCoupler.session().getIsInCommandState());
+    assertEquals("", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
   }
 
   @Test
   void editsAtTheCursorAndBackspaceThenEscapeClears() {
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("ArrowLeft"));
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("x"));
-    assertEquals("clearEDxS", ServiceHolder.editorModelCoupler.getCommandStateContent());
-    assertEquals(8, ServiceHolder.editorModelCoupler.getCommandCursor());
+    assertEquals("clearEDxS", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
+    assertEquals(8, ServiceHolder.editorModelCoupler.session().getCommandCursor());
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("Backspace"));
-    assertEquals("clearEDS", ServiceHolder.editorModelCoupler.getCommandStateContent());
-    assertEquals(7, ServiceHolder.editorModelCoupler.getCommandCursor());
+    assertEquals("clearEDS", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
+    assertEquals(7, ServiceHolder.editorModelCoupler.session().getCommandCursor());
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("Escape"));
-    assertEquals("", ServiceHolder.editorModelCoupler.getCommandStateContent());
+    assertEquals("", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
   }
 
   @Test
   void enterCompilesAndExecutesCommand() {
-    ServiceHolder.editorModelCoupler.putCommandStateContent("1");
-    ServiceHolder.editorModelCoupler.putCommandCursor(1);
+    ServiceHolder.editorModelCoupler.session().putCommandStateContent("1");
+    ServiceHolder.editorModelCoupler.session().putCommandCursor(1);
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("Enter"));
     assertEquals(1, ServiceHolder.editorModelCoupler.session().getExecutionDataStack().peek());
-    assertFalse(ServiceHolder.editorModelCoupler.getIsInCommandState());
+    assertFalse(ServiceHolder.editorModelCoupler.session().getIsInCommandState());
   }
 
   @Test
   void recallsExecutedCommandAndMovesCursorToEnd() {
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("Enter"));
-    assertFalse(ServiceHolder.editorModelCoupler.getIsInCommandState());
+    assertFalse(ServiceHolder.editorModelCoupler.session().getIsInCommandState());
 
-    ServiceHolder.editorModelCoupler.putIsInCommandState(true);
+    ServiceHolder.editorModelCoupler.session().putIsInCommandState(true);
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("ArrowUp"));
 
-    assertEquals("clearEDS", ServiceHolder.editorModelCoupler.getCommandStateContent());
-    assertEquals("clearEDS".length(), ServiceHolder.editorModelCoupler.getCommandCursor());
+    assertEquals("clearEDS", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
+    assertEquals("clearEDS".length(), ServiceHolder.editorModelCoupler.session().getCommandCursor());
 
     ServiceHolder.commandStateService.executeCommandState(KeyPressed.from("ArrowDown"));
-    assertEquals("", ServiceHolder.editorModelCoupler.getCommandStateContent());
-    assertEquals(0, ServiceHolder.editorModelCoupler.getCommandCursor());
+    assertEquals("", ServiceHolder.editorModelCoupler.session().getCommandStateContent());
+    assertEquals(0, ServiceHolder.editorModelCoupler.session().getCommandCursor());
   }
 }

@@ -69,13 +69,13 @@ public class SessionText {
     discard(emc);
     if (repeated.length() == 0) return;
 
-    String content = emc.getEditorContent();
-    int caret = emc.getCA();
-    emc.putEditorContent(content.substring(0, caret) + repeated + content.substring(caret));
+    String content = emc.document().getContent();
+    int caret = emc.session().getCA();
+    emc.document().putContent(content.substring(0, caret) + repeated + content.substring(caret));
     int endOfLastCopy = caret + repeated.length();
-    emc.putCA(endOfLastCopy);
-    int[] bounds = emc.getCursorQuantum()
-      .getBoundaries(endOfLastCopy, emc.getNextLineIndices(), emc.getSpan(), false);
+    emc.session().putCA(endOfLastCopy);
+    int[] bounds = emc.session().getCursorQuantum()
+      .getBoundaries(endOfLastCopy, emc.document().getNextLineIndices(), emc.session().getSpan(), false);
     emc.session().putCursorQuantumStartAndScroll(bounds[0]);
     emc.session().putCursorQuantumEndAndScroll(bounds[1]);
   }

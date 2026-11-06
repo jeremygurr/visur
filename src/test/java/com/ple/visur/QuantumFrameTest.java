@@ -37,22 +37,22 @@ class QuantumFrameTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(A_LINE_OF_WORDS + TWENTY_FIVE_BLANK_LINES + A_LINE_OF_SHORT_WORDS);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(A_LINE_OF_WORDS + TWENTY_FIVE_BLANK_LINES + A_LINE_OF_SHORT_WORDS);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     character = emc.getQuantumNameToQuantum().get("character");
-    emc.putCursorQuantum(character);
-    emc.putCX(COLUMN_IN_THAT_LINE);
-    emc.putCY(BLANK_LINE_NUMBER);
+    emc.session().putCursorQuantum(character);
+    emc.session().putCX(COLUMN_IN_THAT_LINE);
+    emc.session().putCY(BLANK_LINE_NUMBER);
     emc.session().putVirtualCX(COLUMN_IN_THAT_LINE);
     emc.session().putCanvasStart(0);
     emc.session().putFY(BLANK_LINE_NUMBER);
-    emc.putCA(A_BLANK_LINE);
-    assertEquals(A_BLANK_LINE, emc.getCA()); // cx and cy agree with ca, so nothing recomputes it under the jump
+    emc.session().putCA(A_BLANK_LINE);
+    assertEquals(A_BLANK_LINE, emc.session().getCA()); // cx and cy agree with ca, so nothing recomputes it under the jump
   }
 
   @AfterEach
@@ -63,31 +63,31 @@ class QuantumFrameTest {
   @Test
   void jumpingToEndOfAWordAtSpanOneLeavesYouInTheWordQuantum() {
     jumpToEndOfWord(1); // one character measures more than a word that is not there, so the character quantum frames
-    assertEquals("word", emc.getCursorQuantum().getName());
+    assertEquals("word", emc.session().getCursorQuantum().getName());
   }
 
   @Test
   void jumpingToEndOfAWordAtSpanTwentyLeavesYouInTheWordQuantum() {
     jumpToEndOfWord(20); // twenty characters still measure more than a word that is not here
-    assertEquals("word", emc.getCursorQuantum().getName());
+    assertEquals("word", emc.session().getCursorQuantum().getName());
   }
 
   @Test
   void jumpingToStartOfAWordAtSpanTwentyLeavesYouInTheWordQuantum() {
     jumpToStartOfWord(20); // the same ranking decides [ w, so it must not flip either
-    assertEquals("word", emc.getCursorQuantum().getName());
+    assertEquals("word", emc.session().getCursorQuantum().getName());
   }
 
   /** The keystroke {@code ] w}: the submode pushes the operand's name, and the cursor quantum runs the jump. */
   private void jumpToEndOfWord(int span) {
-    emc.putSpan(span);
+    emc.session().putSpan(span);
     emc.session().putOnExecutionDataStack("word");
     character.quantumEnd();
   }
 
   /** The keystroke {@code [ w}. */
   private void jumpToStartOfWord(int span) {
-    emc.putSpan(span);
+    emc.session().putSpan(span);
     emc.session().putOnExecutionDataStack("word");
     character.quantumStart();
   }
@@ -101,17 +101,17 @@ class QuantumFrameTest {
    */
   @Test
   void jumpingToTheCharacterInAOneCharacterWordLeavesYouInTheCharacterQuantum() {
-    emc.putEditorContent("a b\n");
-    emc.putCX(0);
-    emc.putCY(0);
+    emc.document().putContent("a b\n");
+    emc.session().putCX(0);
+    emc.session().putCY(0);
     emc.session().putVirtualCX(0);
     emc.session().putFY(0);
-    emc.putCA(0);
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
-    emc.putSpan(1);
+    emc.session().putCA(0);
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.session().putSpan(1);
     emc.session().putOnExecutionDataStack("character");
     emc.getQuantumNameToQuantum().get("word").quantumEnd(); // the keystroke ] q, with words as the cursor quantum
-    assertEquals("character", emc.getCursorQuantum().getName());
+    assertEquals("character", emc.session().getCursorQuantum().getName());
     assertEquals(1, emc.session().getCursorQuantumStart());
     assertEquals(2, emc.session().getCursorQuantumEnd());
   }
@@ -128,17 +128,17 @@ class QuantumFrameTest {
    */
   @Test
   void twentyWordsOutMeasureTwentyLinesAndTheLineStillFrames() {
-    emc.putEditorContent("alpha beta\n" + "\n".repeat(19)
+    emc.document().putContent("alpha beta\n" + "\n".repeat(19)
       + "one two three four five six seven eight nine ten eleven twelve thirteen\n");
-    emc.putCX(0);
-    emc.putCY(0);
+    emc.session().putCX(0);
+    emc.session().putCY(0);
     emc.session().putVirtualCX(0);
     emc.session().putFY(0);
-    emc.putCA(0);
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
-    emc.putSpan(20);
+    emc.session().putCA(0);
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.session().putSpan(20);
     emc.session().putOnExecutionDataStack("line");
     emc.getQuantumNameToQuantum().get("word").quantumEnd(); // the keystroke ] e, with words as the cursor quantum
-    assertEquals("word", emc.getCursorQuantum().getName());
+    assertEquals("word", emc.session().getCursorQuantum().getName());
   }
 }

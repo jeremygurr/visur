@@ -4,7 +4,9 @@ Conventions this codebase follows that the code itself does not force. Tooling a
 
 ## State
 
-`EditorModelCoupler` is the only mutable editor model. Read it through `getX`, write it through `putX` (`putCA`, `putSpan`, `putCursorQuantumStartAndScroll`). Operators reach it through `ServiceHolder` and nothing else — `EditorContentService` and `EditorDataModel` behind it are wired at startup and stay private to `EditorModelCoupler`.
+There are two mutable models and they answer different questions. [`Document`](src/main/java/com/ple/visur/Document.java) is the text and what it costs to know it — content, path, the undo ring, where the lines start; it outlives the window. [`Session`](src/main/java/com/ple/visur/Session.java) is the pair of hands at one keyboard — cursor, selection, typed count, submode, scroll position, command line, message, viewport; it dies with the socket. A field belongs to whichever one asks "whose is this?" and gets answered "nobody else's" or "everybody's"; that question is the reason the split exists, because while both lived in one map a second client's keystroke continued the first client's work.
+
+`EditorModelCoupler` is the locator, not a third model: it hands out `document()` and `session()` and holds what is built once at boot and only read after (the keymaps, the quantum registries). Operators reach all of it through `ServiceHolder` and nothing else. Never add a `getX` for document or session state back onto the coupler — a state both owners can answer through is a state whose owner nobody has to say.
 
 Writes that scroll use the `AndScroll` variant; the plain variant is for restoring a position the renderer already knows.
 
@@ -32,7 +34,7 @@ pending snapshot survives an insert session and `g`, the typing and the count's 
 undo exists — that is what keeps a command's boundary from being gotten wrong once per operator. `undo` and `redo` clear
 the pending snapshot themselves, which is how they decline to count as an edit.
 
-`reportError` is how an operator tells the user something failed, and it has exactly two destinations: the model, where a
+`reportError` is how an operator tells the user something failed, and it has exactly two destinations: the window in play, where a
 renderer can draw it, and stdout, where the log keeps a copy for a bug report. Nothing else prints a problem, and nothing
 else draws one — the message is one string on the view payload, not a severity, not a code, not a second message. It is
 retired at the top of `press`, before the key runs, because a message describes what the last thing the user asked for did:
@@ -99,7 +101,7 @@ JUnit 5. `mockito-core` is declared in the build file and no test uses it; there
 
 When the behavior is arithmetic, test the static seam and boot nothing — [`ViewportTest`](src/test/java/com/ple/visur/ViewportTest.java), the `*BoundsTest` set. That is why `boundsFor` is a static: a live model holds one span at a time, and a span test wants to try several.
 
-When the behavior *is* the service wiring, boot it in `@BeforeEach` — `Vertx.vertx()` then `ServiceHolder.init(vertx.sharedData())`, a `@TempDir` for files — and drive the real [`EditorModelCoupler`](src/test/java/com/ple/visur/FileIoTest.java). That is the honest way to test file I/O and command state.
+When the behavior *is* the service wiring, boot it in `@BeforeEach` — `Vertx.vertx()` then `ServiceHolder.init()`, a `@TempDir` for files — and drive the real [`EditorModelCoupler`](src/test/java/com/ple/visur/FileIoTest.java). That is the honest way to test file I/O and command state.
 
 Expected values are literals, never recomputed from the code under test. A test name states the behavior it pins. When current behavior looks wrong and you are pinning it rather than fixing it, name the doubt in the test and link the ticket that settles it — see the `cursorOnWhitespaceSelectsTheWordBeforeIt` case in [`WordQuantumBoundsTest`](src/test/java/com/ple/visur/WordQuantumBoundsTest.java).
 

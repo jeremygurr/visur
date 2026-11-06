@@ -25,8 +25,8 @@ public class RegexQuantum extends Quantum {
    */
   @Override
   public int[] boundsFor(int realCA, ArrayList<Integer> newlineIndices, int span, boolean includeTail) {
-    int[] bounds = boundsFor(pattern, emc.getEditorContent(), newlineIndices, realCA, emc.getCY(), span);
-    emc.putCA(bounds[0]); // legacy side effect: the cursor snaps to the start of the quantum it selected
+    int[] bounds = boundsFor(pattern, emc.document().getContent(), newlineIndices, realCA, emc.session().getCY(), span);
+    emc.session().putCA(bounds[0]); // legacy side effect: the cursor snaps to the start of the quantum it selected
     return bounds;
   }
 
@@ -133,9 +133,9 @@ public class RegexQuantum extends Quantum {
    */
   @Override
   public int move(String editorContent, ArrayList<Integer> newlineIndices, MovementVector mv) {
-    int startingCA = emc.getCA();
+    int startingCA = emc.session().getCA();
     int destination = startingCA;
-    int span = emc.getSpan();
+    int span = emc.session().getSpan();
     int incrementer = mv.dx > 0 ? 1 : -1;
     while(mv.dx != 0) {
       destination = mv.dx > 0 ? getNextBound(pattern, editorContent, destination) : getPrevBound(pattern, editorContent, destination);
@@ -145,8 +145,8 @@ public class RegexQuantum extends Quantum {
       if(!isAtBeginningOfQuantum(destination)) {
         destination = mv.dx > 0 ? getNextQuantumStart(destination) : getPrevQuantumStart(destination);
       }
-      emc.putCA(destination);
-      emc.session().putVirtualCX(emc.getCX());
+      emc.session().putCA(destination);
+      emc.session().putVirtualCX(emc.session().getCX());
       mv.dx -= incrementer;
       boolean destinationIsInWrongPlace = mv.dx == 0 && span > 0 && !isAtBeginningOfQuantum(destination);
       if(destinationIsInWrongPlace) {
@@ -163,12 +163,12 @@ public class RegexQuantum extends Quantum {
 
 
   private boolean isAtBeginningOfQuantum(int bound) {
-    String nextString = emc.getStrToMatch(true, bound);
+    String nextString = emc.document().getStrToMatch(true, bound);
     Matcher nextStringMatcher = pattern.matcher(nextString);
     boolean nextStringMatches = nextStringMatcher.matches();
     boolean prevStringMatches = false;
     if(bound > 0) {
-      String prevString = emc.getStrToMatch(false, bound);
+      String prevString = emc.document().getStrToMatch(false, bound);
       Matcher prevStringMatcher = pattern.matcher(prevString);
       prevStringMatches = prevStringMatcher.matches();
     }
@@ -176,7 +176,7 @@ public class RegexQuantum extends Quantum {
   }
 
   private int getNextQuantumStart(int bound) {
-    String editorContent = emc.getEditorContent();
+    String editorContent = emc.document().getContent();
     int nextStart = bound;
     boolean matchFound = false;
     while(!matchFound) {

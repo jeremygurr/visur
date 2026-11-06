@@ -7,12 +7,12 @@ public class InsertCharOp implements Operator {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     ExecutionDataStack eds = emc.session().getExecutionDataStack();
     String charToBeInserted = (String) eds.pop();
-    String editorContent = emc.getEditorContent();
-    int ca = emc.getCA();
+    String editorContent = emc.document().getContent();
+    int ca = emc.session().getCA();
     String contentBeforeChar = editorContent.substring(0, ca);
     String contentAfterChar = editorContent.substring(ca, editorContent.length());
     String resultingEditorContent = contentBeforeChar + charToBeInserted + contentAfterChar;
-    emc.putEditorContent(resultingEditorContent);
+    emc.document().putContent(resultingEditorContent);
     SessionText.record(emc, charToBeInserted);
   }
 

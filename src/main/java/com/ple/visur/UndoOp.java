@@ -8,6 +8,6 @@ public class UndoOp implements Operator {
   @Override
   public void execute(Object ignored) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    emc.getUndoHistory().undo(emc);
+    emc.document().getUndoHistory().undo(emc);
   }
 }

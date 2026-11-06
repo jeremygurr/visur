@@ -76,6 +76,10 @@ public class Session {
     editorSubmodeStack = new Stack<>();
     editorSubmodeStack.push(EditorSubmode.navigate);
     executionData.clear();
+    isInCommandState = false;
+    commandStateContent = "";
+    commandCursor = 0;
+    message = null;
     lineWrapping = LineWrapping.wrapped;
     previousSearchDirectionWasForward = false;
     vars.put("span", ObjectVisurVar.make(0));
@@ -150,8 +154,20 @@ public class Session {
     cy.putVal(row);
   }
 
+  public void putPreviousSearchTarget(String target) {
+    putGlobalVar("previousSearchTarget", ObjectVisurVar.make(target));
+  }
+
+  public Quantum getCursorQuantum() {
+    return (Quantum) getGlobalVar("cursorQuantum").getVal();
+  }
+
   public void putCursorQuantum(Quantum cursorQuantum) {
     putGlobalVar("cursorQuantum", ObjectVisurVar.make(cursorQuantum));
+  }
+
+  public Quantum getScopeQuantum() {
+    return (Quantum) getGlobalVar("scopeQuantum").getVal();
   }
 
   public void putScopeQuantum(Quantum scopeQuantum) {
@@ -302,10 +318,6 @@ public class Session {
     isAtQuantumStart = atQuantumStart;
   }
 
-  public Quantum getCursorQuantum() {
-    return (Quantum) getGlobalVar("cursorQuantum").getVal();
-  }
-
   public EditorMode getEditorMode() {
     return editorMode;
   }
@@ -360,6 +372,51 @@ public class Session {
     return executionData.size() > 0 ? (String) executionData.peek() : "";
   }
 
+  /**
+   * Tell the user something went wrong: on this window's screen, and in the log.
+   *
+   * <p>The screen half is what makes an error an error — before it, a failed load and an unbound key were
+   * indistinguishable to anyone not reading the server log. The log half stays because a message on screen is gone on
+   * the next keypress and a bug report outlives it.
+   */
+  public void reportError(String problem) {
+    System.out.println(problem);
+    message = problem;
+  }
+
+  /** The message to draw, or empty when there is none: the field is always present on the wire. */
+  public String getMessage() {
+    return message == null ? "" : message;
+  }
+
+  public void clearMessage() {
+    message = null;
+  }
+
+  public boolean getIsInCommandState() {
+    return isInCommandState;
+  }
+
+  public void putIsInCommandState(boolean inCommandState) {
+    isInCommandState = inCommandState;
+  }
+
+  public String getCommandStateContent() {
+    return commandStateContent;
+  }
+
+  public void putCommandStateContent(String content) {
+    commandStateContent = content;
+  }
+
+  public int getCommandCursor() {
+    return commandCursor;
+  }
+
+  public void putCommandCursor(int x) {
+    commandCursor = x;
+  }
+
   public LineWrapping getLineWrapping() {
     return lineWrapping;
   }
@@ -394,6 +451,25 @@ public class Session {
   private EditorMode editorMode;
   private Stack<EditorSubmode> editorSubmodeStack = new Stack<>();
   private final ExecutionDataStack executionData = new ExecutionDataStack();
+
+  /**
+   * The command line, which is a thing one window is being asked for.
+   *
+   * <p>{@code ;} opens it, and while it is open the keys a client types are command text rather than editing: this
+   * is the state that decides which of the two a key means, so it cannot be shared with a window that is not typing
+   * a command.
+   */
+  private boolean isInCommandState;
+  private String commandStateContent = "";
+  private int commandCursor;
+
+  /**
+   * What to draw in this window's mode line, or null when there is nothing to say.
+   *
+   * <p>A message is what the last thing *this* client asked for did, which is also why any keypress of its own
+   * retires it. A window that never asked is not the place to answer somebody else.
+   */
+  private String message;
 
   /** Whether the editor wraps lines here, which is a window's: two windows cannot agree on one width. */
   private LineWrapping lineWrapping;

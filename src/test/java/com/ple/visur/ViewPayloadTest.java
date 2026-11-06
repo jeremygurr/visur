@@ -23,22 +23,22 @@ class ViewPayloadTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath("");
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath("");
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     emc.session().putCanvasStart(0);
-    emc.putCA(0);
+    emc.session().putCA(0);
     java.util.Stack<EditorSubmode> submodes = new java.util.Stack<>();
     submodes.push(navigate);
     emc.session().putEditorSubmodeStack(submodes);
-    emc.putIsInCommandState(false);
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
-    emc.putScopeQuantum(emc.getQuantumNameToQuantum().get("line"));
-    emc.putSpan(3);
+    emc.session().putIsInCommandState(false);
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.session().putScopeQuantum(emc.getQuantumNameToQuantum().get("line"));
+    emc.session().putSpan(3);
   }
 
   @AfterEach
@@ -76,7 +76,7 @@ class ViewPayloadTest {
   void aReportedErrorTravelsToThePayloadAndAnEditorThatReportedNothingShowsNothing() {
     assertEquals("", View.of(emc).render().getString("message"), "nothing reported is nothing shown");
 
-    emc.reportError("loadFile: file not found: /tmp/gone.txt");
+    emc.session().reportError("loadFile: file not found: /tmp/gone.txt");
 
     assertEquals("loadFile: file not found: /tmp/gone.txt", View.of(emc).render().getString("message"));
   }

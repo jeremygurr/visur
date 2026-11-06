@@ -31,21 +31,21 @@ class SearchFenceTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
-    emc.putCA(0);
-    emc.putCX(0);
-    emc.putCY(0);
+    emc.session().putCA(0);
+    emc.session().putCX(0);
+    emc.session().putCY(0);
     emc.session().putVirtualCX(0);
     emc.session().putCanvasStart(0);
     emc.session().putFY(0);
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("character"));
-    emc.putSpan(1);
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get("character"));
+    emc.session().putSpan(1);
     assertEquals(6, FIRST_NEEDLE);
     assertEquals(29, SECOND_NEEDLE);
   }
@@ -59,10 +59,10 @@ class SearchFenceTest {
   void aSearchInsideALineFenceDoesNotReachTheSecondLine() {
     fence("line");
     search("needle");
-    assertEquals(FIRST_NEEDLE, emc.getCA());
+    assertEquals(FIRST_NEEDLE, emc.session().getCA());
 
     search("needle"); // the next needle is on the next line, which is outside the fence
-    assertEquals(FIRST_NEEDLE, emc.getCA(), "a search that found nothing must leave the cursor where it was");
+    assertEquals(FIRST_NEEDLE, emc.session().getCA(), "a search that found nothing must leave the cursor where it was");
   }
 
   /** The control for the test above: it was the fence that stopped the search, not the search. */
@@ -71,7 +71,7 @@ class SearchFenceTest {
     fence("document");
     search("needle");
     search("needle");
-    assertEquals(SECOND_NEEDLE, emc.getCA());
+    assertEquals(SECOND_NEEDLE, emc.session().getCA());
   }
 
   /**
@@ -82,24 +82,24 @@ class SearchFenceTest {
   @Test
   void aSelectionRunsAcrossAFenceItIsSmallerThan() {
     fence("character");
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
-    emc.putCA(2); // inside "alpha"
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.session().putCA(2); // inside "alpha"
     select(5);
     assertEquals(0, emc.session().getCursorQuantumStart());
     assertEquals(29, emc.session().getCursorQuantumEnd()); // the end of "zeta", on the second line
-    assertEquals("character", emc.getScopeQuantum().getName(), "selecting does not move the fence");
+    assertEquals("character", emc.session().getScopeQuantum().getName(), "selecting does not move the fence");
   }
 
   /** Deleting what was selected deletes all of it, even where the fence could not hold it. */
   @Test
   void aDeleteAcrossTheFenceGoesAcrossTheFence() {
     fence("line");
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
-    emc.putCA(2);
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.session().putCA(2);
     select(5);
     new DeleteCursorQuantumOp().execute(null);
-    assertEquals("needle eta\n", emc.getEditorContent());
-    assertEquals("line", emc.getScopeQuantum().getName(), "an operator does not move the fence");
+    assertEquals("needle eta\n", emc.document().getContent());
+    assertEquals("line", emc.session().getScopeQuantum().getName(), "an operator does not move the fence");
   }
 
   /** The keystroke {@code f} + target + {@code Enter}: the submode leaves the target on the stack and runs the op. */
@@ -116,6 +116,6 @@ class SearchFenceTest {
 
   /** The keystroke {@code /} + a quantum key, which is the only thing that has ever written the fence. */
   private void fence(String quantumName) {
-    emc.putScopeQuantum(emc.getQuantumNameToQuantum().get(quantumName));
+    emc.session().putScopeQuantum(emc.getQuantumNameToQuantum().get(quantumName));
   }
 }

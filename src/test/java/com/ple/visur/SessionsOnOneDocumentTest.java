@@ -42,14 +42,14 @@ class SessionsOnOneDocumentTest {
     vertx.deployVerticle(new MainVerticle()).blockingGet();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath("");
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath("");
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasStart(0);
-    emc.putCA(0);
+    emc.session().putCA(0);
     Stack<EditorSubmode> submodes = new Stack<>();
     submodes.push(navigate);
     emc.session().putEditorSubmodeStack(submodes);
-    emc.putIsInCommandState(false);
+    emc.session().putIsInCommandState(false);
     ViewportPerClientTest.awaitNoConnections();
   }
 
@@ -57,6 +57,51 @@ class SessionsOnOneDocumentTest {
   void stopTheServer() {
     // Blocking, so the server is gone before the next test asks for the port range back.
     vertx.close().blockingAwait();
+  }
+
+  @Test
+  void oneDocumentIsOneDocument() {
+    try (WireClient first = new WireClient(vertx, port, 40, 10);
+         WireClient second = new WireClient(vertx, port, 40, 10)) {
+      // "zz" typed in one window is in the other window's text: two sessions, one document, not two copies.
+      first.presses("i");
+      first.types("zz");
+      first.presses("Escape");
+      assertTrue(second.view().toString().contains("zz"), "the edit is in the document both windows are looking at");
+
+      // ...and one undo ring, because undo is a property of the text and not of who changed it. The window that
+      // never typed undoes what the other one did.
+      second.presses("u");
+      assertEquals(false, first.view().toString().contains("zz"),
+        "the neighbour's undo took the edit out from under both windows");
+    }
+  }
+
+  @Test
+  void aMessageIsShownToTheWindowThatEarnedIt() {
+    try (WireClient first = new WireClient(vertx, port, 60, 10);
+         WireClient second = new WireClient(vertx, port, 60, 10)) {
+      assertEquals("", second.message(), "nothing has gone wrong yet, in either window");
+
+      // A load of a file that is not there, because it is the shortest thing that is certain to fail and say so.
+      first.types(";\"/it/is/not/here\" loadFile");
+      first.presses("Enter");
+
+      assertTrue(first.message().contains("not found"), "the window that asked for the file was told it is not there");
+      assertEquals("", second.message(), "the other window did not ask, and is not being told about it");
+    }
+  }
+
+  @Test
+  void aCommandLineBelongsToTheWindowThatOpenedIt() {
+    try (WireClient first = new WireClient(vertx, port, 40, 10);
+         WireClient second = new WireClient(vertx, port, 40, 10)) {
+      assertEquals(false, second.isInCommandState(), "neither window is being asked for a command");
+
+      first.presses(";");
+      assertEquals(true, first.isInCommandState(), "the window that pressed ; is being asked for a command");
+      assertEquals(false, second.isInCommandState(), "the other window was not asked, and is still editing");
+    }
   }
 
   @Test

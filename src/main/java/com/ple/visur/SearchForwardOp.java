@@ -13,9 +13,9 @@ public class SearchForwardOp implements Operator {
       System.out.println("No search target found");
     } else {
       System.out.println("forward search target = " + searchTarget);
-      String editorContent = emc.getEditorContent();
-      Quantum scopeQuantum = emc.getScopeQuantum();
-      int[] scopeQuantumBounds = scopeQuantum.getBoundaries(emc.getCA(), emc.getNextLineIndices(), 1, false); //span is always 1 when searching within a scopeQuantum
+      String editorContent = emc.document().getContent();
+      Quantum scopeQuantum = emc.session().getScopeQuantum();
+      int[] scopeQuantumBounds = scopeQuantum.getBoundaries(emc.session().getCA(), emc.document().getNextLineIndices(), 1, false); //span is always 1 when searching within a scopeQuantum
       int scopeQuantumEnd = scopeQuantumBounds[1];
       int cursorQuantumEnd = emc.session().getCursorQuantumEnd();
       if(cursorQuantumEnd < scopeQuantumEnd) {
@@ -23,16 +23,16 @@ public class SearchForwardOp implements Operator {
         int foundResult = editorContentSubstringToSearch.indexOf(searchTarget);
         if (foundResult > -1) {
           int foundIndex = foundResult + cursorQuantumEnd + 1;
-          emc.putCA(foundIndex);
-          emc.session().putVirtualCX(emc.getCX());
-          Quantum cursorQuantum = emc.getCursorQuantum();
-          int[] newBounds = cursorQuantum.getBoundaries(emc.getCA(), emc.getNextLineIndices(), emc.getSpan(), false);
+          emc.session().putCA(foundIndex);
+          emc.session().putVirtualCX(emc.session().getCX());
+          Quantum cursorQuantum = emc.session().getCursorQuantum();
+          int[] newBounds = cursorQuantum.getBoundaries(emc.session().getCA(), emc.document().getNextLineIndices(), emc.session().getSpan(), false);
           emc.session().putCursorQuantumStartAndScroll(newBounds[0]);
           emc.session().putCursorQuantumEndAndScroll(newBounds[1]);
         }
       }
     }
-    emc.putPreviousSearchTarget(searchTarget);
+    emc.session().putPreviousSearchTarget(searchTarget);
     emc.session().putPreviousSearchDirectionWasForward(true);
   }
 }

@@ -47,14 +47,14 @@ class ViewportPerClientTest {
     // before it is a document the server never sees.
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath("");
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath("");
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasStart(0);
-    emc.putCA(0);
+    emc.session().putCA(0);
     Stack<EditorSubmode> submodes = new Stack<>();
     submodes.push(navigate);
     emc.session().putEditorSubmodeStack(submodes);
-    emc.putIsInCommandState(false);
+    emc.session().putIsInCommandState(false);
     // Connections is static and the test JVM is shared between classes, so a socket another class forgot, or had not
     // finished forgetting, would otherwise be counted here.
     awaitNoConnections();

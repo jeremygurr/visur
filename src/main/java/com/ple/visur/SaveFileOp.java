@@ -18,7 +18,7 @@ public class SaveFileOp implements Operator {
   @Override
   public void execute(Object opInfo) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    String content = emc.getEditorContent();
+    String content = emc.document().getContent();
     ExecutionDataStack eds = emc.session().getExecutionDataStack();
 
     // Pop optional path argument
@@ -29,10 +29,10 @@ public class SaveFileOp implements Operator {
 
     String filePath = targetPath;
     if (filePath == null || filePath.isEmpty()) {
-      filePath = emc.getSourceFilePath();
+      filePath = emc.document().getSourceFilePath();
     }
     if (filePath == null || filePath.isEmpty()) {
-      emc.reportError("saveFile: no path — neither an argument nor a remembered (source) file.");
+      emc.session().reportError("saveFile: no path — neither an argument nor a remembered (source) file.");
       return;
     }
 
@@ -60,12 +60,12 @@ public class SaveFileOp implements Operator {
       Path swapPath = target.resolveSibling(target.getFileName().toString() + ".visur-swap");
       try { Files.delete(swapPath); } catch (IOException ignored) {}
       // Update remembered source path
-      emc.setSourceFilePath(filePath);
+      emc.document().setSourceFilePath(filePath);
     } catch (IOException e) {
       if (tempFile != null) {
         try { Files.deleteIfExists(tempFile); } catch (IOException ignored) {}
       }
-      emc.reportError("saveFile: " + e.getMessage());
+      emc.session().reportError("saveFile: " + e.getMessage());
     }
   }
 }

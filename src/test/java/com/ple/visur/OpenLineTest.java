@@ -34,15 +34,15 @@ class OpenLineTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(TWO_LINES);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(TWO_LINES);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     emc.session().putCanvasStart(0);
-    emc.putSpan(1);
+    emc.session().putSpan(1);
     cursorAt(0, 0, 0);
   }
 
@@ -57,8 +57,8 @@ class OpenLineTest {
     cursorAt(MIDDLE_OF_LINE_TWO, 1, 1);
 
     press("g");
-    assertEquals(WITH_A_LINE_OPENED, emc.getEditorContent());
-    assertEquals(4, emc.getCA(), "the caret is on the new empty line, not on either neighbour");
+    assertEquals(WITH_A_LINE_OPENED, emc.document().getContent());
+    assertEquals(4, emc.session().getCA(), "the caret is on the new empty line, not on either neighbour");
     assertEquals("insert", drawn().getString("editorSubmode"));
   }
 
@@ -68,8 +68,8 @@ class OpenLineTest {
     cursorAt(1, 1, 0); // line one
 
     press("G");
-    assertEquals(WITH_A_LINE_OPENED, emc.getEditorContent());
-    assertEquals(4, emc.getCA(), "the caret is on the new empty line, not on either neighbour");
+    assertEquals(WITH_A_LINE_OPENED, emc.document().getContent());
+    assertEquals(4, emc.session().getCA(), "the caret is on the new empty line, not on either neighbour");
     assertEquals("insert", drawn().getString("editorSubmode"));
   }
 
@@ -79,14 +79,14 @@ class OpenLineTest {
    */
   @Test
   void capitalGOnTheLastLineWithNoTrailingNewlineStillGivesANewEmptyLine() {
-    emc.putEditorContent("one\ntwo");
+    emc.document().putContent("one\ntwo");
     chooseCursorQuantum("line");
     cursorAt(6, 2, 1); // the "o" that ends the document
 
     press("G");
-    assertEquals("one\ntwo\n", emc.getEditorContent());
+    assertEquals("one\ntwo\n", emc.document().getContent());
     press("x");
-    assertEquals("one\ntwo\nx", emc.getEditorContent(),
+    assertEquals("one\ntwo\nx", emc.document().getContent(),
         "the typed character goes on the new line, not at the end of the old one");
   }
 
@@ -98,13 +98,13 @@ class OpenLineTest {
   @Test
   void gOnAnEmptyDocumentLeavesALineToTypeOn() {
     openFromNothing("g");
-    assertEquals("x\n", emc.getEditorContent());
+    assertEquals("x\n", emc.document().getContent());
   }
 
   @Test
   void capitalGOnAnEmptyDocumentLeavesALineToTypeOn() {
     openFromNothing("G");
-    assertEquals("\nx", emc.getEditorContent());
+    assertEquals("\nx", emc.document().getContent());
   }
 
   /**
@@ -126,14 +126,14 @@ class OpenLineTest {
    */
   @Test
   void gAtTheWordQuantumMidLineOpensALineAboveRatherThanSplittingTheLine() {
-    emc.putEditorContent("one\ntwo three\n");
+    emc.document().putContent("one\ntwo three\n");
     chooseCursorQuantum("word");
     cursorAt(9, 5, 1); // the "h" of "three", whose word starts at 8 and whose line starts at 4
 
     press("g");
-    assertEquals("one\n\ntwo three\n", emc.getEditorContent(),
+    assertEquals("one\n\ntwo three\n", emc.document().getContent(),
         "the newline went at the line's start, not the word's");
-    assertEquals(4, emc.getCA());
+    assertEquals(4, emc.session().getCA());
   }
 
   /**
@@ -173,7 +173,7 @@ class OpenLineTest {
 
     press("3");
     press("g");
-    assertEquals(WITH_A_LINE_OPENED, emc.getEditorContent(), "one newline, however big the count");
+    assertEquals(WITH_A_LINE_OPENED, emc.document().getContent(), "one newline, however big the count");
     assertEquals(3, stashedCount(), "the count, kept for the session that is about to be typed");
   }
 
@@ -198,23 +198,23 @@ class OpenLineTest {
    * because in insert mode the caller's next keypress is a character rather than a command.
    */
   private String openBelow() {
-    emc.putEditorContent(TWO_LINES);
-    emc.putSpan(1);
+    emc.document().putContent(TWO_LINES);
+    emc.session().putSpan(1);
     chooseCursorQuantum("line");
     cursorAt(1, 1, 0);
     press("G");
-    String opened = emc.getEditorContent();
+    String opened = emc.document().getContent();
     press("Escape"); // leave insert mode, so the caller's next keypress is a command and not a character
     return opened;
   }
 
   /** The empty document, the key pressed, and one character typed: what a user would see. */
   private void openFromNothing(String key) {
-    emc.putEditorContent("");
+    emc.document().putContent("");
     cursorAt(0, 0, 0);
     chooseCursorQuantum("line");
     press(key);
-    assertEquals("\n", emc.getEditorContent(), key + " on nothing still gives a line to type on");
+    assertEquals("\n", emc.document().getContent(), key + " on nothing still gives a line to type on");
     press("x");
   }
 
@@ -229,17 +229,17 @@ class OpenLineTest {
   }
 
   private void chooseCursorQuantum(String quantumName) {
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
   }
 
   /** cx and cy have to agree with ca, or the model recomputes ca from them while the command runs. */
   private void cursorAt(int ca, int cx, int cy) {
-    emc.putCX(cx);
-    emc.putCY(cy);
+    emc.session().putCX(cx);
+    emc.session().putCY(cy);
     emc.session().putVirtualCX(cx);
     emc.session().putFY(cy);
-    emc.putCA(ca);
-    assertEquals(ca, emc.getCA());
+    emc.session().putCA(ca);
+    assertEquals(ca, emc.session().getCA());
   }
 
   /** The verticle's own keypress handler, minus the bus: see {@link KeyWasPressedVerticle#press}. */

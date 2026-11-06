@@ -14,15 +14,15 @@ class QuantumBoundaryTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.putEditorContent("one two\nthree");
-    emc.putCA(0);
-    emc.putCX(0);
-    emc.putCY(0);
+    emc.document().putContent("one two\nthree");
+    emc.session().putCA(0);
+    emc.session().putCX(0);
+    emc.session().putCY(0);
     emc.session().putVirtualCX(0);
-    emc.putSpan(1);
+    emc.session().putSpan(1);
   }
 
   @AfterEach
@@ -33,12 +33,12 @@ class QuantumBoundaryTest {
   @Test
   void wordBoundariesIncludeTheFollowingSpace() {
     Quantum word = emc.getQuantumNameToQuantum().get("word");
-    assertArrayEquals(new int[]{0, 4}, word.getBoundaries(0, emc.getNextLineIndices(), 1, false));
+    assertArrayEquals(new int[]{0, 4}, word.getBoundaries(0, emc.document().getNextLineIndices(), 1, false));
   }
 
   @Test
   void lineBoundariesIncludeTheFollowingNewline() {
     Quantum line = emc.getQuantumNameToQuantum().get("line");
-    assertArrayEquals(new int[]{0, 8}, line.getBoundaries(0, emc.getNextLineIndices(), 1, false));
+    assertArrayEquals(new int[]{0, 8}, line.getBoundaries(0, emc.document().getNextLineIndices(), 1, false));
   }
 }

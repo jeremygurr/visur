@@ -6,7 +6,7 @@ public class CharacterQuantum extends Quantum {
   EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
   @Override
   public int[] boundsFor(int ca, ArrayList<Integer> nextLineIndices, int span, boolean includeTail) {
-    return boundsFor(emc.getEditorContent(), nextLineIndices, ca, emc.getCY(), span);
+    return boundsFor(emc.document().getContent(), nextLineIndices, ca, emc.session().getCY(), span);
   }
 
   /**
@@ -33,8 +33,8 @@ public class CharacterQuantum extends Quantum {
 
   @Override
   public int move(String editorContent, ArrayList<Integer> nl, MovementVector mv) {
-    int ca = emc.getCA();
-    int span = emc.getSpan();
+    int ca = emc.session().getCA();
+    int span = emc.session().getSpan();
     if(mv.dx != 0) {
       if(mv.dx > 0) {
         ca = moveRight(nl, span);
@@ -53,36 +53,36 @@ public class CharacterQuantum extends Quantum {
   }
 
   private int moveRight(ArrayList<Integer> nl, int span) {
-    int ca = emc.getCA();
+    int ca = emc.session().getCA();
     int contentEnd = nl.get(nl.size() - 1);
     int endLimit = span > 0 ? contentEnd - 1 : contentEnd;
     if(ca + 1 <= endLimit) {
-      emc.putCA(++ca);
-      emc.session().putVirtualCX(emc.getCX());
+      emc.session().putCA(++ca);
+      emc.session().putVirtualCX(emc.session().getCX());
     }
     return ca;
   }
 
   private int moveLeft() {
-    int ca = emc.getCA();
+    int ca = emc.session().getCA();
     if(ca > 0) {
-      emc.putCA(--ca);
-      emc.session().putVirtualCX(emc.getCX());
+      emc.session().putCA(--ca);
+      emc.session().putVirtualCX(emc.session().getCX());
     }
     return ca;
   }
 
   private int moveDown(ArrayList<Integer> nl, int span) {
-    int cx = emc.getCX();
+    int cx = emc.session().getCX();
     int vcx = emc.session().getVirtualCX();
-    int cy = emc.getCY();
+    int cy = emc.session().getCY();
     int canvasWidth = emc.session().getCanvasWidth();
     int[] shortBounds = RelativeLineBoundCalculator.getShort(cx, cy, nl);
     boolean isOnLastShortLineInLongLine = shortBounds[1] - shortBounds[0] < canvasWidth;
     boolean isAtEndOfEditorContent = getIsAtEndOfEditorContent(nl, cy, span, isOnLastShortLineInLongLine);
     boolean shouldIncrementCY = isOnLastShortLineInLongLine && !isAtEndOfEditorContent;
     if (shouldIncrementCY) {
-      emc.putCY(++cy);
+      emc.session().putCY(++cy);
       vcx = vcx % canvasWidth;
     } else if (!isAtEndOfEditorContent) {
       vcx += canvasWidth;
@@ -91,9 +91,9 @@ public class CharacterQuantum extends Quantum {
     boolean shouldDecrementLongLineLength = nl.get(nl.size() - 1).equals(nl.get(nl.size() - 2)) && cy < nl.size() - 1;
     int longLineLimit = span > 0 || shouldDecrementLongLineLength ? longLineLength - 1 : longLineLength;
     cx = Math.min(vcx, longLineLimit);
-    emc.putCX(cx);
+    emc.session().putCX(cx);
     emc.session().putVirtualCX(vcx);
-    return emc.getCA();
+    return emc.session().getCA();
   }
 
   private boolean getIsAtEndOfEditorContent(ArrayList<Integer> nl, int cy, int span, boolean isOnLastShortOfLong) {
@@ -109,15 +109,15 @@ public class CharacterQuantum extends Quantum {
   }
 
   private int moveUp(ArrayList<Integer> nextLineIndices) {
-    int cx = emc.getCX();
-    int cy = emc.getCY();
+    int cx = emc.session().getCX();
+    int cy = emc.session().getCY();
     int canvasWidth = emc.session().getCanvasWidth();
     int vcx = emc.session().getVirtualCX();
     boolean isOnFirstLongLine = cy == 0;
     boolean isOnFirstShortLine = cx < canvasWidth;
     boolean shouldDecrementCY = !isOnFirstLongLine && isOnFirstShortLine;
     if(shouldDecrementCY) {
-      emc.putCY(--cy);
+      emc.session().putCY(--cy);
       int previousLongLineLength = RelativeLineBoundCalculator.getLongLineLength(cy, nextLineIndices);
       int[] shortBoundsOfLastShortInPreviousLine = RelativeLineBoundCalculator.getShort(previousLongLineLength, cy, nextLineIndices);
       vcx = vcx % canvasWidth + shortBoundsOfLastShortInPreviousLine[0];
@@ -126,9 +126,9 @@ public class CharacterQuantum extends Quantum {
       vcx -= canvasWidth;
       cx = vcx;
     }
-    emc.putCX(cx);
+    emc.session().putCX(cx);
     emc.session().putVirtualCX(vcx);
-    return emc.getCA();
+    return emc.session().getCA();
   }
 
   @Override

@@ -39,14 +39,14 @@ public class UndoHistory implements Shareable {
    */
   private record Snapshot(String content, int cursorQuantumStart, int cursorQuantumEnd, int span, int ca) {
     static Snapshot of(EditorModelCoupler emc) {
-      return new Snapshot(emc.getEditorContent(), emc.session().getCursorQuantumStart(), emc.session().getCursorQuantumEnd(),
-          emc.getSpan(), emc.getCA());
+      return new Snapshot(emc.document().getContent(), emc.session().getCursorQuantumStart(), emc.session().getCursorQuantumEnd(),
+          emc.session().getSpan(), emc.session().getCA());
     }
 
     void restore(EditorModelCoupler emc) {
-      emc.putEditorContent(content);
-      emc.putSpan(span);
-      emc.putCA(ca);
+      emc.document().putContent(content);
+      emc.session().putSpan(span);
+      emc.session().putCA(ca);
       emc.session().putCursorQuantumStartAndScroll(cursorQuantumStart);
       emc.session().putCursorQuantumEndAndScroll(cursorQuantumEnd);
     }
@@ -62,7 +62,7 @@ public class UndoHistory implements Shareable {
     if(pending == null || emc.session().getEditorSubmode() != EditorSubmode.navigate) {
       return; // mid-session: the unit is not over yet
     }
-    if(!pending.content.equals(emc.getEditorContent())) {
+    if(!pending.content.equals(emc.document().getContent())) {
       push(undoStack, pending);
       redoStack.clear(); // a new edit invalidates everything redo was offering
     }

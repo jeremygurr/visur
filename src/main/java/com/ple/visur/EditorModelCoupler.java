@@ -1,61 +1,18 @@
 package com.ple.visur;
 
-import CursorPositionDC.EditorContentService;
-import io.vertx.rxjava3.core.shareddata.LocalMap;
-import io.vertx.rxjava3.core.shareddata.SharedData;
-
-import java.io.IOException;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.StandardOpenOption;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Stack;
-
-import static com.ple.visur.EditorModelKey.*;
-
+/**
+ * The locator for the two owners of editor state, and the configuration neither of them owns.
+ *
+ * <p>{@link #document()} is the text and what it costs to know it; {@link #session()} is the pair of hands currently
+ * at the keyboard. Nothing here holds state that belongs to either, which is the entire point: while cursor and
+ * content lived in one map, a second client's keystroke continued the first client's work, and there was no way to ask
+ * a piece of state whose it was. The two owners answer that question, and the type that answers it is where a field
+ * lives.
+ *
+ * <p>What is left is built once at boot and read from then on — the keymaps and the quantum registries — plus the
+ * adopted connection, which is the argument {@link #session()} needs and belongs to neither owner.
+ */
 public class EditorModelCoupler {
-
-  LocalMap<EditorModelKey, Object> editorModel;
-  // Simple time-based debounce for swap file writes: only write if last write was > 500ms ago.
-  // Chosen because writing a few KB to a local filesystem takes microseconds; 500ms is cheap
-  // enough to avoid noticeable keystroke latency while keeping the swap fresh.
-  private volatile long lastSwapWriteTime = 0;
-  private static final long SWAP_DEBOUNCE_MS = 500;
-  private EditorContentService ecs = ServiceHolder.editorContentService;
-
-  private EditorModelCoupler(SharedData sharedData) {
-    this.editorModel = sharedData.getLocalMap("editorModel");
-  }
-
-  public static EditorModelCoupler make(SharedData sharedData) {
-    return new EditorModelCoupler(sharedData);
-  }
-
-  public String getStrToMatch(boolean searchForwards, int startingPoint) {
-    String editorContent = getEditorContent();
-    String strToMatch = "";
-    if(searchForwards && startingPoint < editorContent.length()) {
-      strToMatch = editorContent.substring(startingPoint, startingPoint + 1);
-    } else if(startingPoint > 0) {
-      strToMatch = editorContent.substring(startingPoint - 1, startingPoint);
-    }
-    return strToMatch;
-  }
-
-  public String getEditorContent() {
-    return ecs.getEditorContent(editorModel);
-  }
-
-  public ArrayList<Integer> getNextLineIndices() {
-    return ecs.getNextLineIndices(editorModel);
-  }
-
-  /** One cell for the whole document; see {@link CursorPositionDC.EditorContentService#putNewlineIndicesCell}. */
-  public void putNewlineIndicesCell(BrickVisurVar cell) {
-    ecs.putNewlineIndicesCell(cell, editorModel);
-  }
 
   /**
    * The connection the code currently executing is working for, and it is confined to this thread on purpose.
@@ -73,13 +30,14 @@ public class EditorModelCoupler {
    */
   private static final ThreadLocal<String> connectionForThisThread = new ThreadLocal<>();
 
-  public String getConnection() {
-    String id = connectionForThisThread.get();
-    return id == null ? Connections.NONE : id;
-  }
+  private final Document document = new Document();
 
-  public void putConnection(String id) {
-    connectionForThisThread.set(id);
+  private KeymapMap keymapMap;
+  private QuantumNameToQuantum quantumNameToQuantum;
+  private KeyToQuantumName keyToQuantumName;
+
+  public static EditorModelCoupler make() {
+    return new EditorModelCoupler();
   }
 
   /**
@@ -93,196 +51,44 @@ public class EditorModelCoupler {
     return Connections.session(getConnection());
   }
 
-  /** The cursor of the session in play. See {@link #session()}. */
-  public int getCA() {
-    return session().getCA();
+  /**
+   * The text on screen. One document per process until the screens map makes it a question with an argument; the
+   * reason it is already a method with no parameters to spare is that adding the argument is then nothing else.
+   */
+  public Document document() {
+    return document;
   }
 
-  public void putCA(int ca) {
-    session().putCA(ca);
+  public String getConnection() {
+    String id = connectionForThisThread.get();
+    return id == null ? Connections.NONE : id;
   }
 
-  public int getCX() {
-    return session().getCX();
-  }
-
-  public void putCX(int cx) {
-    session().putCX(cx);
-  }
-
-  public int getCY() {
-    return session().getCY();
-  }
-
-  public void putCY(int cy) {
-    session().putCY(cy);
-  }
-
-  public int getSpan() {
-    return session().getSpan();
-  }
-
-  public void putSpan(int span) {
-    session().putSpan(span);
-  }
-
-  public Quantum getCursorQuantum() {
-    return (Quantum) session().getGlobalVar("cursorQuantum").getVal();
-  }
-
-  public void putCursorQuantum(Quantum cursorQuantum) {
-    session().putGlobalVar("cursorQuantum", ObjectVisurVar.make(cursorQuantum));
-  }
-
-  public Quantum getScopeQuantum() {
-    return (Quantum) session().getGlobalVar("scopeQuantum").getVal();
-  }
-
-  public void putScopeQuantum(Quantum scopeQuantum) {
-    session().putGlobalVar("scopeQuantum", ObjectVisurVar.make(scopeQuantum));
-  }
-
-  public void putPreviousSearchTarget(String previousSearchTarget) {
-    session().putGlobalVar("previousSearchTarget", ObjectVisurVar.make(previousSearchTarget));
-  }
-
-  public UndoHistory getUndoHistory() {
-    return (UndoHistory) editorModel.get(undoHistory);
-  }
-
-  public void putUndoHistory(UndoHistory history) {
-    editorModel.put(undoHistory, history);
+  public void putConnection(String id) {
+    connectionForThisThread.set(id);
   }
 
   public KeymapMap getKeymapMap() {
-    return (KeymapMap) editorModel.get(modeToKeymap);
+    return keymapMap;
   }
 
-  public boolean getIsInCommandState() {
-    return (boolean)editorModel.get(isInCommandState);
-  }
-
-  public String getCommandStateContent() {
-    return (String)editorModel.get(commandStateContent);
-  }
-
-  public int getCommandCursor() {
-    return (int)editorModel.get(commandCursor);
-  }
-
-  /**
-   * The text currently being searched for, or "" when nothing is.
-   *
-   * <p>The cursor that marks the end of the prompt used to be appended where the payload was assembled
-   * ({@code searchTarget += "_"}), which put a rendering decision in the serialiser and left one renderer able to
-   * show a caret the other could not. The caret belongs to the renderer now.
-   */
-  public QuantumNameToQuantum getQuantumNameToQuantum() {
-    return (QuantumNameToQuantum)editorModel.get(quantumNameToQuantum);
-  }
-
-  public KeyToQuantumName getKeyToQuantumName() {
-    return (KeyToQuantumName) editorModel.get(keyToQuantumName);
-  }
-
-  public void initializeEditorContent(String content) {
-    ecs.initializeEditorContent(content, editorModel);
-  }
-
-  public void putEditorContent(String content) {
-    ecs.putEditorContent(content, editorModel);
-    writeSwapFileDebounced(content);
-  }
-
-  /**
-   * Writes the swap file for the current source path, debounced by 500ms.
-   *
-   * <p>Chosen hook: every call to {@code putEditorContent}. This covers all content changes
-   * (startup load, save, loadFile, edits) in a single place. The 500ms debounce prevents
-   * excessive I/O on rapid edits while keeping the swap reasonably fresh.
-   */
-  private void writeSwapFileDebounced(String content) {
-    String sourcePath = getSourceFilePath();
-    if (sourcePath == null || sourcePath.isEmpty()) {
-      return;
-    }
-    long now = System.currentTimeMillis();
-    if (now - lastSwapWriteTime < SWAP_DEBOUNCE_MS) {
-      return; // debounce: not enough time since last write
-    }
-    lastSwapWriteTime = now;
-    try {
-      Path swapPath = Paths.get(sourcePath + ".visur-swap");
-      Files.write(swapPath, content.getBytes(StandardCharsets.UTF_8),
-        StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
-    } catch (IOException e) {
-      // Non-fatal: if swap write fails, the document is still correct.
-      System.out.println("Swap write failed: " + e.getMessage());
-    }
-  }
-
-  public void updateNextLineIndices() {
-    ecs.updateNextLineIndices(editorModel);
-  }
-
-  /** Resizes the connection in play. Tests use these to say "the window is this wide" without owning a socket. */
   public void putKeymapMap(KeymapMap keymapMap) {
-    editorModel.put(modeToKeymap, keymapMap);
+    this.keymapMap = keymapMap;
   }
 
-  public void putIsInCommandState(boolean inCommandState) {
-    editorModel.put(isInCommandState, inCommandState);
-  }
-
-  public void putCommandStateContent(String content) {
-    editorModel.put(commandStateContent, content);
-  }
-
-  public void putCommandCursor(int x) {
-    editorModel.put(commandCursor, x);
+  public QuantumNameToQuantum getQuantumNameToQuantum() {
+    return quantumNameToQuantum;
   }
 
   public void putQuantumNameToQuantum(QuantumNameToQuantum qNameToQuantum) {
-    editorModel.put(quantumNameToQuantum, qNameToQuantum);
+    quantumNameToQuantum = qNameToQuantum;
+  }
+
+  public KeyToQuantumName getKeyToQuantumName() {
+    return keyToQuantumName;
   }
 
   public void putKeyToQuantumName(KeyToQuantumName keyToQName) {
-    editorModel.put(keyToQuantumName, keyToQName);
+    keyToQuantumName = keyToQName;
   }
-
-  /**
-   * Tell the user something went wrong: on the screen, and in the log.
-   *
-   * <p>The screen half is what makes an error an error — before it, a failed load and an unbound key were
-   * indistinguishable to anyone not reading the server log. The log half stays because a message on screen is gone on
-   * the next keypress and a bug report outlives it.
-   */
-  public void reportError(String message) {
-    System.out.println(message);
-    editorModel.put(EditorModelKey.message, message);
-  }
-
-  /** The message to draw, or empty when there is none: the field is always present on the wire. */
-  public String getMessage() {
-    Object val = editorModel.get(message);
-    return val == null ? "" : (String) val;
-  }
-
-  public void clearMessage() {
-    editorModel.remove(message);
-  }
-
-  public String getSourceFilePath() {
-    Object val = editorModel.get(sourceFilePath);
-    return val == null ? null : (String) val;
-  }
-
-  public void setSourceFilePath(String path) {
-    if (path == null) {
-      editorModel.remove(sourceFilePath);
-    } else {
-      editorModel.put(sourceFilePath, path);
-    }
-  }
-
 }

@@ -14,16 +14,16 @@ class ToggleSeparatorsOpTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.putEditorContent("one two");
-    emc.putCA(0);
-    emc.putCX(0);
-    emc.putCY(0);
+    emc.document().putContent("one two");
+    emc.session().putCA(0);
+    emc.session().putCX(0);
+    emc.session().putCY(0);
     emc.session().putVirtualCX(0);
-    emc.putSpan(1);
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.session().putSpan(1);
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
   }
 
   @AfterEach
@@ -39,13 +39,13 @@ class ToggleSeparatorsOpTest {
   @Test
   void theBackslashKeyTogglesSeparatorsBothWays() {
     Quantum word = emc.getQuantumNameToQuantum().get("word");
-    int[] withSeparator = word.getBoundaries(0, emc.getNextLineIndices(), 1, false);
+    int[] withSeparator = word.getBoundaries(0, emc.document().getNextLineIndices(), 1, false);
 
     press("\\");
-    assertArrayEquals(new int[]{0, 3}, word.getBoundaries(0, emc.getNextLineIndices(), 1, false));
+    assertArrayEquals(new int[]{0, 3}, word.getBoundaries(0, emc.document().getNextLineIndices(), 1, false));
 
     press("\\");
-    assertArrayEquals(withSeparator, word.getBoundaries(0, emc.getNextLineIndices(), 1, false));
+    assertArrayEquals(withSeparator, word.getBoundaries(0, emc.document().getNextLineIndices(), 1, false));
   }
 
   private void press(String key) {
@@ -58,13 +58,13 @@ class ToggleSeparatorsOpTest {
     Quantum word = emc.getQuantumNameToQuantum().get("word");
     ToggleSeparatorsOp toggle = new ToggleSeparatorsOp();
 
-    assertArrayEquals(new int[]{0, 4}, word.getBoundaries(0, emc.getNextLineIndices(), 1, false));
+    assertArrayEquals(new int[]{0, 4}, word.getBoundaries(0, emc.document().getNextLineIndices(), 1, false));
     toggle.execute(null);
-    assertArrayEquals(new int[]{0, 3}, word.getBoundaries(0, emc.getNextLineIndices(), 1, false));
+    assertArrayEquals(new int[]{0, 3}, word.getBoundaries(0, emc.document().getNextLineIndices(), 1, false));
     toggle.execute(null);
-    assertArrayEquals(new int[]{0, 4}, word.getBoundaries(0, emc.getNextLineIndices(), 1, false));
-    assertEquals("word", emc.getCursorQuantum().getName());
-    assertEquals(1, emc.getSpan());
+    assertArrayEquals(new int[]{0, 4}, word.getBoundaries(0, emc.document().getNextLineIndices(), 1, false));
+    assertEquals("word", emc.session().getCursorQuantum().getName());
+    assertEquals(1, emc.session().getSpan());
   }
 
   private static void assertEquals(Object expected, Object actual) {

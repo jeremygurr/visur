@@ -34,19 +34,19 @@ class ErrorMessageTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath("");
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath("");
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     emc.session().putCanvasStart(0);
-    emc.putCA(0);
+    emc.session().putCA(0);
     Stack<EditorSubmode> submodes = new Stack<>();
     submodes.push(navigate);
     emc.session().putEditorSubmodeStack(submodes);
-    emc.putIsInCommandState(false);
+    emc.session().putIsInCommandState(false);
   }
 
   @AfterEach
@@ -75,7 +75,7 @@ class ErrorMessageTest {
 
     assertEquals("loadFile: file not found: " + missing, View.of(emc).render().getString("message"),
       "the key that failed says why, and is still on screen when it is drawn");
-    assertEquals(CONTENT, emc.getEditorContent(), "a failed load leaves the document alone");
+    assertEquals(CONTENT, emc.document().getContent(), "a failed load leaves the document alone");
 
     type("w");
 
@@ -85,7 +85,7 @@ class ErrorMessageTest {
   /** A paste is not a keypress, but it is just as much a thing the user did. */
   @Test
   void aPasteTakesTheComplaintAwayToo() {
-    emc.reportError("saveFile: read-only file system");
+    emc.session().reportError("saveFile: read-only file system");
 
     KeyWasPressedVerticle.pasteText(emc, "pasted");
 

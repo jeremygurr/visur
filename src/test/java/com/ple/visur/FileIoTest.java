@@ -30,10 +30,10 @@ class FileIoTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     // Initialize with some content
-    ServiceHolder.editorModelCoupler.putEditorContent("hello world\n");
-    ServiceHolder.editorModelCoupler.setSourceFilePath("");
+    ServiceHolder.editorModelCoupler.document().putContent("hello world\n");
+    ServiceHolder.editorModelCoupler.document().setSourceFilePath("");
   }
 
   @AfterEach
@@ -44,21 +44,21 @@ class FileIoTest {
   @Test
   void saveFileToPathWritesExactBytes() throws IOException {
     Path target = tempDir.resolve("test.txt");
-    ServiceHolder.editorModelCoupler.putEditorContent("hello\nworld");
+    ServiceHolder.editorModelCoupler.document().putContent("hello\nworld");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     new SaveFileOp().execute(null);
 
     byte[] written = Files.readAllBytes(target);
     assertArrayEquals("hello\nworld".getBytes(StandardCharsets.UTF_8), written);
-    assertEquals(target.toString(), ServiceHolder.editorModelCoupler.getSourceFilePath());
+    assertEquals(target.toString(), ServiceHolder.editorModelCoupler.document().getSourceFilePath());
   }
 
   @Test
   void saveFileWithoutPathUsesSourcePath() throws IOException {
     Path target = tempDir.resolve("source.txt");
     String content = "saved from source";
-    ServiceHolder.editorModelCoupler.putEditorContent(content);
-    ServiceHolder.editorModelCoupler.setSourceFilePath(target.toString());
+    ServiceHolder.editorModelCoupler.document().putContent(content);
+    ServiceHolder.editorModelCoupler.document().setSourceFilePath(target.toString());
     new SaveFileOp().execute(null);
 
     byte[] written = Files.readAllBytes(target);
@@ -71,39 +71,39 @@ class FileIoTest {
    * how every file error in this editor stayed invisible to the person it was for.
    */
   private void assertReportedSomethingWorthReading() {
-    String message = ServiceHolder.editorModelCoupler.getMessage();
+    String message = ServiceHolder.editorModelCoupler.session().getMessage();
     assertFalse(message.isBlank(), "an error the screen does not show is an error that did not happen");
   }
 
   @Test
   void saveFileWithoutPathOrSourceReportsError() throws IOException {
-    ServiceHolder.editorModelCoupler.putEditorContent("no source");
-    ServiceHolder.editorModelCoupler.setSourceFilePath("");
+    ServiceHolder.editorModelCoupler.document().putContent("no source");
+    ServiceHolder.editorModelCoupler.document().setSourceFilePath("");
     // No argument on EDS
     new SaveFileOp().execute(null);
 
     // Document is unchanged
-    assertEquals("no source", ServiceHolder.editorModelCoupler.getEditorContent());
+    assertEquals("no source", ServiceHolder.editorModelCoupler.document().getContent());
     assertReportedSomethingWorthReading();
   }
 
   @Test
   void saveFileWithExplicitPathSavesThereAndUpdatesSource() throws IOException {
     Path target = tempDir.resolve("renamed.txt");
-    ServiceHolder.editorModelCoupler.putEditorContent("content");
-    ServiceHolder.editorModelCoupler.setSourceFilePath(tempDir.resolve("old.txt").toString());
+    ServiceHolder.editorModelCoupler.document().putContent("content");
+    ServiceHolder.editorModelCoupler.document().setSourceFilePath(tempDir.resolve("old.txt").toString());
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     new SaveFileOp().execute(null);
 
     byte[] written = Files.readAllBytes(target);
     assertEquals("content", new String(written, StandardCharsets.UTF_8));
-    assertEquals(target.toString(), ServiceHolder.editorModelCoupler.getSourceFilePath());
+    assertEquals(target.toString(), ServiceHolder.editorModelCoupler.document().getSourceFilePath());
   }
 
   @Test
   void saveFileNoTrailingNewlinePreservesAbsence() throws IOException {
     Path target = tempDir.resolve("noNewline.txt");
-    ServiceHolder.editorModelCoupler.putEditorContent("no trailing newline");
+    ServiceHolder.editorModelCoupler.document().putContent("no trailing newline");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     new SaveFileOp().execute(null);
 
@@ -116,7 +116,7 @@ class FileIoTest {
   @Test
   void saveFileWithTrailingNewlinePreservesIt() throws IOException {
     Path target = tempDir.resolve("withNewline.txt");
-    ServiceHolder.editorModelCoupler.putEditorContent("trailing\n");
+    ServiceHolder.editorModelCoupler.document().putContent("trailing\n");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     new SaveFileOp().execute(null);
 
@@ -131,31 +131,31 @@ class FileIoTest {
     String content = "loaded content\nwith lines";
     Files.write(file, content.getBytes(StandardCharsets.UTF_8));
 
-    ServiceHolder.editorModelCoupler.putEditorContent("original");
+    ServiceHolder.editorModelCoupler.document().putContent("original");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 
-    assertEquals(content, ServiceHolder.editorModelCoupler.getEditorContent());
-    assertEquals(file.toString(), ServiceHolder.editorModelCoupler.getSourceFilePath());
+    assertEquals(content, ServiceHolder.editorModelCoupler.document().getContent());
+    assertEquals(file.toString(), ServiceHolder.editorModelCoupler.document().getSourceFilePath());
   }
 
   @Test
   void loadFileMissingFileLeavesDocumentUntouched() {
-    ServiceHolder.editorModelCoupler.putEditorContent("stays");
+    ServiceHolder.editorModelCoupler.document().putContent("stays");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack("/nonexistent/path.txt");
     new LoadFileOp().execute(null);
 
-    assertEquals("stays", ServiceHolder.editorModelCoupler.getEditorContent());
-    assertTrue(ServiceHolder.editorModelCoupler.getMessage().contains("/nonexistent/path.txt"),
+    assertEquals("stays", ServiceHolder.editorModelCoupler.document().getContent());
+    assertTrue(ServiceHolder.editorModelCoupler.session().getMessage().contains("/nonexistent/path.txt"),
       "an error that does not name the file it failed on tells the user nothing");
   }
 
   @Test
   void loadFileNoArgumentReportsError() {
-    ServiceHolder.editorModelCoupler.putEditorContent("stays");
+    ServiceHolder.editorModelCoupler.document().putContent("stays");
     new LoadFileOp().execute(null);
 
-    assertEquals("stays", ServiceHolder.editorModelCoupler.getEditorContent());
+    assertEquals("stays", ServiceHolder.editorModelCoupler.document().getContent());
     assertReportedSomethingWorthReading();
   }
 
@@ -163,23 +163,23 @@ class FileIoTest {
   void roundTripSaveThenLoadIsIdentity() throws IOException {
     Path file = tempDir.resolve("roundtrip.txt");
     String original = "line 1\nline 2\nno trailing newline";
-    ServiceHolder.editorModelCoupler.putEditorContent(original);
+    ServiceHolder.editorModelCoupler.document().putContent(original);
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new SaveFileOp().execute(null);
 
     // Now load it back
-    ServiceHolder.editorModelCoupler.putEditorContent("REPLACED");
+    ServiceHolder.editorModelCoupler.document().putContent("REPLACED");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 
-    assertEquals(original, ServiceHolder.editorModelCoupler.getEditorContent());
+    assertEquals(original, ServiceHolder.editorModelCoupler.document().getContent());
   }
 
   @Test
   void roundTripWithCrlf() throws IOException {
     Path file = tempDir.resolve("crlf.txt");
     String original = "windows\r\nline 2\r\n";
-    ServiceHolder.editorModelCoupler.putEditorContent(original);
+    ServiceHolder.editorModelCoupler.document().putContent(original);
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new SaveFileOp().execute(null);
 
@@ -190,11 +190,11 @@ class FileIoTest {
     assertEquals(original, new String(bytes, StandardCharsets.UTF_8));
 
     // Load back
-    ServiceHolder.editorModelCoupler.putEditorContent("REPLACED");
+    ServiceHolder.editorModelCoupler.document().putContent("REPLACED");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 
-    assertEquals(original, ServiceHolder.editorModelCoupler.getEditorContent());
+    assertEquals(original, ServiceHolder.editorModelCoupler.document().getContent());
   }
 
   @Test
@@ -205,7 +205,7 @@ class FileIoTest {
     Files.write(target, oldContent.getBytes(StandardCharsets.UTF_8));
 
     // Overwrite to a path in tempDir
-    ServiceHolder.editorModelCoupler.putEditorContent(newContent);
+    ServiceHolder.editorModelCoupler.document().putContent(newContent);
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     // This should succeed
     new SaveFileOp().execute(null);
@@ -218,7 +218,7 @@ class FileIoTest {
   @Test
   void saveFileCreatesParentDirectories() throws IOException {
     Path target = tempDir.resolve("subdir/nested/file.txt");
-    ServiceHolder.editorModelCoupler.putEditorContent("nested");
+    ServiceHolder.editorModelCoupler.document().putContent("nested");
     ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(target.toString());
     new SaveFileOp().execute(null);
 
@@ -229,7 +229,7 @@ class FileIoTest {
   @Test
   void startupContentWithNoPathMeansEmptyUnnamedDocument() {
     // Verify source path is empty or null (no named file when no VISUR_FILE).
-    String path = ServiceHolder.editorModelCoupler.getSourceFilePath();
+    String path = ServiceHolder.editorModelCoupler.document().getSourceFilePath();
     assertTrue(path == null || path.isEmpty(),
       "source path should be empty or null when no VISUR_FILE is set, got: " + path);
   }
@@ -242,10 +242,10 @@ class FileIoTest {
   void neverSavedDocumentRecoverableFromSwap() throws IOException, InterruptedException {
     Path target = tempDir.resolve("recovery_test.txt");
     // Start with a source path (as if the file was set at startup or by loadFile)
-    ServiceHolder.editorModelCoupler.setSourceFilePath(target.toString());
+    ServiceHolder.editorModelCoupler.document().setSourceFilePath(target.toString());
     // Simulate editing: change the document content (this triggers swap write).
     String editedContent = "edited content that was never saved";
-    ServiceHolder.editorModelCoupler.putEditorContent(editedContent);
+    ServiceHolder.editorModelCoupler.document().putContent(editedContent);
 
     // The swap file should exist (written by putEditorContent with debounce).
     Path swapPath = Paths.get(target.toString() + ".visur-swap");
@@ -268,8 +268,8 @@ class FileIoTest {
     String editedContent = "edited content - crash happened mid-save";
 
     // Set up: the document has been edited (swap written by putEditorContent)
-    ServiceHolder.editorModelCoupler.setSourceFilePath(target.toString());
-    ServiceHolder.editorModelCoupler.putEditorContent(editedContent);
+    ServiceHolder.editorModelCoupler.document().setSourceFilePath(target.toString());
+    ServiceHolder.editorModelCoupler.document().putContent(editedContent);
     // Wait for debounce so swap is written.
     Thread.sleep(600);
 

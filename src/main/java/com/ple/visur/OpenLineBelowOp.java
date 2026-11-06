@@ -17,11 +17,11 @@ public class OpenLineBelowOp implements Operator {
   @Override
   public void execute(Object ignored) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    String content = emc.getEditorContent();
-    ArrayList<Integer> nl = emc.getNextLineIndices();
-    int nextLineStart = nl.get(emc.getCY()); // the index just past this line's newline, or the end of the content
+    String content = emc.document().getContent();
+    ArrayList<Integer> nl = emc.document().getNextLineIndices();
+    int nextLineStart = nl.get(emc.session().getCY()); // the index just past this line's newline, or the end of the content
     boolean lineHasItsOwnNewline = nextLineStart > 0 && content.charAt(nextLineStart - 1) == '\n';
-    emc.putEditorContent(content.substring(0, nextLineStart) + "\n" + content.substring(nextLineStart));
-    emc.putCA(lineHasItsOwnNewline ? nextLineStart : nextLineStart + 1);
+    emc.document().putContent(content.substring(0, nextLineStart) + "\n" + content.substring(nextLineStart));
+    emc.session().putCA(lineHasItsOwnNewline ? nextLineStart : nextLineStart + 1);
   }
 }

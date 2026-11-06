@@ -21,22 +21,22 @@ public class PasteYankRegisterOp implements Operator {
     // before anything is removed so the selection and the register both survive a 0 p untouched.
     String pasted = value.repeat(CountPrefix.countOrOne(emc));
     if (pasted.isEmpty()) return;
-    String content = emc.getEditorContent();
+    String content = emc.document().getContent();
     int start = Math.min(emc.session().getCursorQuantumStart(), content.length());
     int end = Math.min(Math.max(emc.session().getCursorQuantumEnd(), start), content.length());
     String displaced = content.substring(start, end);
-    emc.putEditorContent(content.substring(0, start) + pasted + content.substring(end));
+    emc.document().putContent(content.substring(0, start) + pasted + content.substring(end));
     // The register records what this keypress removed, and only then.
     if (!displaced.isEmpty()) emc.session().putGlobalVar("yankRegister", ObjectVisurVar.make(displaced));
     // Paste finishes at span 0 with the caret on the last pasted character, so the next p — or the next d — meets the
     // text the paste left, not the selection the first one consumed. The span is s's to set, and this is the one
     // command whose post-condition is a span of zero rather than a range that happened to come back empty.
     int cursor = start + pasted.length() - 1;
-    emc.putCA(cursor);
-    int[] bounds = emc.getCursorQuantum().getBoundaries(cursor, emc.getNextLineIndices(), 0, false);
+    emc.session().putCA(cursor);
+    int[] bounds = emc.session().getCursorQuantum().getBoundaries(cursor, emc.document().getNextLineIndices(), 0, false);
     emc.session().putCursorQuantumStartAndScroll(bounds[0]);
     emc.session().putCursorQuantumEndAndScroll(bounds[1]);
-    emc.putSpan(0);
+    emc.session().putSpan(0);
     emc.session().putIsAtQuantumStart(true);
   }
 }

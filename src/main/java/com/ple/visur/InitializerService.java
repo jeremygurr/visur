@@ -3,7 +3,6 @@ package com.ple.visur;
 import CursorPositionDC.*;
 import DataClass.CompoundDataClassBrick;
 import DataClass.LayeredDataClassBrick;
-import DataClass.PrimitiveDataClassBrick;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +20,6 @@ public class InitializerService {
   private final EditorModelCoupler emc;
   private final String startingCursorQuantumName = "character";
   private final String startingScopeQuantumName = "line";
-  private PrimitiveDataClassBrick newlineIndicesCell;
 
   public static InitializerService make(EditorModelCoupler editorModelCoupler) {
     return new InitializerService(editorModelCoupler);
@@ -34,8 +32,6 @@ public class InitializerService {
 
   public void initializeEditorModel() {
     emc.session().openFresh();
-
-    emc.putUndoHistory(new UndoHistory());
 
     final String initialEditorContent = "The unanimous Declaration of the thirteen united States of America, When in the Course of human events, it becomes necessary for one people to dissolve the political bands which have connected them with another, and to assume among the powers of the earth, the separate and equal station to which the Laws of Nature and of Nature’s God entitle them, a decent respect to the opinions of mankind requires that they should declare the causes which impel them to the separation.\n" +
       "\n" +
@@ -92,21 +88,19 @@ public class InitializerService {
       "He has excited domestic insurrections amongst us, and has endeavoured to bring on the inhabitants of our frontiers, the merciless Indian Savages, whose known rule of warfare, is an undistinguished destruction of all ages, sexes and conditions.\n" +
       "\n";
 
-    initializeNewlineIndicesCell();
-
     String content = startupContent();
-    emc.initializeEditorContent(content);
+    emc.document().putContent(content);
     // Recover from any swap files left by a crash.
     recoverFromSwapFiles();
-    emc.updateNextLineIndices();
+    emc.document().updateNextLineIndices();
     emc.session().putVirtualCX(0);
     emc.session().putCanvasStart(0);
     emc.session().putFY(0);
 
-    emc.putIsInCommandState(false);
-    emc.putCommandStateContent("");
-    emc.putCommandCursor(emc.getCommandStateContent().length());
-    emc.putPreviousSearchTarget("");
+    emc.session().putIsInCommandState(false);
+    emc.session().putCommandStateContent("");
+    emc.session().putCommandCursor(emc.session().getCommandStateContent().length());
+    emc.session().putPreviousSearchTarget("");
 
     initializeQuantumRegistry();
 
@@ -167,7 +161,7 @@ public class InitializerService {
     if (filePath != null) {
       // VISUR_FILE is set: load from file (empty buffer if missing)
       String content = readStartupFile(filePath);
-      emc.setSourceFilePath(filePath);
+      emc.document().setSourceFilePath(filePath);
       return content;
     }
     // No VISUR_FILE: fall through to VISUR_CONTENT_BYTES or empty.
@@ -228,7 +222,7 @@ public class InitializerService {
    * at all) is recovered as an unnamed document.
    */
   private void recoverFromSwapFiles() {
-    String sourcePath = emc.getSourceFilePath();
+    String sourcePath = emc.document().getSourceFilePath();
     if (sourcePath == null || sourcePath.isEmpty()) {
       // No source path: look for orphaned swap files in the working directory.
       // This is unlikely in normal use but handles the case of an unsaved document
@@ -252,13 +246,13 @@ public class InitializerService {
         Files.write(Paths.get(recoveryName), swapBytes);
         System.out.println("Swap file found at startup: " + swapPath
           + " -> recovered to buffer, copy at " + recoveryName);
-        emc.putEditorContent(swapContent);
-        emc.updateNextLineIndices();
+        emc.document().putContent(swapContent);
+        emc.document().updateNextLineIndices();
         Files.delete(swapPath);
       } else {
         // Source file doesn't exist: recover into buffer as empty file with name.
-        emc.putEditorContent(swapContent);
-        emc.updateNextLineIndices();
+        emc.document().putContent(swapContent);
+        emc.document().updateNextLineIndices();
         Files.delete(swapPath);
         System.out.println("Orphaned swap file found: " + swapPath
           + " -> recovered to buffer (empty document for path " + sourcePath + ")");
@@ -275,26 +269,14 @@ public class InitializerService {
    * <p>Everything window-shaped that boot used to do to the single shared model belongs here, because a second client
    * is a second window and starts where a first one started.
    */
-  /**
-   * One mutable cell holding where every line in the document starts.
-   *
-   * <p>It lives with the document and every window's cursor is wired to it, because "which row is index 4,231 in" is a
-   * fact about the text: edit it and every window's cursor moves the same way. The data classes do that moving — they
-   * invalidate whatever derives from a cell when the cell is written — which is why this is one cell and not a copy
-   * per window.
-   */
-  private void initializeNewlineIndicesCell() {
-    newlineIndicesCell = new CursorPositionDCHolder().wholeNumberListDC.makeBrick("nl", new ArrayList<>(), true);
-    emc.putNewlineIndicesCell(BrickVisurVar.make(newlineIndicesCell));
-  }
 
   public void startSession(Session session) {
-    session.installCursorCells(newlineIndicesCell);
-    session.putSpan(emc.getEditorContent().length() > 0 ? 1 : 0);
+    session.installCursorCells(emc.document().lineOffsetsCell());
+    session.putSpan(emc.document().getContent().length() > 0 ? 1 : 0);
     session.putCursorQuantum(emc.getQuantumNameToQuantum().get(startingCursorQuantumName));
     session.putScopeQuantum(emc.getQuantumNameToQuantum().get(startingScopeQuantumName));
     int bounds[] = emc.getQuantumNameToQuantum().get(startingCursorQuantumName)
-      .getBoundaries(session.getCA(), emc.getNextLineIndices(), session.getSpan(), false);
+      .getBoundaries(session.getCA(), emc.document().getNextLineIndices(), session.getSpan(), false);
     emc.session().putCursorQuantumStartAndScroll(bounds[0]);
     emc.session().putCursorQuantumEnd(bounds[1]);
     emc.session().putIsAtQuantumStart(true);

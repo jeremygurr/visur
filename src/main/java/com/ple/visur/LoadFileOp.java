@@ -24,7 +24,7 @@ public class LoadFileOp implements Operator {
 
     // loadFile requires a path argument
     if (eds.size() == 0) {
-      emc.reportError("loadFile requires a path argument: ;\"path\" loadFile");
+      emc.session().reportError("loadFile requires a path argument: ;\"path\" loadFile");
       return;
     }
 
@@ -32,45 +32,45 @@ public class LoadFileOp implements Operator {
     try {
       Path path = Paths.get(filePath);
       if (!Files.exists(path)) {
-        emc.reportError("loadFile: file not found: " + filePath);
+        emc.session().reportError("loadFile: file not found: " + filePath);
         return;
       }
       if (!Files.isRegularFile(path)) {
-        emc.reportError("loadFile: not a regular file: " + filePath);
+        emc.session().reportError("loadFile: not a regular file: " + filePath);
         return;
       }
       byte[] bytes = Files.readAllBytes(path);
       String content = new String(bytes, StandardCharsets.UTF_8);
       // Replace the document content
-      emc.putEditorContent(content);
+      emc.document().putContent(content);
 
       // Reset cursor to (0,0)
-      emc.putCA(0);
+      emc.session().putCA(0);
       emc.session().putVirtualCX(0);
       emc.session().putCanvasStart(0);
       emc.session().putFY(0);
 
       // Recompute line indices (this handles newline tracking)
-      emc.updateNextLineIndices();
+      emc.document().updateNextLineIndices();
 
       // Update span based on content length
       if (content.length() > 0) {
-        emc.putSpan(1);
+        emc.session().putSpan(1);
       } else {
-        emc.putSpan(0);
+        emc.session().putSpan(0);
       }
 
       // This file becomes the new remembered source
-      emc.setSourceFilePath(filePath);
+      emc.document().setSourceFilePath(filePath);
 
       // A different document is not this document's history: u would paste one file's text into another's.
-      emc.getUndoHistory().clear();
+      emc.document().getUndoHistory().clear();
 
       // Exit command state (it's been executed successfully)
       // Note: CommandStateService.exitCommandState() handles this
 
     } catch (IOException e) {
-      emc.reportError("loadFile: " + e.getMessage());
+      emc.session().reportError("loadFile: " + e.getMessage());
     }
   }
 }

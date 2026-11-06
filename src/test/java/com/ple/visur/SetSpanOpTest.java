@@ -31,21 +31,21 @@ class SetSpanOpTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
-    emc.putCA(0);
-    emc.putCX(0);
-    emc.putCY(0);
+    emc.session().putCA(0);
+    emc.session().putCX(0);
+    emc.session().putCY(0);
     emc.session().putVirtualCX(0);
     emc.session().putCanvasStart(0);
     emc.session().putFY(0);
-    emc.putCursorQuantum(new CharacterQuantum());
-    emc.putSpan(1);
+    emc.session().putCursorQuantum(new CharacterQuantum());
+    emc.session().putSpan(1);
   }
 
   @AfterEach
@@ -60,7 +60,7 @@ class SetSpanOpTest {
 
   /** How many words the selection covers, counted from what is actually selected. */
   private int wordsSelected() {
-    String selected = emc.getEditorContent().substring(emc.session().getCursorQuantumStart(), emc.session().getCursorQuantumEnd()).trim();
+    String selected = emc.document().getContent().substring(emc.session().getCursorQuantumStart(), emc.session().getCursorQuantumEnd()).trim();
     return selected.isEmpty() ? 0 : selected.split("\\s+").length;
   }
 
@@ -71,7 +71,7 @@ class SetSpanOpTest {
   @Test
   void theSpanKeepsTheNumberItWasGiven() {
     requestSpan(7);
-    assertEquals(7, emc.getSpan());
+    assertEquals(7, emc.session().getSpan());
     assertEquals(0, emc.session().getCursorQuantumStart());
     assertEquals(7, emc.session().getCursorQuantumEnd());
   }
@@ -80,15 +80,15 @@ class SetSpanOpTest {
   void aSpanOfZeroCollapsesTheRange() {
     requestSpan(3);
     requestSpan(0);
-    assertEquals(0, emc.getSpan());
+    assertEquals(0, emc.session().getSpan());
     assertEquals(0, selectedWidth());
   }
 
   @Test
   void aSpanWiderThanTheContentKeepsTheRequestedSpanAndSelectsWhatIsLeft() {
-    emc.putEditorContent("abc\n");
+    emc.document().putContent("abc\n");
     requestSpan(10);
-    assertEquals(10, emc.getSpan());
+    assertEquals(10, emc.session().getSpan());
     assertEquals(0, emc.session().getCursorQuantumStart());
     assertEquals(4, emc.session().getCursorQuantumEnd());
   }
@@ -97,9 +97,9 @@ class SetSpanOpTest {
   void nothingLeftToSelectKeepsTheNumberAndSelectsNothing() {
     // the span is the number the key was given, the range is what the content allows. Zeroing the span here used to
     // look harmless and was a trap door: a move derives its range from the span, so span zero derives nothing.
-    emc.putCA(CONTENT.length()); // at the end of the content there is nothing left to select
+    emc.session().putCA(CONTENT.length()); // at the end of the content there is nothing left to select
     requestSpan(3);
-    assertEquals(3, emc.getSpan());
+    assertEquals(3, emc.session().getSpan());
     assertEquals(0, selectedWidth());
   }
 
@@ -107,14 +107,14 @@ class SetSpanOpTest {
   void thePendingCountBecomesTheSpan() {
     emc.session().putPendingCount(12);
     new SetSpanOp().execute(null);
-    assertEquals(12, emc.getSpan());
+    assertEquals(12, emc.session().getSpan());
     assertEquals(12, selectedWidth());
   }
 
   @Test
   void noPendingCountMeansOneQuantum() {
     new SetSpanOp().execute(null);
-    assertEquals(1, emc.getSpan());
+    assertEquals(1, emc.session().getSpan());
   }
 
   @Test
@@ -122,7 +122,7 @@ class SetSpanOpTest {
     requestSpan(3);
     emc.session().putPendingCount(0);
     new SetSpanOp().execute(null);
-    assertEquals(0, emc.getSpan());
+    assertEquals(0, emc.session().getSpan());
     assertEquals(0, selectedWidth());
   }
 
@@ -132,7 +132,7 @@ class SetSpanOpTest {
     emc.session().putPendingCount(5);
     emc.session().putOnExecutionDataStack(0);
     new SetSpanOp().execute(null);
-    assertEquals(0, emc.getSpan());
+    assertEquals(0, emc.session().getSpan());
   }
 
   /**
@@ -144,7 +144,7 @@ class SetSpanOpTest {
   void deletingLeavesAGapAndKeepsTheSpanForTheNextMove() {
     requestSpan(3);
     new DeleteCursorQuantumOp().execute(null);
-    assertEquals(3, emc.getSpan());
+    assertEquals(3, emc.session().getSpan());
     assertEquals(0, selectedWidth(), "the highlight marks the gap the delete made");
   }
 
@@ -155,7 +155,7 @@ class SetSpanOpTest {
     emc.session().putOnExecutionDataStack(1);
     emc.session().putOnExecutionDataStack(0);
     new RelativeMoveOp().execute(null);
-    assertEquals(3, emc.getSpan());
+    assertEquals(3, emc.session().getSpan());
     assertEquals(3, selectedWidth());
   }
 
@@ -166,12 +166,12 @@ class SetSpanOpTest {
    */
   @Test
   void aWindowThatRanOutOfContentGrowsBackToTheSizeThatWasAskedFor() {
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
-    emc.putEditorContent(TWENTY_FIVE_WORDS);
-    emc.putCA(TWENTY_FIVE_WORDS.lastIndexOf(' ') + 1); // the last word, with one word left to select
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.document().putContent(TWENTY_FIVE_WORDS);
+    emc.session().putCA(TWENTY_FIVE_WORDS.lastIndexOf(' ') + 1); // the last word, with one word left to select
     requestSpan(5);
     emc.session().clearPendingCount(); // the keypress path retires the count once spent; this test drives the operators directly
-    assertEquals(5, emc.getSpan());
+    assertEquals(5, emc.session().getSpan());
 
     List<Integer> wordsAtEachStep = new ArrayList<>();
     for (int step = 0; step < 5; step++) {
@@ -186,11 +186,11 @@ class SetSpanOpTest {
 
   @Test
   void deletingTheLastTextKeepsTheSpanAndSelectsNothing() {
-    emc.putEditorContent("ab\n");
-    emc.putCA(0);
+    emc.document().putContent("ab\n");
+    emc.session().putCA(0);
     requestSpan(3); // wider than the content, so the whole thing is selected
     new DeleteCursorQuantumOp().execute(null);
     assertEquals(0, selectedWidth());
-    assertEquals(3, emc.getSpan(), "delete takes the span down no further than a move does");
+    assertEquals(3, emc.session().getSpan(), "delete takes the span down no further than a move does");
   }
 }

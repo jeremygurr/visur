@@ -1,19 +1,13 @@
 package com.ple.visur;
 
-import CursorPositionDC.EditorContentService;
-import io.vertx.rxjava3.core.shareddata.SharedData;
-
 public class ServiceHolder {
 
-
-
-  public static ServiceHolder init(SharedData sharedData) {
-    return new ServiceHolder(sharedData);
+  public static ServiceHolder init() {
+    return new ServiceHolder();
   }
 
-  ServiceHolder(SharedData sharedData) {
-    editorContentService = EditorContentService.make();
-    editorModelCoupler = EditorModelCoupler.make(sharedData);
+  ServiceHolder() {
+    editorModelCoupler = EditorModelCoupler.make();
     commandCompileService = CommandCompileService.make();
     initializerService = InitializerService.make(editorModelCoupler);
     commandExecutionService = CommandExecutionService.make();
@@ -21,7 +15,6 @@ public class ServiceHolder {
     modeSwitchService = ModeSwitchService.make();
   }
 
-  public static EditorContentService editorContentService;
   public static EditorModelCoupler editorModelCoupler;
   public static CommandCompileService commandCompileService;
   public static CommandExecutionService commandExecutionService;

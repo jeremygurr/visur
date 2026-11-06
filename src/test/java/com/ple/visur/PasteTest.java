@@ -29,11 +29,11 @@ class PasteTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     emc.session().putCanvasStart(0);
@@ -52,7 +52,7 @@ class PasteTest {
     press("y");
     press("l"); // "two " selected
     press("p");
-    assertEquals("one one three four\nfive six\n\nlast line\n", emc.getEditorContent(),
+    assertEquals("one one three four\nfive six\n\nlast line\n", emc.document().getContent(),
         "the selection was replaced by the register, cell for cell");
     assertEquals("two ", yankRegister(), "and the register took what the paste displaced");
   }
@@ -63,12 +63,12 @@ class PasteTest {
     press("s");
     press("y"); // register "one "
     press("d"); // "one " removed, the highlight left as the gap it made
-    assertEquals("two three four\nfive six\n\nlast line\n", emc.getEditorContent());
+    assertEquals("two three four\nfive six\n\nlast line\n", emc.document().getContent());
     assertEquals("one ", yankRegister());
 
     press("l"); // one word over: "three " is now selected
     press("p");
-    assertEquals("two one four\nfive six\n\nlast line\n", emc.getEditorContent(),
+    assertEquals("two one four\nfive six\n\nlast line\n", emc.document().getContent(),
         "the paste lands where the cursor is now, not where the text was deleted from");
   }
 
@@ -85,7 +85,7 @@ class PasteTest {
     yank("X");
     press("p");
     press("p");
-    assertEquals("XX" + CONTENT, emc.getEditorContent(), "two copies, because neither paste displaced anything");
+    assertEquals("XX" + CONTENT, emc.document().getContent(), "two copies, because neither paste displaced anything");
     assertEquals("X", yankRegister(), "and the register was never blanked");
   }
 
@@ -100,7 +100,7 @@ class PasteTest {
     yank("X");
 
     press("p");
-    assertEquals("one two three four\nfive six\nX\nlast line\n", emc.getEditorContent());
+    assertEquals("one two three four\nfive six\nX\nlast line\n", emc.document().getContent());
     assertEquals("X", yankRegister(), "the register survived a paste that displaced nothing");
   }
 
@@ -112,7 +112,7 @@ class PasteTest {
     yank("X");
     press("3");
     press("p");
-    assertEquals("XXXfour\nfive six\n\nlast line\n", emc.getEditorContent(),
+    assertEquals("XXXfour\nfive six\n\nlast line\n", emc.document().getContent(),
         "the count multiplies the copies, never the text removed");
     assertEquals("one two three ", yankRegister(), "the displaced text, once: the register is a place, not a count");
   }
@@ -126,7 +126,7 @@ class PasteTest {
     yank("X");
     press("0");
     press("p");
-    assertEquals(CONTENT, emc.getEditorContent());
+    assertEquals(CONTENT, emc.document().getContent());
     assertEquals("X", yankRegister());
   }
 
@@ -156,7 +156,7 @@ class PasteTest {
     yank("X");
 
     press("P");
-    assertEquals("Xone two three four\nfive six\n\nlast line\n", emc.getEditorContent(),
+    assertEquals("Xone two three four\nfive six\n\nlast line\n", emc.document().getContent(),
         "inserted in front of the selection, which is not disturbed");
 
     JsonObject drawn = View.of(emc).render();
@@ -174,7 +174,7 @@ class PasteTest {
     yank("X");
 
     press("P");
-    assertEquals("X" + CONTENT, emc.getEditorContent());
+    assertEquals("X" + CONTENT, emc.document().getContent());
 
     JsonObject drawn = View.of(emc).render();
     assertEquals(0, drawn.getInteger("span"));
@@ -193,17 +193,17 @@ class PasteTest {
   }
 
   private void chooseCursorQuantum(String quantumName) {
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
   }
 
   /** cx and cy have to agree with ca, or the model recomputes ca from them while the command runs. */
   private void cursorAt(int ca, int cx, int cy) {
-    emc.putCX(cx);
-    emc.putCY(cy);
+    emc.session().putCX(cx);
+    emc.session().putCY(cy);
     emc.session().putVirtualCX(cx);
     emc.session().putFY(cy);
-    emc.putCA(ca);
-    assertEquals(ca, emc.getCA());
+    emc.session().putCA(ca);
+    assertEquals(ca, emc.session().getCA());
   }
 
   /** The verticle's own keypress handler, minus the bus: see {@link KeyWasPressedVerticle#press}. */

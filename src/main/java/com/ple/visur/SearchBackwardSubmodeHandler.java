@@ -21,7 +21,7 @@ public class SearchBackwardSubmodeHandler implements KeymapHandler {
       return null;
     } else if(key.equals("Enter")) {
       String searchTarget = (String)eds.peek();
-      emc.putPreviousSearchTarget(searchTarget);
+      emc.session().putPreviousSearchTarget(searchTarget);
       emc.session().putPreviousSearchDirectionWasForward(false);
       return ccs.compile("searchBackward \"navigate\" pushSubmode");
     } else if(key.equals("Escape")) {

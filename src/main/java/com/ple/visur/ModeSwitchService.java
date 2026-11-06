@@ -30,7 +30,7 @@ public class ModeSwitchService implements OperatorService {
 //        enterInsertMode();
 //        break;
 //      default:
-//        ems.reportError("Operator not recognized in " + this.getClass().getSimpleName());
+//        ems.session().reportError("Operator not recognized in " + this.getClass().getSimpleName());
 //    }
 
   }

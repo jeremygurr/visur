@@ -45,11 +45,11 @@ class OperatorCountTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     emc.session().putCanvasStart(0);
@@ -72,7 +72,7 @@ class OperatorCountTest {
     press("s");
     press("2");
     press("d");
-    assertEquals(CONTENT.substring(4), emc.getEditorContent(), "four characters, not two");
+    assertEquals(CONTENT.substring(4), emc.document().getContent(), "four characters, not two");
     assertEquals(CONTENT.substring(0, 4), yankRegister());
   }
 
@@ -82,12 +82,12 @@ class OperatorCountTest {
     chooseCursorQuantum("word");
     press("3");
     press("s");
-    assertEquals(3, emc.getSpan(), "three words are shown");
+    assertEquals(3, emc.session().getSpan(), "three words are shown");
     press("3");
     press("d");
-    assertEquals(CONTENT.substring(END_OF_NINE_WORDS), emc.getEditorContent());
+    assertEquals(CONTENT.substring(END_OF_NINE_WORDS), emc.document().getContent());
     assertEquals(CONTENT.substring(0, END_OF_NINE_WORDS), yankRegister(), "and p can put them back");
-    assertEquals(3, emc.getSpan(), "the span is what s set; the count does not widen what is shown");
+    assertEquals(3, emc.session().getSpan(), "the span is what s set; the count does not widen what is shown");
   }
 
   @Test
@@ -101,7 +101,7 @@ class OperatorCountTest {
     // The newline that ends line eight survives: a line's own terminator is not one of the newlines *between* the
     // selected lines (LineQuantumBoundsTest.aLineEndingInANewlineEndsBeforeItWhenAnotherLineFollows), so eight lines
     // of text go and one empty line stays. Same shape as deleting words and keeping the space after the last one.
-    assertEquals(CONTENT.substring(START_OF_LINE_NINE), emc.getEditorContent(), "lines one to eight, including their separators");
+    assertEquals(CONTENT.substring(START_OF_LINE_NINE), emc.document().getContent(), "lines one to eight, including their separators");
     assertEquals(CONTENT.substring(0, START_OF_LINE_NINE), yankRegister());
   }
 
@@ -113,7 +113,7 @@ class OperatorCountTest {
     press("s");
     press("2");
     press("d");
-    assertEquals("", emc.getEditorContent());
+    assertEquals("", emc.document().getContent());
     assertEquals(CONTENT, yankRegister());
   }
 
@@ -126,14 +126,14 @@ class OperatorCountTest {
     chooseCursorQuantum("word");
     press("0");
     press("s");
-    assertEquals(0, emc.getSpan());
+    assertEquals(0, emc.session().getSpan());
     yank("one");
 
     press("d");
     press("3");
     press("d");
 
-    assertEquals(CONTENT, emc.getEditorContent(), "nothing was selected, so nothing was removed");
+    assertEquals(CONTENT, emc.document().getContent(), "nothing was selected, so nothing was removed");
     assertEquals("one", yankRegister(), "and the register keeps what it was holding");
   }
 
@@ -150,7 +150,7 @@ class OperatorCountTest {
     press("y");
     press("3");
     press("p");
-    assertEquals("oneoneone" + CONTENT.substring(3), emc.getEditorContent());
+    assertEquals("oneoneone" + CONTENT.substring(3), emc.document().getContent());
   }
 
   /** The register is one unnamed slot, so the delete wins over the yank. Pinned, not implied. */
@@ -165,7 +165,7 @@ class OperatorCountTest {
     press("d");
     assertEquals("one two ", yankRegister(), "the delete replaced the yank");
     press("p");
-    assertEquals(CONTENT, emc.getEditorContent(), "the register held exactly what the delete removed, and p put it back");
+    assertEquals(CONTENT, emc.document().getContent(), "the register held exactly what the delete removed, and p put it back");
   }
 
   /**
@@ -186,7 +186,7 @@ class OperatorCountTest {
     press("0");
     press("p");
 
-    assertEquals(CONTENT, emc.getEditorContent(), "nothing deleted, nothing pasted");
+    assertEquals(CONTENT, emc.document().getContent(), "nothing deleted, nothing pasted");
     assertEquals("keep me", yankRegister(), "and the register was not overwritten with nothing");
   }
 
@@ -201,17 +201,17 @@ class OperatorCountTest {
   }
 
   private void chooseCursorQuantum(String quantumName) {
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
   }
 
   /** cx and cy have to agree with ca, or the model recomputes ca from them while the command runs. */
   private void cursorAt(int ca, int cx, int cy) {
-    emc.putCX(cx);
-    emc.putCY(cy);
+    emc.session().putCX(cx);
+    emc.session().putCY(cy);
     emc.session().putVirtualCX(cx);
     emc.session().putFY(cy);
-    emc.putCA(ca);
-    assertEquals(ca, emc.getCA());
+    emc.session().putCA(ca);
+    assertEquals(ca, emc.session().getCA());
   }
 
   /** The verticle's own keypress handler, minus the bus: see {@link KeyWasPressedVerticle#press}. */

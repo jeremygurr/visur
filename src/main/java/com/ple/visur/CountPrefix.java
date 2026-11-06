@@ -16,7 +16,7 @@ public class CountPrefix {
    * @return whether the keypress was consumed as part of the count, so nothing else should run for it
    */
   static boolean record(EditorModelCoupler emc, String key) {
-    if (!isDigit(key) || emc.getIsInCommandState() || emc.session().getEditorSubmode() != EditorSubmode.navigate) {
+    if (!isDigit(key) || emc.session().getIsInCommandState() || emc.session().getEditorSubmode() != EditorSubmode.navigate) {
       return false;
     }
     int digit = key.charAt(0) - '0';

@@ -25,15 +25,15 @@ class InsertRepeatTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(TWO_LINES);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(TWO_LINES);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     emc.session().putCanvasStart(0);
-    emc.putSpan(1);
+    emc.session().putSpan(1);
     chooseCursorQuantum("line");
     cursorAt(0, 0, 0);
   }
@@ -53,8 +53,8 @@ class InsertRepeatTest {
     type("abc");
     press("Escape");
 
-    assertEquals("one\nabc\nabc\nabc\ntwo\n", emc.getEditorContent());
-    assertEquals(15, emc.getCA(), "just past the last character of the third copy");
+    assertEquals("one\nabc\nabc\nabc\ntwo\n", emc.document().getContent());
+    assertEquals(15, emc.session().getCA(), "just past the last character of the third copy");
   }
 
   /**
@@ -69,7 +69,7 @@ class InsertRepeatTest {
     press("g");
     press("Escape");
 
-    assertEquals("one\n\n\n\ntwo\n", emc.getEditorContent(), "one opened line and two more from the count");
+    assertEquals("one\n\n\n\ntwo\n", emc.document().getContent(), "one opened line and two more from the count");
   }
 
   /**
@@ -82,25 +82,25 @@ class InsertRepeatTest {
    */
   @Test
   void threeIThenTypingAbcThenEscapeGivesAbcAbcAbcAtTheStartOfTheWord() {
-    emc.putEditorContent("one\ntwo");
+    emc.document().putContent("one\ntwo");
     chooseCursorQuantum("word");
     cursorAt(MIDDLE_OF_LINE_TWO, 1, 1); // the "w", inside the word that starts at 4
 
     press("3");
     press("i");
-    assertEquals(4, emc.getCA(), "i went to the start of the word, as it always does");
+    assertEquals(4, emc.session().getCA(), "i went to the start of the word, as it always does");
     type("abc");
     press("Escape");
 
-    assertEquals("one\nabcabcabctwo", emc.getEditorContent());
-    assertEquals(4, emc.getCA(), "where typing the same text by hand leaves it");
+    assertEquals("one\nabcabcabctwo", emc.document().getContent());
+    assertEquals(4, emc.session().getCA(), "where typing the same text by hand leaves it");
     assertEquals(16, emc.session().getCursorQuantumEnd(), "restored over the run the three copies made");
   }
 
   /** The fourth key of the mechanism: {@code 3 a} types at the end of the word and repeats from there. */
   @Test
   void threeAThenTypingAbcThenEscapeGivesAbcAbcAbcAfterTheWord() {
-    emc.putEditorContent("one\ntwo");
+    emc.document().putContent("one\ntwo");
     chooseCursorQuantum("word");
     cursorAt(MIDDLE_OF_LINE_TWO, 1, 1);
 
@@ -109,7 +109,7 @@ class InsertRepeatTest {
     type("abc");
     press("Escape");
 
-    assertEquals("one\ntwoabcabcabc", emc.getEditorContent());
+    assertEquals("one\ntwoabcabcabc", emc.document().getContent());
   }
 
   /** A session that spanned a newline repeats whole: the unit is one session's worth of text, not one line of it. */
@@ -124,7 +124,7 @@ class InsertRepeatTest {
     type("two");
     press("Escape");
 
-    assertEquals("one\n" + "one\ntwo\n".repeat(3) + "two\n", emc.getEditorContent(),
+    assertEquals("one\n" + "one\ntwo\n".repeat(3) + "two\n", emc.document().getContent(),
         "three copies of both lines, and the line that was already below");
   }
 
@@ -139,7 +139,7 @@ class InsertRepeatTest {
     press("Backspace");
     press("Escape");
 
-    assertEquals("one\nabc\nabc\nabc\ntwo\n", emc.getEditorContent());
+    assertEquals("one\nabc\nabc\nabc\ntwo\n", emc.document().getContent());
   }
 
   /**
@@ -161,7 +161,7 @@ class InsertRepeatTest {
     type("c");
     press("Escape");
 
-    assertEquals("one\nac\nabc\nabcb\ntwo\n", emc.getEditorContent(),
+    assertEquals("one\nac\nabc\nabcb\ntwo\n", emc.document().getContent(),
         "the copies hold the text the session inserted, not the text it moved over");
   }
 
@@ -174,7 +174,7 @@ class InsertRepeatTest {
     type("abc");
     press("Escape");
 
-    assertEquals("one\nabc\ntwo\n", emc.getEditorContent());
+    assertEquals("one\nabc\ntwo\n", emc.document().getContent());
   }
 
   /**
@@ -195,7 +195,7 @@ class InsertRepeatTest {
     type("x");
     press("Escape");
 
-    assertEquals("x\none\nabc\nabc\nabc\ntwo\n", emc.getEditorContent(), "one x, however the first session repeated");
+    assertEquals("x\none\nabc\nabc\nabc\ntwo\n", emc.document().getContent(), "one x, however the first session repeated");
   }
 
   /**
@@ -205,7 +205,7 @@ class InsertRepeatTest {
    */
   @Test
   void aCountBeforeReplaceModeIsSpentByTheKeyAndNotByTheTyping() {
-    emc.putEditorContent("one\ntwo\n");
+    emc.document().putContent("one\ntwo\n");
     chooseCursorQuantum("character");
     cursorAt(4, 0, 1);
 
@@ -214,7 +214,7 @@ class InsertRepeatTest {
     type("abc");
     press("Escape");
 
-    assertEquals("one\nabc\n", emc.getEditorContent(), "three characters over three characters, not three of each");
+    assertEquals("one\nabc\n", emc.document().getContent(), "three characters over three characters, not three of each");
   }
 
   private void type(String text) {
@@ -224,17 +224,17 @@ class InsertRepeatTest {
   }
 
   private void chooseCursorQuantum(String quantumName) {
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
   }
 
   /** cx and cy have to agree with ca, or the model recomputes ca from them while the command runs. */
   private void cursorAt(int ca, int cx, int cy) {
-    emc.putCX(cx);
-    emc.putCY(cy);
+    emc.session().putCX(cx);
+    emc.session().putCY(cy);
     emc.session().putVirtualCX(cx);
     emc.session().putFY(cy);
-    emc.putCA(ca);
-    assertEquals(ca, emc.getCA());
+    emc.session().putCA(ca);
+    assertEquals(ca, emc.session().getCA());
   }
 
   /** The verticle's own keypress handler, minus the bus: see {@link KeyWasPressedVerticle#press}. */

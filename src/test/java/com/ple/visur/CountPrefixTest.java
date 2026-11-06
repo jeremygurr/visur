@@ -23,9 +23,9 @@ class CountPrefixTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     emc = ServiceHolder.editorModelCoupler;
-    emc.putIsInCommandState(false);
+    emc.session().putIsInCommandState(false);
     emc.session().putEditorSubmodeStack(navigate());
   }
 
@@ -88,7 +88,7 @@ class CountPrefixTest {
 
   @Test
   void aDigitTypedWhileTypingACommandIsCommandTextNotACount() {
-    emc.putIsInCommandState(true);
+    emc.session().putIsInCommandState(true);
     assertFalse(CountPrefix.record(emc, "7"));
     assertNull(emc.session().getPendingCount());
   }
@@ -114,7 +114,7 @@ class CountPrefixTest {
     press("1");
     press("2");
     press("s");
-    assertEquals(12, emc.getSpan());
+    assertEquals(12, emc.session().getSpan());
     assertNull(emc.session().getPendingCount(), "the key it belonged to used it up");
   }
 
@@ -124,14 +124,14 @@ class CountPrefixTest {
     press("3");
     press("q"); // q changes the cursor quantum to character, and takes no count
     assertNull(emc.session().getPendingCount());
-    assertEquals("character", emc.getCursorQuantum().getName());
+    assertEquals("character", emc.session().getCursorQuantum().getName());
   }
 
   /** A model wired the way a session's is: keymaps compiled, quantum chosen, a document to select in. */
   private void bootNavigateMode() {
     ServiceHolder.initializerService.initializeEditorModel();
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent("one two three four five six seven eight nine ten\n");
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent("one two three four five six seven eight nine ten\n");
     emc.session().putEditorSubmodeStack(navigate());
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
@@ -147,9 +147,9 @@ class CountPrefixTest {
   void aDigitTypedAfterSSetsNoSpan() {
     bootNavigateMode();
     press("s");
-    assertEquals(1, emc.getSpan(), "bare s is one quantum");
+    assertEquals(1, emc.session().getSpan(), "bare s is one quantum");
     press("3");
-    assertEquals(1, emc.getSpan(), "the digit is the start of the next count, not a revision of the last key");
+    assertEquals(1, emc.session().getSpan(), "the digit is the start of the next count, not a revision of the last key");
     assertEquals(3, emc.session().getPendingCount());
   }
 

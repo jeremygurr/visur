@@ -38,7 +38,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
   static void press(EditorModelCoupler emc, KeyPressed keyPressed, String key) {
     // Before the key runs, not after: a message reports what the last thing the user asked for did, and the key they
     // are pressing now is what makes it stale. Clearing afterwards would erase the message this very key reports.
-    emc.clearMessage();
+    emc.session().clearMessage();
     if(CountPrefix.record(emc, key)) {
       return; // a digit in navigate mode is the count for the next key, not a command of its own
     }
@@ -47,7 +47,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
       // nothing, so this key opens command state and does nothing else.
       return;
     }
-    if(emc.getIsInCommandState()) {
+    if(emc.session().getIsInCommandState()) {
       ServiceHolder.commandStateService.executeCommandState(keyPressed);
     } else {
       KeymapMap keymapMap = emc.getKeymapMap();
@@ -57,7 +57,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
       if(currentCommand != null) {
         // The one place a command runs, so this is the one place a command can be snapshotted before it changes
         // content. UndoHistory decides whether what it changes is worth a unit.
-        UndoHistory history = emc.getUndoHistory();
+        UndoHistory history = emc.document().getUndoHistory();
         history.beforeCommand(emc);
         ces.execute(currentCommand);
         history.afterCommand(emc);
@@ -76,21 +76,21 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
   /** A pasted block arrives on the bus rather than as a key; static for the same reason {@link #press} is. */
   static void pasteText(EditorModelCoupler emc, String text) {
     emc.session().clearPendingCount(); // typed text arrives without a keypress, so it retires a pending count the way one would
-    emc.clearMessage(); // and it is a thing the user did, which is what retires a message
-    if (!emc.getIsInCommandState() && emc.session().getEditorSubmode() == EditorSubmode.navigate) {
-      UndoHistory history = emc.getUndoHistory();
+    emc.session().clearMessage(); // and it is a thing the user did, which is what retires a message
+    if (!emc.session().getIsInCommandState() && emc.session().getEditorSubmode() == EditorSubmode.navigate) {
+      UndoHistory history = emc.document().getUndoHistory();
       history.beforeCommand(emc);
-      TextInsertion.insertAt(emc, text, emc.getCA());
+      TextInsertion.insertAt(emc, text, emc.session().getCA());
       history.afterCommand(emc);
     }
   }
 
   /** @return whether this keypress opened command state, so the caller knows the key is spent */
   static boolean enterCommandStateIfRequested(EditorModelCoupler emc, String key) {
-    if(!emc.getIsInCommandState() && key.equals(";") && emc.session().getEditorSubmode() == EditorSubmode.navigate) {
-      emc.putIsInCommandState(true);
-      emc.putCommandStateContent("");
-      emc.putCommandCursor(0);
+    if(!emc.session().getIsInCommandState() && key.equals(";") && emc.session().getEditorSubmode() == EditorSubmode.navigate) {
+      emc.session().putIsInCommandState(true);
+      emc.session().putCommandStateContent("");
+      emc.session().putCommandCursor(0);
       return true;
     }
     return false;

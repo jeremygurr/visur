@@ -10,7 +10,7 @@ public class ChangeScopeOp implements Operator {
     QuantumNameToQuantum quantumNameToQuantum = emc.getQuantumNameToQuantum();
     Quantum scopeQuantum = quantumNameToQuantum.get(scopeName);
     if(scopeQuantum != null) {
-      emc.putScopeQuantum(scopeQuantum);
+      emc.session().putScopeQuantum(scopeQuantum);
     }
   }
 }

@@ -25,15 +25,15 @@ class DocumentQuantumJumpTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     emc.session().putCanvasStart(0);
-    emc.putSpan(1);
+    emc.session().putSpan(1);
     // inside "five" on line two, so neither end is where the cursor already is
     cursorAt(MIDDLE_OF_CONTENT, MIDDLE_OF_CONTENT - CONTENT.lastIndexOf('\n', MIDDLE_OF_CONTENT) - 1, 1);
     chooseCursorQuantum("character");
@@ -48,7 +48,7 @@ class DocumentQuantumJumpTest {
   void theStartOfTheDocumentIsItsFirstCharacter() {
     press("[");
     press("r");
-    assertEquals(0, emc.getCA());
+    assertEquals(0, emc.session().getCA());
   }
 
   @Test
@@ -57,7 +57,7 @@ class DocumentQuantumJumpTest {
     press("s");
     press("[");
     press("r");
-    assertEquals(0, emc.getCA());
+    assertEquals(0, emc.session().getCA());
     assertEquals(0, emc.session().getCursorQuantumEnd(), "and nothing is selected on arrival");
   }
 
@@ -69,7 +69,7 @@ class DocumentQuantumJumpTest {
   void theEndOfTheDocumentIsItsLastCharacter() {
     press("]");
     press("r");
-    assertEquals(LAST_CHARACTER, emc.getCA());
+    assertEquals(LAST_CHARACTER, emc.session().getCA());
   }
 
   /** With nothing selected the caret sits one past the last character, which is where the character quantum lets it go. */
@@ -79,7 +79,7 @@ class DocumentQuantumJumpTest {
     press("s");
     press("]");
     press("r");
-    assertEquals(CONTENT.length(), emc.getCA());
+    assertEquals(CONTENT.length(), emc.session().getCA());
     assertEquals(CONTENT.length(), emc.session().getCursorQuantumEnd(), "and nothing is selected on arrival");
   }
 
@@ -94,7 +94,7 @@ class DocumentQuantumJumpTest {
     press("s");
     press("]");
     press("r");
-    assertEquals(CONTENT.length(), emc.getCA());
+    assertEquals(CONTENT.length(), emc.session().getCA());
     assertEquals(CONTENT.length(), emc.session().getCursorQuantumEnd(), "the whole document is not suddenly selected");
   }
 
@@ -104,21 +104,21 @@ class DocumentQuantumJumpTest {
     press("r");
     press("[");
     press("r");
-    assertEquals(0, emc.getCA());
+    assertEquals(0, emc.session().getCA());
   }
 
   private void chooseCursorQuantum(String quantumName) {
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
   }
 
   /** cx and cy have to agree with ca, or the model recomputes ca from them while the command runs. */
   private void cursorAt(int ca, int cx, int cy) {
-    emc.putCX(cx);
-    emc.putCY(cy);
+    emc.session().putCX(cx);
+    emc.session().putCY(cy);
     emc.session().putVirtualCX(cx);
     emc.session().putFY(cy);
-    emc.putCA(ca);
-    assertEquals(ca, emc.getCA());
+    emc.session().putCA(ca);
+    assertEquals(ca, emc.session().getCA());
   }
 
   /** The verticle's own keypress handler, minus the bus: see {@link KeyWasPressedVerticle#press}. */

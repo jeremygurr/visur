@@ -10,7 +10,7 @@ public abstract class Quantum implements Shareable {
     int[] bounds = boundsFor(ca, newlineIndices, span, includeTail);
     VisurVar separatorState = emc.session().getGlobalVar("includeSeparators");
     boolean includeSeparators = separatorState == null || Boolean.TRUE.equals(separatorState.getVal());
-    return includeSeparators ? Separators.including(emc.getEditorContent(), bounds,
+    return includeSeparators ? Separators.including(emc.document().getContent(), bounds,
       emc.getQuantumNameToQuantum().separatorsFor(getName())) : bounds;
   }
 
@@ -31,8 +31,8 @@ public abstract class Quantum implements Shareable {
    * every quantum already answers with, and the operators refuse to act on an empty range.
    */
   int[] operatorExtent() {
-    int units = CountPrefix.countOrOne(emc) * emc.getSpan();
-    return getBoundaries(emc.session().getCursorQuantumStart(), emc.getNextLineIndices(), units, false);
+    int units = CountPrefix.countOrOne(emc) * emc.session().getSpan();
+    return getBoundaries(emc.session().getCursorQuantumStart(), emc.document().getNextLineIndices(), units, false);
   }
 
   /**
@@ -42,17 +42,17 @@ public abstract class Quantum implements Shareable {
    * walking back N of them is arithmetic the bound functions do not have yet. {@code 3[} is one quantum back.
    */
   void quantumStart() {
-    int actualSpan = emc.getSpan();
+    int actualSpan = emc.session().getSpan();
     int spanMinimumOne = Math.max(actualSpan, 1);
     Quantum[] frameAndCursorQuantums = getFrameAndCursorQuantums();
     Quantum frameQuantum = frameAndCursorQuantums[0];
     Quantum cursorQuantum = frameAndCursorQuantums[1];
-    int ca = emc.getCA();
-    int[] frameBounds = frameQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
+    int ca = emc.session().getCA();
+    int[] frameBounds = frameQuantum.getBoundaries(ca, emc.document().getNextLineIndices(), spanMinimumOne, false);
     ca = frameBounds[0];
-    emc.putCA(ca);
-    emc.session().putVirtualCX(emc.getCX());
-    int[] newCursorBounds = cursorQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
+    emc.session().putCA(ca);
+    emc.session().putVirtualCX(emc.session().getCX());
+    int[] newCursorBounds = cursorQuantum.getBoundaries(ca, emc.document().getNextLineIndices(), spanMinimumOne, false);
     if(actualSpan == 0) {
       newCursorBounds[1] = newCursorBounds[0];
     }
@@ -69,27 +69,27 @@ public abstract class Quantum implements Shareable {
    * the same two keys.
    */
   void quantumEnd() {
-    int actualSpan = emc.getSpan();
+    int actualSpan = emc.session().getSpan();
     int spanMinimumOne = Math.max(actualSpan, 1);
     // A jump has to land somewhere, so 0] is ] rather than a cursor off the end of the frame.
     int jumpUnits = Math.max(CountPrefix.countOrOne(emc), 1);
     Quantum[] frameAndCursorQuantums = getFrameAndCursorQuantums();
     Quantum frameQuantum = frameAndCursorQuantums[0];
     Quantum cursorQuantum = frameAndCursorQuantums[1];
-    int ca = emc.getCA();
-    int[] frameBounds = frameQuantum.getBoundaries(ca, emc.getNextLineIndices(), jumpUnits, false);
+    int ca = emc.session().getCA();
+    int[] frameBounds = frameQuantum.getBoundaries(ca, emc.document().getNextLineIndices(), jumpUnits, false);
     ca = actualSpan > 0 ? frameBounds[1] - 1 : frameBounds[1];
-    emc.putCA(ca);
-    emc.session().putVirtualCX(emc.getCX());
-    int[] newCursorBounds = cursorQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
+    emc.session().putCA(ca);
+    emc.session().putVirtualCX(emc.session().getCX());
+    int[] newCursorBounds = cursorQuantum.getBoundaries(ca, emc.document().getNextLineIndices(), spanMinimumOne, false);
     emc.session().putCursorQuantumStartAndScroll(newCursorBounds[0]);
     emc.session().putCursorQuantumEndAndScroll(newCursorBounds[1]);
     setSmallestQuantum(cursorQuantum);
   }
 
   private void setSmallestQuantum(Quantum smallestQuantum) {
-    if(!smallestQuantum.equals(emc.getCursorQuantum())) {
-      emc.putCursorQuantum(smallestQuantum);
+    if(!smallestQuantum.equals(emc.session().getCursorQuantum())) {
+      emc.session().putCursorQuantum(smallestQuantum);
     }
   }
 
@@ -141,7 +141,7 @@ public abstract class Quantum implements Shareable {
    * cursor's neighbourhood, not about how much text is selected.
    */
   boolean hasQuantumAtCursor() {
-    int[] bounds = getBoundaries(emc.getCA(), emc.getNextLineIndices(), 1, false);
+    int[] bounds = getBoundaries(emc.session().getCA(), emc.document().getNextLineIndices(), 1, false);
     return bounds[1] > bounds[0];
   }
 

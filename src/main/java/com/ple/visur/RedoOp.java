@@ -8,6 +8,6 @@ public class RedoOp implements Operator {
   @Override
   public void execute(Object ignored) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    emc.getUndoHistory().redo(emc);
+    emc.document().getUndoHistory().redo(emc);
   }
 }

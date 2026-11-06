@@ -23,21 +23,21 @@ class RelativeMoveOpTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
-    emc.putCA(0);
-    emc.putCX(0);
-    emc.putCY(0);
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
+    emc.session().putCA(0);
+    emc.session().putCX(0);
+    emc.session().putCY(0);
     emc.session().putVirtualCX(0);
     emc.session().putCanvasStart(0);
     emc.session().putFY(0);
-    emc.putSpan(1);
+    emc.session().putSpan(1);
   }
 
   @AfterEach
@@ -48,8 +48,8 @@ class RelativeMoveOpTest {
   @Test
   void aLineWithNoWordInItKeepsTheSpanAndSelectsNothing() {
     move(0, 1); // down from "one" onto the empty line
-    assertEquals(8, emc.getCA());
-    assertEquals(1, emc.getSpan());
+    assertEquals(8, emc.session().getCA());
+    assertEquals(1, emc.session().getSpan());
     assertEquals(0, selectedWidth());
   }
 
@@ -57,7 +57,7 @@ class RelativeMoveOpTest {
   void movingBackOntoAWordSelectsItAgain() {
     move(0, 1);
     move(0, 1); // and onto "three"
-    assertEquals(1, emc.getSpan());
+    assertEquals(1, emc.session().getSpan());
     assertEquals(9, emc.session().getCursorQuantumStart());
     assertEquals(15, emc.session().getCursorQuantumEnd());
   }
@@ -69,11 +69,11 @@ class RelativeMoveOpTest {
    */
   @Test
   void aWideGapIsOneStepInBothDirections() {
-    emc.putEditorContent("one   two   three"); // words at 0, 6 and 12
+    emc.document().putContent("one   two   three"); // words at 0, 6 and 12
     move(1, 0);
-    assertEquals(6, emc.getCA(), "right, onto the next word");
+    assertEquals(6, emc.session().getCA(), "right, onto the next word");
     move(-1, 0);
-    assertEquals(0, emc.getCA(), "and back");
+    assertEquals(0, emc.session().getCA(), "and back");
   }
 
   private int selectedWidth() {

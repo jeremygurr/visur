@@ -8,7 +8,7 @@ public class LineQuantum extends Quantum {
 
   @Override
   public int[] boundsFor(int ca, ArrayList<Integer> nl, int span, boolean includeTail) {
-    return boundsFor(emc.getEditorContent(), nl, ca, emc.getCY(), span);
+    return boundsFor(emc.document().getContent(), nl, ca, emc.session().getCY(), span);
   }
 
   /**
@@ -43,8 +43,8 @@ public class LineQuantum extends Quantum {
 
   @Override
   public int move(String editorContent, ArrayList<Integer> newlineIndices, MovementVector mv) {
-    int ca = emc.getCA();
-    int span = emc.getSpan();
+    int ca = emc.session().getCA();
+    int span = emc.session().getSpan();
     if(span > 0) {
       mv.dy += mv.dx;
       mv.dx = 0;
@@ -66,36 +66,36 @@ public class LineQuantum extends Quantum {
         ca = zeroQuantumMoveLeft(ca, newlineIndices);
         mv.dx++;
       }
-      emc.putCA(ca);
-      emc.session().putVirtualCX(emc.getCX());
+      emc.session().putCA(ca);
+      emc.session().putVirtualCX(emc.session().getCX());
     }
     return ca;
   }
 
   private int moveDown(ArrayList<Integer> nl) {
-    int cy = emc.getCY();
+    int cy = emc.session().getCY();
     if(cy < nl.size() - 1) {
-      emc.putCY(++cy);
+      emc.session().putCY(++cy);
       int newLongLineLength = RelativeLineBoundCalculator.getLongLineLength(cy, nl);
       int vcx = emc.session().getVirtualCX();
       int lineEndLimit = newLongLineLength - 1;
       int cx = Math.min(vcx, lineEndLimit);
-      emc.putCX(cx);
+      emc.session().putCX(cx);
     }
-    return emc.getCA();
+    return emc.session().getCA();
   }
 
   private int moveUp(ArrayList<Integer> nl) {
-    int cy = emc.getCY();
+    int cy = emc.session().getCY();
     if(cy > 0) {
-      emc.putCY(--cy);
+      emc.session().putCY(--cy);
       int newLongLineLength = RelativeLineBoundCalculator.getLongLineLength(cy, nl);
       int vcx = emc.session().getVirtualCX();
       int lineEndLimit = cy == nl.size() - 1 ? newLongLineLength : newLongLineLength - 1;
       int cx = Math.min(vcx, lineEndLimit);
-      emc.putCX(cx);
+      emc.session().putCX(cx);
     }
-    return emc.getCA();
+    return emc.session().getCA();
   }
 
   /** Whether {@code bound} sits inside a line rather than at its start. */
@@ -116,7 +116,7 @@ public class LineQuantum extends Quantum {
     if (startingCharIsNewline && ca < contentEnd) {
       destination++;
     } else if(ca < contentEnd) {
-      int cy = emc.getCY();
+      int cy = emc.session().getCY();
       boolean lastCharInContentIsNewline = nl.get(nl.size() - 1) == '\n';
       boolean cyIsOnLastLongInContent = cy == nl.size() - 1;
       boolean shouldDecrementNextLineIndex = !(lastCharInContentIsNewline || cyIsOnLastLongInContent);
@@ -128,7 +128,7 @@ public class LineQuantum extends Quantum {
   private int zeroQuantumMoveLeft(int ca, ArrayList<Integer> nl) {
     int destination = ca;
     if(ca > 0) {
-      int cy = emc.getCY();
+      int cy = emc.session().getCY();
       boolean previousCharIsNewline = nl.contains(ca) && ca < nl.get(nl.size() - 1);
       if(previousCharIsNewline) {
         destination--;

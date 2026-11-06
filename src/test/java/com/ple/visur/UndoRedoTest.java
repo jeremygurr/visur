@@ -35,15 +35,15 @@ class UndoRedoTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(TWO_LINES);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(TWO_LINES);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     emc.session().putCanvasStart(0);
-    emc.putSpan(1);
+    emc.session().putSpan(1);
     chooseCursorQuantum("line");
     cursorAt(0, 0, 0);
   }
@@ -57,11 +57,11 @@ class UndoRedoTest {
   @Test
   void undoBringsBackWhatTheDeleteRemoved() {
     press("d");
-    assertEquals("two\n", emc.getEditorContent(), "the delete happened first");
+    assertEquals("two\n", emc.document().getContent(), "the delete happened first");
 
     press("u");
 
-    assertEquals(TWO_LINES, emc.getEditorContent());
+    assertEquals(TWO_LINES, emc.document().getContent());
   }
 
   /**
@@ -72,18 +72,18 @@ class UndoRedoTest {
   void undoPutsBackTheSpanAndCursorSoTheCommandCanRunAgain() {
     press("j"); // onto line two; not an edit, so nothing is snapshot for it
     press("d");
-    assertEquals("one\n", emc.getEditorContent());
+    assertEquals("one\n", emc.document().getContent());
 
     press("u");
 
-    assertEquals(TWO_LINES, emc.getEditorContent());
+    assertEquals(TWO_LINES, emc.document().getContent());
     assertEquals(MIDDLE_OF_LINE_TWO - 1, emc.session().getCursorQuantumStart(), "line two selected again");
     assertEquals(8, emc.session().getCursorQuantumEnd());
-    assertEquals(1, emc.getSpan());
-    assertEquals(4, emc.getCA());
+    assertEquals(1, emc.session().getSpan());
+    assertEquals(4, emc.session().getCA());
 
     press("d");
-    assertEquals("one\n", emc.getEditorContent(), "one keypress, not a selection to rebuild");
+    assertEquals("one\n", emc.document().getContent(), "one keypress, not a selection to rebuild");
   }
 
   /**
@@ -97,39 +97,39 @@ class UndoRedoTest {
     press("g");
     type("hello there");
     press("Escape");
-    assertEquals("one\nhello there\ntwo\n", emc.getEditorContent(), "the session happened");
+    assertEquals("one\nhello there\ntwo\n", emc.document().getContent(), "the session happened");
 
     press("u");
 
-    assertEquals(TWO_LINES, emc.getEditorContent(), "the words and the line they were typed on, together");
+    assertEquals(TWO_LINES, emc.document().getContent(), "the words and the line they were typed on, together");
   }
 
   /** A count multiplies what one command removes, and it is still one command: one {@code u} brings all of it back. */
   @Test
   void aCountedDeleteIsOneUndo() {
-    emc.putEditorContent("one\ntwo\nthree\nfour\n");
+    emc.document().putContent("one\ntwo\nthree\nfour\n");
 
     press("3");
     press("d");
-    assertEquals("four\n", emc.getEditorContent());
+    assertEquals("four\n", emc.document().getContent());
 
     press("u");
 
-    assertEquals("one\ntwo\nthree\nfour\n", emc.getEditorContent());
+    assertEquals("one\ntwo\nthree\nfour\n", emc.document().getContent());
   }
 
   /** The bottom of the undo stack and the top of the redo stack are both no-ops, and neither breaks the next undo. */
   @Test
   void undoAtTheBottomAndRedoAtTheTopDoNothing() {
     press("u"); // nothing has been edited yet
-    assertEquals(TWO_LINES, emc.getEditorContent());
+    assertEquals(TWO_LINES, emc.document().getContent());
     press("R"); // nothing has been undone
 
-    assertEquals(TWO_LINES, emc.getEditorContent());
+    assertEquals(TWO_LINES, emc.document().getContent());
 
     press("d");
     press("u");
-    assertEquals(TWO_LINES, emc.getEditorContent(), "the stack still had the delete in it");
+    assertEquals(TWO_LINES, emc.document().getContent(), "the stack still had the delete in it");
   }
 
   /** A new edit clears the redo stack: what {@code R} was offering no longer describes the document. */
@@ -140,10 +140,10 @@ class UndoRedoTest {
 
     press("g"); // a new edit, however small
     press("Escape");
-    assertEquals("\none\ntwo\n", emc.getEditorContent());
+    assertEquals("\none\ntwo\n", emc.document().getContent());
 
     press("R");
-    assertEquals("\none\ntwo\n", emc.getEditorContent(), "the redo that was cleared is not offered again");
+    assertEquals("\none\ntwo\n", emc.document().getContent(), "the redo that was cleared is not offered again");
   }
 
   /**
@@ -156,12 +156,12 @@ class UndoRedoTest {
     press("y"); // yank line one
     press("j");
     press("p");
-    assertEquals("one\none\n", emc.getEditorContent());
+    assertEquals("one\none\n", emc.document().getContent());
     assertEquals("two\n", register(), "the paste displaced line two into the register");
 
     press("u");
 
-    assertEquals(TWO_LINES, emc.getEditorContent());
+    assertEquals(TWO_LINES, emc.document().getContent());
     assertEquals("two\n", register(), "the register keeps what the paste put there");
   }
 
@@ -174,13 +174,13 @@ class UndoRedoTest {
     Path file = tempDir.resolve("next.txt");
     Files.write(file, "loaded\n".getBytes(StandardCharsets.UTF_8));
     press("d");
-    assertEquals("two\n", emc.getEditorContent(), "an edit, so there is something to undo");
+    assertEquals("two\n", emc.document().getContent(), "an edit, so there is something to undo");
 
     emc.session().putOnExecutionDataStack(file.toString());
     new LoadFileOp().execute(null);
 
     press("u");
-    assertEquals("loaded\n", emc.getEditorContent(), "the delete belonged to the document before this one");
+    assertEquals("loaded\n", emc.document().getContent(), "the delete belonged to the document before this one");
   }
 
   /**
@@ -190,11 +190,11 @@ class UndoRedoTest {
   @Test
   void aPastedBlockIsOneUndo() {
     KeyWasPressedVerticle.pasteText(emc, "pasted\n");
-    assertEquals("pasted\none\ntwo\n", emc.getEditorContent());
+    assertEquals("pasted\none\ntwo\n", emc.document().getContent());
 
     press("u");
 
-    assertEquals(TWO_LINES, emc.getEditorContent());
+    assertEquals(TWO_LINES, emc.document().getContent());
   }
 
   private String register() {
@@ -208,15 +208,15 @@ class UndoRedoTest {
   }
 
   private void chooseCursorQuantum(String name) {
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get(name));
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get(name));
   }
 
   private void cursorAt(int ca, int cx, int cy) {
-    emc.putCX(cx);
-    emc.putCY(cy);
+    emc.session().putCX(cx);
+    emc.session().putCY(cy);
     emc.session().putVirtualCX(cx);
     emc.session().putFY(cy);
-    emc.putCA(ca);
+    emc.session().putCA(ca);
   }
 
   private void press(String key) {

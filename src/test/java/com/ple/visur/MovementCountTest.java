@@ -33,15 +33,15 @@ class MovementCountTest {
   @BeforeEach
   void setUp() {
     vertx = Vertx.vertx();
-    ServiceHolder.init(vertx.sharedData());
+    ServiceHolder.init();
     ServiceHolder.initializerService.initializeEditorModel();
     emc = ServiceHolder.editorModelCoupler;
-    emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
-    emc.putEditorContent(CONTENT);
+    emc.document().setSourceFilePath(""); // keep the swap-file hook away from the working tree
+    emc.document().putContent(CONTENT);
     emc.session().putCanvasWidth(80);
     emc.session().putCanvasHeight(24);
     emc.session().putCanvasStart(0);
-    emc.putSpan(1);
+    emc.session().putSpan(1);
     cursorAt(0, 0, 0);
   }
 
@@ -55,7 +55,7 @@ class MovementCountTest {
     chooseCursorQuantum("character");
     press("3");
     press("l");
-    assertEquals(3, emc.getCA());
+    assertEquals(3, emc.session().getCA());
   }
 
   @Test
@@ -63,7 +63,7 @@ class MovementCountTest {
     chooseCursorQuantum("word");
     press("3");
     press("l");
-    assertEquals(FOURTH_WORD, emc.getCA());
+    assertEquals(FOURTH_WORD, emc.session().getCA());
     assertEquals(FOURTH_WORD, emc.session().getCursorQuantumStart());
     assertEquals(19, emc.session().getCursorQuantumEnd(), "and it selects the word it landed on");
   }
@@ -83,7 +83,7 @@ class MovementCountTest {
 
     press("l");
 
-    assertEquals(CONTENT.indexOf("three"), emc.getCA(), "one word along, not five");
+    assertEquals(CONTENT.indexOf("three"), emc.session().getCA(), "one word along, not five");
   }
 
   /**
@@ -97,8 +97,8 @@ class MovementCountTest {
     press("0");
     press("s"); // nothing selected, which is the case the old branch skipped
     press("l");
-    assertEquals(CONTENT.indexOf("two"), emc.getCA());
-    assertEquals(0, emc.getSpan());
+    assertEquals(CONTENT.indexOf("two"), emc.session().getCA());
+    assertEquals(0, emc.session().getSpan());
   }
 
   @Test
@@ -106,8 +106,8 @@ class MovementCountTest {
     chooseCursorQuantum("character");
     press("2");
     press("j");
-    assertEquals(START_OF_LINE_THREE, emc.getCA());
-    assertEquals(2, emc.getCY());
+    assertEquals(START_OF_LINE_THREE, emc.session().getCA());
+    assertEquals(2, emc.session().getCY());
   }
 
   @Test
@@ -115,8 +115,8 @@ class MovementCountTest {
     chooseCursorQuantum("word");
     press("2");
     press("j");
-    assertEquals(START_OF_LINE_THREE, emc.getCA());
-    assertEquals(2, emc.getCY());
+    assertEquals(START_OF_LINE_THREE, emc.session().getCA());
+    assertEquals(2, emc.session().getCY());
   }
 
   @Test
@@ -124,7 +124,7 @@ class MovementCountTest {
     chooseCursorQuantum("character");
     press("0");
     press("l");
-    assertEquals(0, emc.getCA());
+    assertEquals(0, emc.session().getCA());
   }
 
   @Test
@@ -132,7 +132,7 @@ class MovementCountTest {
     chooseCursorQuantum("character");
     press("3");
     press("ArrowRight");
-    assertEquals(3, emc.getCA());
+    assertEquals(3, emc.session().getCA());
   }
 
   @Test
@@ -155,18 +155,18 @@ class MovementCountTest {
     chooseCursorQuantum("line");
     press("]");
     press("q");
-    assertEquals(LAST_CHARACTER_OF_LINE_ONE, emc.getCA());
+    assertEquals(LAST_CHARACTER_OF_LINE_ONE, emc.session().getCA());
     assertEquals(23, emc.session().getCursorQuantumStart());
     assertEquals(24, emc.session().getCursorQuantumEnd());
   }
 
   @Test
   void aJumpFromTheLineQuantumAtSpanFiveGoesToTheSamePlaceWider() {
-    emc.putSpan(5);
+    emc.session().putSpan(5);
     chooseCursorQuantum("line");
     press("]");
     press("q");
-    assertEquals(LAST_CHARACTER_OF_LINE_ONE, emc.getCA(), "the span widens the selection, not the jump");
+    assertEquals(LAST_CHARACTER_OF_LINE_ONE, emc.session().getCA(), "the span widens the selection, not the jump");
     assertEquals(23, emc.session().getCursorQuantumStart());
     assertEquals(28, emc.session().getCursorQuantumEnd());
   }
@@ -178,8 +178,8 @@ class MovementCountTest {
     press("3");
     press("]");
     press("q");
-    assertEquals(END_OF_LINE_THREE, emc.getCA());
-    assertEquals(2, emc.getCY());
+    assertEquals(END_OF_LINE_THREE, emc.session().getCA());
+    assertEquals(2, emc.session().getCY());
   }
 
   @Test
@@ -188,16 +188,16 @@ class MovementCountTest {
     press("0");
     press("]");
     press("q");
-    assertEquals(LAST_CHARACTER_OF_LINE_ONE, emc.getCA());
+    assertEquals(LAST_CHARACTER_OF_LINE_ONE, emc.session().getCA());
   }
 
   @Test
   void aJumpBackFromTheLineQuantumIsNotWiderAtALargerSpan() {
     jumpBackToStartOfLine();
-    assertEquals(0, emc.getCA(), "at span 1");
-    emc.putSpan(5);
+    assertEquals(0, emc.session().getCA(), "at span 1");
+    emc.session().putSpan(5);
     jumpBackToStartOfLine();
-    assertEquals(0, emc.getCA(), "at span 5, and the span is not what decides how far back");
+    assertEquals(0, emc.session().getCA(), "at span 5, and the span is not what decides how far back");
   }
 
   /** Mid-word, so there is somewhere to go back to. The jump leaves you in the quantum it selected, so the line quantum is chosen every time. */
@@ -209,17 +209,17 @@ class MovementCountTest {
   }
 
   private void chooseCursorQuantum(String quantumName) {
-    emc.putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get(quantumName));
   }
 
   /** cx and cy have to agree with ca, or the model recomputes ca from them while the command runs. */
   private void cursorAt(int ca, int cx, int cy) {
-    emc.putCX(cx);
-    emc.putCY(cy);
+    emc.session().putCX(cx);
+    emc.session().putCY(cy);
     emc.session().putVirtualCX(cx);
     emc.session().putFY(cy);
-    emc.putCA(ca);
-    assertEquals(ca, emc.getCA());
+    emc.session().putCA(ca);
+    assertEquals(ca, emc.session().getCA());
   }
 
   /** The verticle's own keypress handler, minus the bus: see {@link KeyWasPressedVerticle#press}. */

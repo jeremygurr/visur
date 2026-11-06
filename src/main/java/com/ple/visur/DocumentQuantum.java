@@ -6,10 +6,10 @@ public class DocumentQuantum extends Quantum {
   @Override
   public int[] boundsFor(int realCA, ArrayList<Integer> newlineIndices, int span, boolean includeTail) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    int[] bounds = boundsFor(emc.getEditorContent(), newlineIndices, realCA, emc.getCY(), span);
+    int[] bounds = boundsFor(emc.document().getContent(), newlineIndices, realCA, emc.session().getCY(), span);
     boolean nothingSelectedAndCursorIsNotAlreadyAtTheEnd = span <= 0 && realCA != bounds[0];
     if(nothingSelectedAndCursorIsNotAlreadyAtTheEnd) {
-      emc.putCA(0); // legacy side effect: selecting no part of the document parks the cursor at its start
+      emc.session().putCA(0); // legacy side effect: selecting no part of the document parks the cursor at its start
     }
     return bounds;
   }
@@ -37,8 +37,8 @@ public class DocumentQuantum extends Quantum {
   @Override
   int move(String editorContent, ArrayList<Integer> newlineIndices, MovementVector m) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    int span = emc.getSpan();
-    int ca = emc.getCA();
+    int span = emc.session().getSpan();
+    int ca = emc.session().getCA();
     if(span == 0) {
       if(ca < editorContent.length() && m.dx > 0) {
         ca = editorContent.length();

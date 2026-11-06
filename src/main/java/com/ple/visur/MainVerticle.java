@@ -6,7 +6,6 @@ import io.vertx.rxjava3.core.AbstractVerticle;
 import io.vertx.rxjava3.core.http.HttpServerRequest;
 import io.vertx.rxjava3.core.http.HttpServerResponse;
 import io.vertx.rxjava3.core.eventbus.MessageConsumer;
-import io.vertx.rxjava3.core.shareddata.SharedData;
 import io.vertx.rxjava3.ext.web.Router;
 import io.vertx.rxjava3.ext.web.RoutingContext;
 import io.vertx.core.json.JsonObject;
@@ -26,23 +25,31 @@ public class MainVerticle extends AbstractVerticle {
   private static final Logger LOGGER = LoggerFactory.getLogger(MainVerticle.class);
   private static final AtomicInteger nextConnection = new AtomicInteger(1);
 
+  /**
+   * Started is not "the verticle was constructed": the port only counts as open once the bus consumers behind it
+   * exist and are listening.
+   *
+   * <p>{@code send} to an address with no consumer is dropped silently, so a client that declared its viewport in the
+   * gap would wait for a view that was never triggered — which is why every client until now re-sent its declaration
+   * on a timer. The same gap is what made a test that deploys this verticle, connects, and presses a key lose a race
+   * it wins only when the machine is idle.
+   */
   @Override
-  public void start() {
+  public void start(io.vertx.core.Promise<Void> started) {
     LOGGER.debug("Starting main verticle");
 
-    final SharedData sharedData = vertx.sharedData();
-    ServiceHolder.init(sharedData);
+    ServiceHolder.init();
 
-    // The port must not open before the bus consumers exist. `send` to an address with no consumer is dropped
-    // silently, so a client that declared its viewport in that window would wait for a view that was never
-    // triggered -- which is why every client until now re-sent its declaration on a timer.
     vertx.deployVerticle(new KeyWasPressedVerticle())
       .flatMap(ignored -> vertx.deployVerticle(new ViewportWasChangedVerticle()))
       .flatMap(ignored -> vertx.deployVerticle(new ModelWasChangedVerticle()))
       .subscribe(
         ignored -> vertx.createHttpServer().requestHandler(router()).listen(serverPort())
-          .subscribe(listening -> { }, this::couldNotListen),
-        error -> LOGGER.error("could not deploy the verticles", error));
+          .subscribe(listening -> started.complete(), failure -> couldNotListen(failure, started)),
+        error -> {
+          LOGGER.error("could not deploy the verticles", error);
+          started.fail(error);
+        });
   }
 
   /**
@@ -51,8 +58,9 @@ public class MainVerticle extends AbstractVerticle {
    * into a debug log while the JVM sat there holding a port it did not have. Orphan servers piled up that way, and
    * tests failed by connecting to somebody else's server.
    */
-  private void couldNotListen(Throwable failure) {
+  private void couldNotListen(Throwable failure, io.vertx.core.Promise<Void> started) {
     System.err.printf("visur cannot serve on port %d: %s%n", serverPort(), String.valueOf(failure.getMessage()));
+    started.fail(failure);
     Runtime.getRuntime().halt(1);
   }
 
