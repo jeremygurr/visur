@@ -46,9 +46,9 @@ public class LoadFileOp implements Operator {
 
       // Reset cursor to (0,0)
       emc.putCA(0);
-      emc.putVirtualCX(0);
-      emc.putCanvasStart(0);
-      emc.putFY(0);
+      emc.session().putVirtualCX(0);
+      emc.session().putCanvasStart(0);
+      emc.session().putFY(0);
 
       // Recompute line indices (this handles newline tracking)
       emc.updateNextLineIndices();

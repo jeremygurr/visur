@@ -92,6 +92,10 @@ final class WireClient implements AutoCloseable {
     return view().getInteger("span");
   }
 
+  int origin() {
+    return view().getInteger("origin");
+  }
+
   int cursorQuantumStart() {
     return view().getInteger("cursorQuantumStart");
   }

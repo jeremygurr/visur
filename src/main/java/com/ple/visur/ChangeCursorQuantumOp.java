@@ -10,8 +10,8 @@ public class ChangeCursorQuantumOp implements Operator {
       Quantum targetQuantum = emc.getQuantumNameToQuantum().get(cursorQuantumName);
       int[] bounds = targetQuantum.getBoundaries(emc.getCA(), emc.getNextLineIndices(), emc.getSpan(), false);
       emc.putCursorQuantum(targetQuantum);
-      emc.putCursorQuantumStartAndScroll(bounds[0]);
-      emc.putCursorQuantumEndAndScroll(bounds[1]);
+      emc.session().putCursorQuantumStartAndScroll(bounds[0]);
+      emc.session().putCursorQuantumEndAndScroll(bounds[1]);
     }
   }
 

@@ -36,14 +36,14 @@ class SetSpanOpTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(CONTENT);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
     emc.putCA(0);
     emc.putCX(0);
     emc.putCY(0);
-    emc.putVirtualCX(0);
-    emc.putCanvasStart(0);
-    emc.putFY(0);
+    emc.session().putVirtualCX(0);
+    emc.session().putCanvasStart(0);
+    emc.session().putFY(0);
     emc.putCursorQuantum(new CharacterQuantum());
     emc.putSpan(1);
   }
@@ -60,20 +60,20 @@ class SetSpanOpTest {
 
   /** How many words the selection covers, counted from what is actually selected. */
   private int wordsSelected() {
-    String selected = emc.getEditorContent().substring(emc.getCursorQuantumStart(), emc.getCursorQuantumEnd()).trim();
+    String selected = emc.getEditorContent().substring(emc.session().getCursorQuantumStart(), emc.session().getCursorQuantumEnd()).trim();
     return selected.isEmpty() ? 0 : selected.split("\\s+").length;
   }
 
   private int selectedWidth() {
-    return emc.getCursorQuantumEnd() - emc.getCursorQuantumStart();
+    return emc.session().getCursorQuantumEnd() - emc.session().getCursorQuantumStart();
   }
 
   @Test
   void theSpanKeepsTheNumberItWasGiven() {
     requestSpan(7);
     assertEquals(7, emc.getSpan());
-    assertEquals(0, emc.getCursorQuantumStart());
-    assertEquals(7, emc.getCursorQuantumEnd());
+    assertEquals(0, emc.session().getCursorQuantumStart());
+    assertEquals(7, emc.session().getCursorQuantumEnd());
   }
 
   @Test
@@ -89,8 +89,8 @@ class SetSpanOpTest {
     emc.putEditorContent("abc\n");
     requestSpan(10);
     assertEquals(10, emc.getSpan());
-    assertEquals(0, emc.getCursorQuantumStart());
-    assertEquals(4, emc.getCursorQuantumEnd());
+    assertEquals(0, emc.session().getCursorQuantumStart());
+    assertEquals(4, emc.session().getCursorQuantumEnd());
   }
 
   @Test

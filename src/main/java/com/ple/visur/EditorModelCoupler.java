@@ -52,10 +52,6 @@ public class EditorModelCoupler {
     return (LineWrapping) editorModel.get(lineWrapping);
   }
 
-  public int getVirtualCX() {
-    return (int)editorModel.get(virtualCX);
-  }
-
   public ArrayList<Integer> getNextLineIndices() {
     return ecs.getNextLineIndices(editorModel);
   }
@@ -154,42 +150,6 @@ public class EditorModelCoupler {
     session().putGlobalVar("previousSearchTarget", ObjectVisurVar.make(previousSearchTarget));
   }
 
-  public int getCanvasWidth() {
-    return session().getCanvasWidth();
-  }
-
-  public int getCanvasHeight() {
-    return session().getCanvasHeight();
-  }
-
-  public int getCanvasStart() {
-    return (int)editorModel.get(canvasStart);
-  }
-
-  public int getFY() {
-    return (int)editorModel.get(fy);
-  }
-
-  public int getCanvasEnd() {
-    int canvasHeight = getCanvasHeight(); //declared height is content rows already
-    int canvasWidth = getCanvasWidth();
-    int rowsAdded = 0;
-    int canvasEnd = getCanvasStart();
-    int fy = getFY();
-    ArrayList<Integer> nl = getNextLineIndices();
-    while(rowsAdded < canvasHeight && fy < nl.size()) {
-      int nextLineStart = nl.get(fy);
-      if(canvasEnd + canvasWidth < nextLineStart) {
-        canvasEnd += canvasWidth;
-      } else {
-        canvasEnd = fy < nl.size() - 1 ? nextLineStart - 1 : nextLineStart;
-        fy++;
-      }
-      rowsAdded++;
-    }
-    return canvasEnd;
-  }
-
   public EditorMode getEditorMode() {
     return (EditorMode)editorModel.get(editorMode);
   }
@@ -255,17 +215,6 @@ public class EditorModelCoupler {
     return (KeyToQuantumName) editorModel.get(keyToQuantumName);
   }
 
-  public int getCursorQuantumStart() {
-    return (int)editorModel.get(quantumStart);
-  }
-  public int getCursorQuantumEnd() {
-    return (int)editorModel.get(quantumEnd);
-  }
-
-  public boolean getIsAtQuantumStart() {
-    return (boolean)editorModel.get(isAtQuantumStart);
-  }
-
   public void initializeEditorContent(String content) {
     ecs.initializeEditorContent(content, editorModel);
   }
@@ -306,31 +255,11 @@ public class EditorModelCoupler {
     editorModel.put(lineWrapping, lw);
   }
 
-  public void putVirtualCX(int vcx) {
-    editorModel.put(virtualCX, vcx);
-  }
-
   public void updateNextLineIndices() {
     ecs.updateNextLineIndices(editorModel);
   }
 
   /** Resizes the connection in play. Tests use these to say "the window is this wide" without owning a socket. */
-  public void putCanvasWidth(int width) {
-    Connections.resize(getConnection(), width, getCanvasHeight());
-  }
-
-  public void putCanvasHeight(int height) {
-    Connections.resize(getConnection(), getCanvasWidth(), height);
-  }
-
-  public void putCanvasStart(int cs) {
-    editorModel.put(canvasStart, cs);
-  }
-
-  public void putFY(int focusY) {
-    editorModel.put(fy, focusY);
-  }
-
   public void putEditorMode(EditorMode mode) {
     editorModel.put(editorMode, mode);
   }
@@ -381,77 +310,6 @@ public class EditorModelCoupler {
 
   public void putKeyToQuantumName(KeyToQuantumName keyToQName) {
     editorModel.put(keyToQuantumName, keyToQName);
-  }
-
-  private void putCursorQuantumStart(int startBound) {
-    editorModel.put(quantumStart, startBound);
-  }
-
-  public void putCursorQuantumStartAndScroll(int startBound) {
-    putCursorQuantumStart(startBound);
-    while (getCanvasStart() > startBound) {
-      decrementCanvasStart();
-    }
-  }
-
-  void putCursorQuantumEnd(int endBound) {
-    editorModel.put(quantumEnd, endBound);
-  }
-
-  public void putCursorQuantumEndAndScroll(int endBound) {
-    putCursorQuantumEnd(endBound);
-    int startBound = getCursorQuantumStart();
-    String cursorQuantumName = getCursorQuantum().getName();
-    int limit = cursorQuantumName.equals("character") ? startBound : endBound;
-    while (getCanvasEnd() < limit) {
-      incrementCanvasStart();
-    }
-  }
-
-  public void putIsAtQuantumStart(boolean isAtQStart) {
-    editorModel.put(isAtQuantumStart, isAtQStart);
-  }
-
-  public void incrementCanvasStart() {
-    int canvasStart = getCanvasStart();
-    int canvasWidth = getCanvasWidth();
-    int fy = getFY();
-    ArrayList<Integer> nl = getNextLineIndices();
-    int nextLineStart = nl.get(fy);
-    if(canvasStart + canvasWidth < nextLineStart) {
-      canvasStart += canvasWidth;
-    } else {
-      canvasStart = nextLineStart;
-      putFY(++fy);
-    }
-    putCanvasStart(canvasStart);
-  }
-
-  public void decrementCanvasStart() {
-    int canvasStart = getCanvasStart();
-    ArrayList<Integer> nl = getNextLineIndices();
-    int fy = getFY();
-    fy = Math.min(fy, nl.size() - 1);
-    int currentLineStart = fy > 0 ? nl.get(fy - 1) : 0;
-    if(nl.get(fy) >= canvasStart) {
-      int canvasWidth = getCanvasWidth();
-      if (canvasStart > currentLineStart) {
-        canvasStart -= canvasWidth;
-      } else {
-        putFY(--fy);
-        int prevLineStart = fy > 0 ? nl.get(fy - 1) : 0;
-        int prevLineLength = currentLineStart - prevLineStart - 1;
-        if (prevLineLength - 1 <= canvasWidth) {
-          canvasStart = prevLineStart;
-        } else {
-          canvasStart = currentLineStart - (prevLineLength % canvasWidth) - 1;
-        }
-      }
-      putCanvasStart(canvasStart);
-    } else {
-      putCanvasStart(currentLineStart);
-      putFY(fy);
-    }
   }
 
   /**

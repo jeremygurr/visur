@@ -109,9 +109,9 @@ public class InitializerService {
     emc.updateNextLineIndices();
     emc.putLineWrapping(LineWrapping.wrapped);
 
-    emc.putVirtualCX(0);
-    emc.putCanvasStart(0);
-    emc.putFY(0);
+    emc.session().putVirtualCX(0);
+    emc.session().putCanvasStart(0);
+    emc.session().putFY(0);
 
     emc.putIsInCommandState(false);
     emc.putCommandStateContent("");
@@ -305,9 +305,9 @@ public class InitializerService {
     session.putScopeQuantum(emc.getQuantumNameToQuantum().get(startingScopeQuantumName));
     int bounds[] = emc.getQuantumNameToQuantum().get(startingCursorQuantumName)
       .getBoundaries(session.getCA(), emc.getNextLineIndices(), session.getSpan(), false);
-    emc.putCursorQuantumStartAndScroll(bounds[0]);
-    emc.putCursorQuantumEnd(bounds[1]);
-    emc.putIsAtQuantumStart(true);
+    emc.session().putCursorQuantumStartAndScroll(bounds[0]);
+    emc.session().putCursorQuantumEnd(bounds[1]);
+    emc.session().putIsAtQuantumStart(true);
   }
 
   private void initializeKeymaps() {

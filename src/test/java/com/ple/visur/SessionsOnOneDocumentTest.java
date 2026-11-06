@@ -9,6 +9,7 @@ import java.util.Stack;
 
 import static com.ple.visur.EditorSubmode.navigate;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Two pairs of hands, one document.
@@ -43,7 +44,7 @@ class SessionsOnOneDocumentTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath("");
     emc.putEditorContent(CONTENT);
-    emc.putCanvasStart(0);
+    emc.session().putCanvasStart(0);
     emc.putCA(0);
     Stack<EditorSubmode> submodes = new Stack<>();
     submodes.push(navigate);
@@ -56,6 +57,37 @@ class SessionsOnOneDocumentTest {
   void stopTheServer() {
     // Blocking, so the server is gone before the next test asks for the port range back.
     vertx.close().blockingAwait();
+  }
+
+  @Test
+  void aScrolledWindowDoesNotScrollItsNeighbour() {
+    // Ten columns by two rows for twenty-four characters: three wrapped rows will not fit, so a window that follows
+    // its own cursor off the bottom has to scroll sideways along the line to keep it in sight.
+    try (WireClient first = new WireClient(vertx, port, 10, 2);
+         WireClient second = new WireClient(vertx, port, 10, 2)) {
+      assertEquals(0, second.origin(), "both windows start at the beginning of the document");
+
+      for (int step = 0; step < 22; step++) {
+        first.presses("l");
+      }
+
+      assertTrue(first.origin() > 0, "the window that followed its cursor scrolled along the line");
+      assertEquals(0, second.origin(), "the window that stayed home did not go with it");
+    }
+  }
+
+  @Test
+  void aCursorBelongsToTheWindowThatMovedIt() {
+    try (WireClient first = new WireClient(vertx, port, 40, 10);
+         WireClient second = new WireClient(vertx, port, 40, 10)) {
+      assertEquals(0, second.cursorQuantumStart(), "both windows start at the beginning");
+
+      first.presses("l");
+      first.presses("l");
+      first.presses("l");
+      assertEquals(3, first.cursorQuantumStart(), "the window that moved right three times is three characters in");
+      assertEquals(0, second.cursorQuantumStart(), "the other window has not moved, and will not until its own keys arrive");
+    }
   }
 
   @Test

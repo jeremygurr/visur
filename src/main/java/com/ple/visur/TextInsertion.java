@@ -12,8 +12,8 @@ final class TextInsertion {
     int cursor = index + text.length() - 1;
     emc.putCA(cursor);
     int[] bounds = emc.getCursorQuantum().getBoundaries(cursor, emc.getNextLineIndices(), 0, false);
-    emc.putCursorQuantumStartAndScroll(bounds[0]);
-    emc.putCursorQuantumEndAndScroll(bounds[1]);
-    emc.putIsAtQuantumStart(true);
+    emc.session().putCursorQuantumStartAndScroll(bounds[0]);
+    emc.session().putCursorQuantumEndAndScroll(bounds[1]);
+    emc.session().putIsAtQuantumStart(true);
   }
 }

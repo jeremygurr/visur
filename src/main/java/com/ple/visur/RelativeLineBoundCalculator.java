@@ -18,7 +18,7 @@ public class RelativeLineBoundCalculator {
   public static int[] getShort(int cx, int cy, ArrayList<Integer> nl) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     int[] shortBounds = new int[2];
-    int canvasWidth = emc.getCanvasWidth();
+    int canvasWidth = emc.session().getCanvasWidth();
     shortBounds[0] = getShortLineStart(canvasWidth, cx);
     shortBounds[1] = getShortLineEnd(shortBounds[0], canvasWidth, cx, cy, nl);
     return shortBounds;

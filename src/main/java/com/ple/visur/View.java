@@ -55,9 +55,9 @@ public record View(
    *             since every row boundary moved.
    */
   public static View of(EditorModelCoupler emc, boolean full) {
-    int origin = emc.getCanvasStart();
-    int height = Math.max(emc.getCanvasHeight(), 0); // declared rows are content rows: no chrome to subtract
-    List<Viewport.Row> rows = Viewport.rows(emc.getEditorContent(), emc.getCanvasWidth(), origin, height);
+    int origin = emc.session().getCanvasStart();
+    int height = Math.max(emc.session().getCanvasHeight(), 0); // declared rows are content rows: no chrome to subtract
+    List<Viewport.Row> rows = Viewport.rows(emc.getEditorContent(), emc.session().getCanvasWidth(), origin, height);
     Viewport.Position cursor = Viewport.position(rows, cursorIndex(emc));
     return new View(
       full,
@@ -65,11 +65,11 @@ public record View(
       rows,
       emc.getSpan(),
       includeSeparators(emc),
-      emc.getCursorQuantumStart(),
-      emc.getCursorQuantumEnd(),
+      emc.session().getCursorQuantumStart(),
+      emc.session().getCursorQuantumEnd(),
       cursor.row(),
       cursor.col(),
-      emc.getIsAtQuantumStart(),
+      emc.session().getIsAtQuantumStart(),
       emc.getCursorQuantum().getName(),
       emc.getScopeQuantum().getName(),
       emc.getEditorMode().name(),
@@ -91,10 +91,10 @@ public record View(
    * way, and a renderer told only {@code cursorRow}/{@code cursorCol} could not work that out for itself.
    */
   private static int cursorIndex(EditorModelCoupler emc) {
-    if (emc.getSpan() == 0 && !emc.getIsAtQuantumStart()) {
-      return emc.getCursorQuantumEnd();
+    if (emc.getSpan() == 0 && !emc.session().getIsAtQuantumStart()) {
+      return emc.session().getCursorQuantumEnd();
     }
-    return emc.getCursorQuantumStart();
+    return emc.session().getCursorQuantumStart();
   }
 
   /** The search prompt, or empty when nothing is being searched: the field is always present on the wire. */

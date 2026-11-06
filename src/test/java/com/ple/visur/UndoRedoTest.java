@@ -40,9 +40,9 @@ class UndoRedoTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(TWO_LINES);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
-    emc.putCanvasStart(0);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
+    emc.session().putCanvasStart(0);
     emc.putSpan(1);
     chooseCursorQuantum("line");
     cursorAt(0, 0, 0);
@@ -77,8 +77,8 @@ class UndoRedoTest {
     press("u");
 
     assertEquals(TWO_LINES, emc.getEditorContent());
-    assertEquals(MIDDLE_OF_LINE_TWO - 1, emc.getCursorQuantumStart(), "line two selected again");
-    assertEquals(8, emc.getCursorQuantumEnd());
+    assertEquals(MIDDLE_OF_LINE_TWO - 1, emc.session().getCursorQuantumStart(), "line two selected again");
+    assertEquals(8, emc.session().getCursorQuantumEnd());
     assertEquals(1, emc.getSpan());
     assertEquals(4, emc.getCA());
 
@@ -214,8 +214,8 @@ class UndoRedoTest {
   private void cursorAt(int ca, int cx, int cy) {
     emc.putCX(cx);
     emc.putCY(cy);
-    emc.putVirtualCX(cx);
-    emc.putFY(cy);
+    emc.session().putVirtualCX(cx);
+    emc.session().putFY(cy);
     emc.putCA(ca);
   }
 

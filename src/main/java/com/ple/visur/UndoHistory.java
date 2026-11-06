@@ -39,7 +39,7 @@ public class UndoHistory implements Shareable {
    */
   private record Snapshot(String content, int cursorQuantumStart, int cursorQuantumEnd, int span, int ca) {
     static Snapshot of(EditorModelCoupler emc) {
-      return new Snapshot(emc.getEditorContent(), emc.getCursorQuantumStart(), emc.getCursorQuantumEnd(),
+      return new Snapshot(emc.getEditorContent(), emc.session().getCursorQuantumStart(), emc.session().getCursorQuantumEnd(),
           emc.getSpan(), emc.getCA());
     }
 
@@ -47,8 +47,8 @@ public class UndoHistory implements Shareable {
       emc.putEditorContent(content);
       emc.putSpan(span);
       emc.putCA(ca);
-      emc.putCursorQuantumStartAndScroll(cursorQuantumStart);
-      emc.putCursorQuantumEndAndScroll(cursorQuantumEnd);
+      emc.session().putCursorQuantumStartAndScroll(cursorQuantumStart);
+      emc.session().putCursorQuantumEndAndScroll(cursorQuantumEnd);
     }
   }
 

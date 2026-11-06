@@ -34,9 +34,9 @@ class PasteTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(CONTENT);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
-    emc.putCanvasStart(0);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
+    emc.session().putCanvasStart(0);
     cursorAt(0, 0, 0);
   }
 
@@ -96,7 +96,7 @@ class PasteTest {
     cursorAt(28, 0, 2); // the blank line
     press("0");
     press("s");
-    assertEquals(0, emc.getCursorQuantumEnd() - emc.getCursorQuantumStart(), "a blank line selects no word");
+    assertEquals(0, emc.session().getCursorQuantumEnd() - emc.session().getCursorQuantumStart(), "a blank line selects no word");
     yank("X");
 
     press("p");
@@ -200,8 +200,8 @@ class PasteTest {
   private void cursorAt(int ca, int cx, int cy) {
     emc.putCX(cx);
     emc.putCY(cy);
-    emc.putVirtualCX(cx);
-    emc.putFY(cy);
+    emc.session().putVirtualCX(cx);
+    emc.session().putFY(cy);
     emc.putCA(ca);
     assertEquals(ca, emc.getCA());
   }

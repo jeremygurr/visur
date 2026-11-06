@@ -39,9 +39,9 @@ class ErrorMessageTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath("");
     emc.putEditorContent(CONTENT);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
-    emc.putCanvasStart(0);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
+    emc.session().putCanvasStart(0);
     emc.putCA(0);
     Stack<EditorSubmode> submodes = new Stack<>();
     submodes.push(navigate);

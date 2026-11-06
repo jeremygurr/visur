@@ -133,8 +133,8 @@ class CountPrefixTest {
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent("one two three four five six seven eight nine ten\n");
     emc.putEditorSubmodeStack(navigate());
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
   }
 
   /** The verticle's own keypress handler, minus the bus: see {@link KeyWasPressedVerticle#press}. */

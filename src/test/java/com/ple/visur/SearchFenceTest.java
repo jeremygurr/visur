@@ -36,14 +36,14 @@ class SearchFenceTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(CONTENT);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
     emc.putCA(0);
     emc.putCX(0);
     emc.putCY(0);
-    emc.putVirtualCX(0);
-    emc.putCanvasStart(0);
-    emc.putFY(0);
+    emc.session().putVirtualCX(0);
+    emc.session().putCanvasStart(0);
+    emc.session().putFY(0);
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("character"));
     emc.putSpan(1);
     assertEquals(6, FIRST_NEEDLE);
@@ -85,8 +85,8 @@ class SearchFenceTest {
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
     emc.putCA(2); // inside "alpha"
     select(5);
-    assertEquals(0, emc.getCursorQuantumStart());
-    assertEquals(29, emc.getCursorQuantumEnd()); // the end of "zeta", on the second line
+    assertEquals(0, emc.session().getCursorQuantumStart());
+    assertEquals(29, emc.session().getCursorQuantumEnd()); // the end of "zeta", on the second line
     assertEquals("character", emc.getScopeQuantum().getName(), "selecting does not move the fence");
   }
 

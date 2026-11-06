@@ -19,8 +19,8 @@ public class PasteBeforeYankRegisterOp implements Operator {
     if (text.isEmpty()) return;
 
     String content = emc.getEditorContent();
-    int start = emc.getCursorQuantumStart();
-    int end = emc.getCursorQuantumEnd();
+    int start = emc.session().getCursorQuantumStart();
+    int end = emc.session().getCursorQuantumEnd();
     String pasted = text.repeat(CountPrefix.countOrOne(emc));
     if (pasted.isEmpty()) return;
 
@@ -32,13 +32,13 @@ public class PasteBeforeYankRegisterOp implements Operator {
     // Keep the selection covering the same text, shifted right by the inserted length, or re-seat at span 0 when
     // there was nothing selected — TextInsertion.insertAt always collapses, which is wrong for the first case.
     if (end > start) {
-      emc.putCursorQuantumStartAndScroll(start + pasted.length());
-      emc.putCursorQuantumEndAndScroll(end + pasted.length());
+      emc.session().putCursorQuantumStartAndScroll(start + pasted.length());
+      emc.session().putCursorQuantumEndAndScroll(end + pasted.length());
     } else {
       int[] bounds = emc.getCursorQuantum().getBoundaries(cursor, emc.getNextLineIndices(), 0, false);
-      emc.putCursorQuantumStartAndScroll(bounds[0]);
-      emc.putCursorQuantumEndAndScroll(bounds[1]);
+      emc.session().putCursorQuantumStartAndScroll(bounds[0]);
+      emc.session().putCursorQuantumEndAndScroll(bounds[1]);
     }
-    emc.putIsAtQuantumStart(true);
+    emc.session().putIsAtQuantumStart(true);
   }
 }

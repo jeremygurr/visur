@@ -6,8 +6,8 @@ public class SetSpanOp implements Operator {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     int spanToSet = spanRequested(emc);
     int[] bounds = emc.getCursorQuantum().getBoundaries(emc.getCA(), emc.getNextLineIndices(), spanToSet, false);
-    emc.putCursorQuantumStartAndScroll(bounds[0]);
-    emc.putCursorQuantumEndAndScroll(bounds[1]);
+    emc.session().putCursorQuantumStartAndScroll(bounds[0]);
+    emc.session().putCursorQuantumEndAndScroll(bounds[1]);
     // The number the key was given, kept even where the range clamped short of it or collapsed entirely. Nothing else
     // writes the span: a move derives its range from the span, so a span of zero derives nothing, and a selection
     // that fell to zero because there was no unit of the quantum here could never come back.

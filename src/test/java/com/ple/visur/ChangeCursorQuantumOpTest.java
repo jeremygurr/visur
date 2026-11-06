@@ -28,15 +28,15 @@ class ChangeCursorQuantumOpTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(CONTENT);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
     emc.putCursorQuantum(new CharacterQuantum());
     emc.putCA(EMPTY_LINE);
     emc.putCX(0);
     emc.putCY(1);
-    emc.putVirtualCX(0);
-    emc.putCanvasStart(0);
-    emc.putFY(0);
+    emc.session().putVirtualCX(0);
+    emc.session().putCanvasStart(0);
+    emc.session().putFY(0);
     emc.putSpan(1);
   }
 
@@ -51,6 +51,6 @@ class ChangeCursorQuantumOpTest {
     new ChangeCursorQuantumOp().execute(null);
     assertEquals("word", emc.getCursorQuantum().getName());
     assertEquals(1, emc.getSpan());
-    assertEquals(0, emc.getCursorQuantumEnd() - emc.getCursorQuantumStart());
+    assertEquals(0, emc.session().getCursorQuantumEnd() - emc.session().getCursorQuantumStart());
   }
 }

@@ -5,6 +5,7 @@ import DataClass.CompoundDataClassBrick;
 import DataClass.LayeredDataClassBrick;
 import DataClass.PrimitiveDataClassBrick;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
@@ -44,6 +45,9 @@ public class Session {
    * <p>{@code nl}, the offset of every line in the document, is handed in from outside because it is the document's
    * and not the window's: it is the one input the cursor derives from that every window shares.
    */
+  /** Where every line in the document starts, shared with every other window on this document. */
+  private PrimitiveDataClassBrick lineOffsets;
+
   private BrickVisurVar ca;
   private BrickVisurVar cx;
   private BrickVisurVar cy;
@@ -81,6 +85,7 @@ public class Session {
    * classes invalidate through the shared cell when that happens.
    */
   void installCursorCells(PrimitiveDataClassBrick nlDCB) {
+    lineOffsets = nlDCB;
     CursorPositionDCHolder cells = new CursorPositionDCHolder();
     LayeredDataClassBrick cursorPositionDCB = cells.cursorPositionDC.makeBrick(nlDCB);
     CompoundDataClassBrick coordinatesDCB = cursorPositionDCB.getLayer(0);
@@ -146,6 +151,154 @@ public class Session {
     putGlobalVar("scopeQuantum", ObjectVisurVar.make(scopeQuantum));
   }
 
+  /**
+   * The rows this window is showing, in characters of content: the first index past the last one drawn.
+   *
+   * <p>Derived, not stored, because the moment it is stored it is a second answer to "what is on screen" — and the
+   * window can be scrolled while the cursor is nowhere near either end of it.
+   */
+  public int getCanvasEnd() {
+    int canvasHeight = getCanvasHeight(); //declared height is content rows already
+    int canvasWidth = getCanvasWidth();
+    int rowsAdded = 0;
+    int canvasEnd = getCanvasStart();
+    int fy = getFY();
+    ArrayList<Integer> nl = getNextLineIndices();
+    while(rowsAdded < canvasHeight && fy < nl.size()) {
+      int nextLineStart = nl.get(fy);
+      if(canvasEnd + canvasWidth < nextLineStart) {
+        canvasEnd += canvasWidth;
+      } else {
+        canvasEnd = fy < nl.size() - 1 ? nextLineStart - 1 : nextLineStart;
+        fy++;
+      }
+      rowsAdded++;
+    }
+    return canvasEnd;
+  }
+
+  /** The window scrolls a screenful right, one wrapped row at a time as its left edge crosses line ends. */
+  public void incrementCanvasStart() {
+    int canvasStart = getCanvasStart();
+    int canvasWidth = getCanvasWidth();
+    int fy = getFY();
+    ArrayList<Integer> nl = getNextLineIndices();
+    int nextLineStart = nl.get(fy);
+    if(canvasStart + canvasWidth < nextLineStart) {
+      canvasStart += canvasWidth;
+    } else {
+      canvasStart = nextLineStart;
+      putFY(++fy);
+    }
+    putCanvasStart(canvasStart);
+  }
+
+  public void decrementCanvasStart() {
+    int canvasStart = getCanvasStart();
+    ArrayList<Integer> nl = getNextLineIndices();
+    int fy = getFY();
+    fy = Math.min(fy, nl.size() - 1);
+    int currentLineStart = fy > 0 ? nl.get(fy - 1) : 0;
+    if(nl.get(fy) >= canvasStart) {
+      int canvasWidth = getCanvasWidth();
+      if (canvasStart > currentLineStart) {
+        canvasStart -= canvasWidth;
+      } else {
+        putFY(--fy);
+        int prevLineStart = fy > 0 ? nl.get(fy - 1) : 0;
+        int prevLineLength = currentLineStart - prevLineStart - 1;
+        if (prevLineLength - 1 <= canvasWidth) {
+          canvasStart = prevLineStart;
+        } else {
+          canvasStart = currentLineStart - (prevLineLength % canvasWidth) - 1;
+        }
+      }
+      putCanvasStart(canvasStart);
+    } else {
+      putCanvasStart(currentLineStart);
+      putFY(fy);
+    }
+  }
+
+  public ArrayList<Integer> getNextLineIndices() {
+    return (ArrayList<Integer>) lineOffsets.getVal();
+  }
+
+  public int getCanvasStart() {
+    return canvasStart;
+  }
+
+  public void putCanvasStart(int start) {
+    canvasStart = start;
+  }
+
+  public int getFY() {
+    return fy;
+  }
+
+  public void putFY(int focusY) {
+    fy = focusY;
+  }
+
+  /**
+   * The column the cursor wants back when it moves vertically, which is not necessarily the one it is in: a cursor
+   * that was at column 40 and moves down onto a short line is at column 4, and moving up again should return it to
+   * 40. That wish is this window's, because the other window never asked for it.
+   */
+  public int getVirtualCX() {
+    return virtualCX;
+  }
+
+  public void putVirtualCX(int virtualColumn) {
+    virtualCX = virtualColumn;
+  }
+
+  public int getCursorQuantumStart() {
+    return quantumStart;
+  }
+
+  public void putCursorQuantumStart(int start) {
+    quantumStart = start;
+  }
+
+  /** Move the start of the range and bring the window with it, so a cursor can never be off screen. */
+  public void putCursorQuantumStartAndScroll(int start) {
+    putCursorQuantumStart(start);
+    while (getCanvasStart() > start) {
+      decrementCanvasStart();
+    }
+  }
+
+  public int getCursorQuantumEnd() {
+    return quantumEnd;
+  }
+
+  public void putCursorQuantumEnd(int end) {
+    quantumEnd = end;
+  }
+
+  public void putCursorQuantumEndAndScroll(int end) {
+    putCursorQuantumEnd(end);
+    int start = getCursorQuantumStart();
+    String cursorQuantumName = ((Quantum) getGlobalVar("cursorQuantum").getVal()).getName();
+    int limit = cursorQuantumName.equals("character") ? start : end;
+    while (getCanvasEnd() < limit) {
+      incrementCanvasStart();
+    }
+  }
+
+  public boolean getIsAtQuantumStart() {
+    return isAtQuantumStart;
+  }
+
+  public void putIsAtQuantumStart(boolean atQuantumStart) {
+    isAtQuantumStart = atQuantumStart;
+  }
+
+  public Quantum getCursorQuantum() {
+    return (Quantum) getGlobalVar("cursorQuantum").getVal();
+  }
+
   public int getSpan() {
     return (int) ((ObjectVisurVar) vars.get("span")).getVal();
   }
@@ -153,6 +306,13 @@ public class Session {
   public void putSpan(int s) {
     vars.put("span", ObjectVisurVar.make(s));
   }
+
+  private int quantumStart;
+  private int quantumEnd;
+  private boolean isAtQuantumStart;
+  private int virtualCX;
+  private int canvasStart;
+  private int fy;
 
   public int getCanvasWidth() {
     return viewport.cols();
@@ -165,6 +325,15 @@ public class Session {
   /** The grid this client said it can paint. Rows are content rows: the client subtracts its own chrome. */
   public void resize(int cols, int rows) {
     viewport = new Connections.Viewport(cols, rows);
+  }
+
+  /** One dimension at a time, because a test says "the window is this wide" and means the height stays. */
+  public void putCanvasWidth(int cols) {
+    resize(cols, getCanvasHeight());
+  }
+
+  public void putCanvasHeight(int rows) {
+    resize(getCanvasWidth(), rows);
   }
 
   public Integer getPendingCount() {

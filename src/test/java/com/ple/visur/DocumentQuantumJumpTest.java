@@ -30,9 +30,9 @@ class DocumentQuantumJumpTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(CONTENT);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
-    emc.putCanvasStart(0);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
+    emc.session().putCanvasStart(0);
     emc.putSpan(1);
     // inside "five" on line two, so neither end is where the cursor already is
     cursorAt(MIDDLE_OF_CONTENT, MIDDLE_OF_CONTENT - CONTENT.lastIndexOf('\n', MIDDLE_OF_CONTENT) - 1, 1);
@@ -58,7 +58,7 @@ class DocumentQuantumJumpTest {
     press("[");
     press("r");
     assertEquals(0, emc.getCA());
-    assertEquals(0, emc.getCursorQuantumEnd(), "and nothing is selected on arrival");
+    assertEquals(0, emc.session().getCursorQuantumEnd(), "and nothing is selected on arrival");
   }
 
   /**
@@ -80,7 +80,7 @@ class DocumentQuantumJumpTest {
     press("]");
     press("r");
     assertEquals(CONTENT.length(), emc.getCA());
-    assertEquals(CONTENT.length(), emc.getCursorQuantumEnd(), "and nothing is selected on arrival");
+    assertEquals(CONTENT.length(), emc.session().getCursorQuantumEnd(), "and nothing is selected on arrival");
   }
 
   /**
@@ -95,7 +95,7 @@ class DocumentQuantumJumpTest {
     press("]");
     press("r");
     assertEquals(CONTENT.length(), emc.getCA());
-    assertEquals(CONTENT.length(), emc.getCursorQuantumEnd(), "the whole document is not suddenly selected");
+    assertEquals(CONTENT.length(), emc.session().getCursorQuantumEnd(), "the whole document is not suddenly selected");
   }
 
   @Test
@@ -115,8 +115,8 @@ class DocumentQuantumJumpTest {
   private void cursorAt(int ca, int cx, int cy) {
     emc.putCX(cx);
     emc.putCY(cy);
-    emc.putVirtualCX(cx);
-    emc.putFY(cy);
+    emc.session().putVirtualCX(cx);
+    emc.session().putFY(cy);
     emc.putCA(ca);
     assertEquals(ca, emc.getCA());
   }

@@ -39,9 +39,9 @@ class OpenLineTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(TWO_LINES);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
-    emc.putCanvasStart(0);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
+    emc.session().putCanvasStart(0);
     emc.putSpan(1);
     cursorAt(0, 0, 0);
   }
@@ -158,7 +158,7 @@ class OpenLineTest {
     JsonObject drawn = drawn();
     assertEquals(3, drawn.getInteger("span"), "the three the user selected before the key");
     assertEquals("character", drawn.getString("cursorQuantum"));
-    assertTrue(emc.getCursorQuantumEnd() > emc.getCursorQuantumStart(), "a selection survived the round trip");
+    assertTrue(emc.session().getCursorQuantumEnd() > emc.session().getCursorQuantumStart(), "a selection survived the round trip");
   }
 
   /**
@@ -236,8 +236,8 @@ class OpenLineTest {
   private void cursorAt(int ca, int cx, int cy) {
     emc.putCX(cx);
     emc.putCY(cy);
-    emc.putVirtualCX(cx);
-    emc.putFY(cy);
+    emc.session().putVirtualCX(cx);
+    emc.session().putFY(cy);
     emc.putCA(ca);
     assertEquals(ca, emc.getCA());
   }

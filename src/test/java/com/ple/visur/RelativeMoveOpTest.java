@@ -28,15 +28,15 @@ class RelativeMoveOpTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(CONTENT);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
     emc.putCA(0);
     emc.putCX(0);
     emc.putCY(0);
-    emc.putVirtualCX(0);
-    emc.putCanvasStart(0);
-    emc.putFY(0);
+    emc.session().putVirtualCX(0);
+    emc.session().putCanvasStart(0);
+    emc.session().putFY(0);
     emc.putSpan(1);
   }
 
@@ -58,8 +58,8 @@ class RelativeMoveOpTest {
     move(0, 1);
     move(0, 1); // and onto "three"
     assertEquals(1, emc.getSpan());
-    assertEquals(9, emc.getCursorQuantumStart());
-    assertEquals(15, emc.getCursorQuantumEnd());
+    assertEquals(9, emc.session().getCursorQuantumStart());
+    assertEquals(15, emc.session().getCursorQuantumEnd());
   }
 
   /**
@@ -77,7 +77,7 @@ class RelativeMoveOpTest {
   }
 
   private int selectedWidth() {
-    return emc.getCursorQuantumEnd() - emc.getCursorQuantumStart();
+    return emc.session().getCursorQuantumEnd() - emc.session().getCursorQuantumStart();
   }
 
   private void move(int dx, int dy) {

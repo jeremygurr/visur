@@ -76,8 +76,8 @@ public class SessionText {
     emc.putCA(endOfLastCopy);
     int[] bounds = emc.getCursorQuantum()
       .getBoundaries(endOfLastCopy, emc.getNextLineIndices(), emc.getSpan(), false);
-    emc.putCursorQuantumStartAndScroll(bounds[0]);
-    emc.putCursorQuantumEndAndScroll(bounds[1]);
+    emc.session().putCursorQuantumStartAndScroll(bounds[0]);
+    emc.session().putCursorQuantumEndAndScroll(bounds[1]);
   }
 
   private static Integer stashedCount(EditorModelCoupler emc) {

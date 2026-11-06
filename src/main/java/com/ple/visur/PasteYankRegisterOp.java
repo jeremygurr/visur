@@ -22,8 +22,8 @@ public class PasteYankRegisterOp implements Operator {
     String pasted = value.repeat(CountPrefix.countOrOne(emc));
     if (pasted.isEmpty()) return;
     String content = emc.getEditorContent();
-    int start = Math.min(emc.getCursorQuantumStart(), content.length());
-    int end = Math.min(Math.max(emc.getCursorQuantumEnd(), start), content.length());
+    int start = Math.min(emc.session().getCursorQuantumStart(), content.length());
+    int end = Math.min(Math.max(emc.session().getCursorQuantumEnd(), start), content.length());
     String displaced = content.substring(start, end);
     emc.putEditorContent(content.substring(0, start) + pasted + content.substring(end));
     // The register records what this keypress removed, and only then.
@@ -34,9 +34,9 @@ public class PasteYankRegisterOp implements Operator {
     int cursor = start + pasted.length() - 1;
     emc.putCA(cursor);
     int[] bounds = emc.getCursorQuantum().getBoundaries(cursor, emc.getNextLineIndices(), 0, false);
-    emc.putCursorQuantumStartAndScroll(bounds[0]);
-    emc.putCursorQuantumEndAndScroll(bounds[1]);
+    emc.session().putCursorQuantumStartAndScroll(bounds[0]);
+    emc.session().putCursorQuantumEndAndScroll(bounds[1]);
     emc.putSpan(0);
-    emc.putIsAtQuantumStart(true);
+    emc.session().putIsAtQuantumStart(true);
   }
 }

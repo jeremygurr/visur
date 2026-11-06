@@ -21,7 +21,7 @@ class ToggleSeparatorsOpTest {
     emc.putCA(0);
     emc.putCX(0);
     emc.putCY(0);
-    emc.putVirtualCX(0);
+    emc.session().putVirtualCX(0);
     emc.putSpan(1);
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
   }

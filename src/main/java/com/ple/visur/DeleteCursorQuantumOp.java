@@ -23,13 +23,13 @@ public class DeleteCursorQuantumOp implements Operator {
       if(ca >= resultingEditorContent.length()) {
         ca = resultingEditorContent.length() > 0 ? resultingEditorContent.length() - 1 : 0;
         emc.putCA(ca);
-        emc.putVirtualCX(emc.getCX());
+        emc.session().putVirtualCX(emc.getCX());
       }
       // The range collapses to the gap the delete made, while the span survives: a window re-derived over the text
       // that slid into the deleted one would be a highlight over text nobody selected, and p (ticket 03) would eat it
       // instead of putting what d removed back. Moving re-derives the window at the span still in the model.
-      emc.putCursorQuantumStartAndScroll(startBound);
-      emc.putCursorQuantumEndAndScroll(startBound);
+      emc.session().putCursorQuantumStartAndScroll(startBound);
+      emc.session().putCursorQuantumEndAndScroll(startBound);
     }
   }
 

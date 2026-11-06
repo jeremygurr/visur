@@ -58,7 +58,7 @@ public class CharacterQuantum extends Quantum {
     int endLimit = span > 0 ? contentEnd - 1 : contentEnd;
     if(ca + 1 <= endLimit) {
       emc.putCA(++ca);
-      emc.putVirtualCX(emc.getCX());
+      emc.session().putVirtualCX(emc.getCX());
     }
     return ca;
   }
@@ -67,16 +67,16 @@ public class CharacterQuantum extends Quantum {
     int ca = emc.getCA();
     if(ca > 0) {
       emc.putCA(--ca);
-      emc.putVirtualCX(emc.getCX());
+      emc.session().putVirtualCX(emc.getCX());
     }
     return ca;
   }
 
   private int moveDown(ArrayList<Integer> nl, int span) {
     int cx = emc.getCX();
-    int vcx = emc.getVirtualCX();
+    int vcx = emc.session().getVirtualCX();
     int cy = emc.getCY();
-    int canvasWidth = emc.getCanvasWidth();
+    int canvasWidth = emc.session().getCanvasWidth();
     int[] shortBounds = RelativeLineBoundCalculator.getShort(cx, cy, nl);
     boolean isOnLastShortLineInLongLine = shortBounds[1] - shortBounds[0] < canvasWidth;
     boolean isAtEndOfEditorContent = getIsAtEndOfEditorContent(nl, cy, span, isOnLastShortLineInLongLine);
@@ -92,7 +92,7 @@ public class CharacterQuantum extends Quantum {
     int longLineLimit = span > 0 || shouldDecrementLongLineLength ? longLineLength - 1 : longLineLength;
     cx = Math.min(vcx, longLineLimit);
     emc.putCX(cx);
-    emc.putVirtualCX(vcx);
+    emc.session().putVirtualCX(vcx);
     return emc.getCA();
   }
 
@@ -111,8 +111,8 @@ public class CharacterQuantum extends Quantum {
   private int moveUp(ArrayList<Integer> nextLineIndices) {
     int cx = emc.getCX();
     int cy = emc.getCY();
-    int canvasWidth = emc.getCanvasWidth();
-    int vcx = emc.getVirtualCX();
+    int canvasWidth = emc.session().getCanvasWidth();
+    int vcx = emc.session().getVirtualCX();
     boolean isOnFirstLongLine = cy == 0;
     boolean isOnFirstShortLine = cx < canvasWidth;
     boolean shouldDecrementCY = !isOnFirstLongLine && isOnFirstShortLine;
@@ -127,7 +127,7 @@ public class CharacterQuantum extends Quantum {
       cx = vcx;
     }
     emc.putCX(cx);
-    emc.putVirtualCX(vcx);
+    emc.session().putVirtualCX(vcx);
     return emc.getCA();
   }
 

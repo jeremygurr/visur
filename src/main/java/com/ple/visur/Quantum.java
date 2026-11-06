@@ -32,7 +32,7 @@ public abstract class Quantum implements Shareable {
    */
   int[] operatorExtent() {
     int units = CountPrefix.countOrOne(emc) * emc.getSpan();
-    return getBoundaries(emc.getCursorQuantumStart(), emc.getNextLineIndices(), units, false);
+    return getBoundaries(emc.session().getCursorQuantumStart(), emc.getNextLineIndices(), units, false);
   }
 
   /**
@@ -51,13 +51,13 @@ public abstract class Quantum implements Shareable {
     int[] frameBounds = frameQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
     ca = frameBounds[0];
     emc.putCA(ca);
-    emc.putVirtualCX(emc.getCX());
+    emc.session().putVirtualCX(emc.getCX());
     int[] newCursorBounds = cursorQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
     if(actualSpan == 0) {
       newCursorBounds[1] = newCursorBounds[0];
     }
-    emc.putCursorQuantumStartAndScroll(newCursorBounds[0]);
-    emc.putCursorQuantumEndAndScroll(newCursorBounds[1]);
+    emc.session().putCursorQuantumStartAndScroll(newCursorBounds[0]);
+    emc.session().putCursorQuantumEndAndScroll(newCursorBounds[1]);
     setSmallestQuantum(cursorQuantum);
   }
 
@@ -80,10 +80,10 @@ public abstract class Quantum implements Shareable {
     int[] frameBounds = frameQuantum.getBoundaries(ca, emc.getNextLineIndices(), jumpUnits, false);
     ca = actualSpan > 0 ? frameBounds[1] - 1 : frameBounds[1];
     emc.putCA(ca);
-    emc.putVirtualCX(emc.getCX());
+    emc.session().putVirtualCX(emc.getCX());
     int[] newCursorBounds = cursorQuantum.getBoundaries(ca, emc.getNextLineIndices(), spanMinimumOne, false);
-    emc.putCursorQuantumStartAndScroll(newCursorBounds[0]);
-    emc.putCursorQuantumEndAndScroll(newCursorBounds[1]);
+    emc.session().putCursorQuantumStartAndScroll(newCursorBounds[0]);
+    emc.session().putCursorQuantumEndAndScroll(newCursorBounds[1]);
     setSmallestQuantum(cursorQuantum);
   }
 

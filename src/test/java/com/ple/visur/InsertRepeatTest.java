@@ -30,9 +30,9 @@ class InsertRepeatTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(TWO_LINES);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
-    emc.putCanvasStart(0);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
+    emc.session().putCanvasStart(0);
     emc.putSpan(1);
     chooseCursorQuantum("line");
     cursorAt(0, 0, 0);
@@ -94,7 +94,7 @@ class InsertRepeatTest {
 
     assertEquals("one\nabcabcabctwo", emc.getEditorContent());
     assertEquals(4, emc.getCA(), "where typing the same text by hand leaves it");
-    assertEquals(16, emc.getCursorQuantumEnd(), "restored over the run the three copies made");
+    assertEquals(16, emc.session().getCursorQuantumEnd(), "restored over the run the three copies made");
   }
 
   /** The fourth key of the mechanism: {@code 3 a} types at the end of the word and repeats from there. */
@@ -231,8 +231,8 @@ class InsertRepeatTest {
   private void cursorAt(int ca, int cx, int cy) {
     emc.putCX(cx);
     emc.putCY(cy);
-    emc.putVirtualCX(cx);
-    emc.putFY(cy);
+    emc.session().putVirtualCX(cx);
+    emc.session().putFY(cy);
     emc.putCA(ca);
     assertEquals(ca, emc.getCA());
   }

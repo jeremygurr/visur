@@ -67,7 +67,7 @@ public class LineQuantum extends Quantum {
         mv.dx++;
       }
       emc.putCA(ca);
-      emc.putVirtualCX(emc.getCX());
+      emc.session().putVirtualCX(emc.getCX());
     }
     return ca;
   }
@@ -77,7 +77,7 @@ public class LineQuantum extends Quantum {
     if(cy < nl.size() - 1) {
       emc.putCY(++cy);
       int newLongLineLength = RelativeLineBoundCalculator.getLongLineLength(cy, nl);
-      int vcx = emc.getVirtualCX();
+      int vcx = emc.session().getVirtualCX();
       int lineEndLimit = newLongLineLength - 1;
       int cx = Math.min(vcx, lineEndLimit);
       emc.putCX(cx);
@@ -90,7 +90,7 @@ public class LineQuantum extends Quantum {
     if(cy > 0) {
       emc.putCY(--cy);
       int newLongLineLength = RelativeLineBoundCalculator.getLongLineLength(cy, nl);
-      int vcx = emc.getVirtualCX();
+      int vcx = emc.session().getVirtualCX();
       int lineEndLimit = cy == nl.size() - 1 ? newLongLineLength : newLongLineLength - 1;
       int cx = Math.min(vcx, lineEndLimit);
       emc.putCX(cx);

@@ -42,15 +42,15 @@ class QuantumFrameTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(A_LINE_OF_WORDS + TWENTY_FIVE_BLANK_LINES + A_LINE_OF_SHORT_WORDS);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
     character = emc.getQuantumNameToQuantum().get("character");
     emc.putCursorQuantum(character);
     emc.putCX(COLUMN_IN_THAT_LINE);
     emc.putCY(BLANK_LINE_NUMBER);
-    emc.putVirtualCX(COLUMN_IN_THAT_LINE);
-    emc.putCanvasStart(0);
-    emc.putFY(BLANK_LINE_NUMBER);
+    emc.session().putVirtualCX(COLUMN_IN_THAT_LINE);
+    emc.session().putCanvasStart(0);
+    emc.session().putFY(BLANK_LINE_NUMBER);
     emc.putCA(A_BLANK_LINE);
     assertEquals(A_BLANK_LINE, emc.getCA()); // cx and cy agree with ca, so nothing recomputes it under the jump
   }
@@ -104,16 +104,16 @@ class QuantumFrameTest {
     emc.putEditorContent("a b\n");
     emc.putCX(0);
     emc.putCY(0);
-    emc.putVirtualCX(0);
-    emc.putFY(0);
+    emc.session().putVirtualCX(0);
+    emc.session().putFY(0);
     emc.putCA(0);
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
     emc.putSpan(1);
     emc.putOnExecutionDataStack("character");
     emc.getQuantumNameToQuantum().get("word").quantumEnd(); // the keystroke ] q, with words as the cursor quantum
     assertEquals("character", emc.getCursorQuantum().getName());
-    assertEquals(1, emc.getCursorQuantumStart());
-    assertEquals(2, emc.getCursorQuantumEnd());
+    assertEquals(1, emc.session().getCursorQuantumStart());
+    assertEquals(2, emc.session().getCursorQuantumEnd());
   }
 
   /**
@@ -132,8 +132,8 @@ class QuantumFrameTest {
       + "one two three four five six seven eight nine ten eleven twelve thirteen\n");
     emc.putCX(0);
     emc.putCY(0);
-    emc.putVirtualCX(0);
-    emc.putFY(0);
+    emc.session().putVirtualCX(0);
+    emc.session().putFY(0);
     emc.putCA(0);
     emc.putCursorQuantum(emc.getQuantumNameToQuantum().get("word"));
     emc.putSpan(20);

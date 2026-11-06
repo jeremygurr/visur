@@ -38,9 +38,9 @@ class MovementCountTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath(""); // keep the swap-file hook away from the working tree
     emc.putEditorContent(CONTENT);
-    emc.putCanvasWidth(80);
-    emc.putCanvasHeight(24);
-    emc.putCanvasStart(0);
+    emc.session().putCanvasWidth(80);
+    emc.session().putCanvasHeight(24);
+    emc.session().putCanvasStart(0);
     emc.putSpan(1);
     cursorAt(0, 0, 0);
   }
@@ -64,8 +64,8 @@ class MovementCountTest {
     press("3");
     press("l");
     assertEquals(FOURTH_WORD, emc.getCA());
-    assertEquals(FOURTH_WORD, emc.getCursorQuantumStart());
-    assertEquals(19, emc.getCursorQuantumEnd(), "and it selects the word it landed on");
+    assertEquals(FOURTH_WORD, emc.session().getCursorQuantumStart());
+    assertEquals(19, emc.session().getCursorQuantumEnd(), "and it selects the word it landed on");
   }
 
   /**
@@ -79,7 +79,7 @@ class MovementCountTest {
     press("l"); // onto "two"
     press("5");
     press("s");
-    assertEquals(CONTENT.indexOf("six") + 3, emc.getCursorQuantumEnd(), "five words wide from here");
+    assertEquals(CONTENT.indexOf("six") + 3, emc.session().getCursorQuantumEnd(), "five words wide from here");
 
     press("l");
 
@@ -156,8 +156,8 @@ class MovementCountTest {
     press("]");
     press("q");
     assertEquals(LAST_CHARACTER_OF_LINE_ONE, emc.getCA());
-    assertEquals(23, emc.getCursorQuantumStart());
-    assertEquals(24, emc.getCursorQuantumEnd());
+    assertEquals(23, emc.session().getCursorQuantumStart());
+    assertEquals(24, emc.session().getCursorQuantumEnd());
   }
 
   @Test
@@ -167,8 +167,8 @@ class MovementCountTest {
     press("]");
     press("q");
     assertEquals(LAST_CHARACTER_OF_LINE_ONE, emc.getCA(), "the span widens the selection, not the jump");
-    assertEquals(23, emc.getCursorQuantumStart());
-    assertEquals(28, emc.getCursorQuantumEnd());
+    assertEquals(23, emc.session().getCursorQuantumStart());
+    assertEquals(28, emc.session().getCursorQuantumEnd());
   }
 
   @Test
@@ -216,8 +216,8 @@ class MovementCountTest {
   private void cursorAt(int ca, int cx, int cy) {
     emc.putCX(cx);
     emc.putCY(cy);
-    emc.putVirtualCX(cx);
-    emc.putFY(cy);
+    emc.session().putVirtualCX(cx);
+    emc.session().putFY(cy);
     emc.putCA(ca);
     assertEquals(ca, emc.getCA());
   }

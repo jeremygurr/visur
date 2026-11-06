@@ -49,7 +49,7 @@ class ViewportPerClientTest {
     emc = ServiceHolder.editorModelCoupler;
     emc.setSourceFilePath("");
     emc.putEditorContent(CONTENT);
-    emc.putCanvasStart(0);
+    emc.session().putCanvasStart(0);
     emc.putCA(0);
     Stack<EditorSubmode> submodes = new Stack<>();
     submodes.push(navigate);
