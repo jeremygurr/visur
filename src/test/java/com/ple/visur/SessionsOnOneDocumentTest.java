@@ -60,6 +60,42 @@ class SessionsOnOneDocumentTest {
   }
 
   @Test
+  void whatIsBeingTypedInInsertModeBelongsToTheWindowTypingIt() {
+    try (WireClient first = new WireClient(vertx, port, 40, 10);
+         WireClient second = new WireClient(vertx, port, 40, 10)) {
+      // One window is mid-insert with a count of three. It has typed "ab" and not left insert mode.
+      first.presses("3");
+      first.presses("i");
+      first.types("ab");
+
+      // The other window opens its own insert with no count at all. A count that lives in the shared model would
+      // pay out here: three copies of this character, because the only count in the editor belongs to the other
+      // window, and the typed text it repeats would be "ab" rather than "z".
+      second.presses("i");
+      second.presses("z");
+      second.presses("Escape");
+
+      assertEquals(1, occurrences(second.text(), "z"), "one copy: this window typed one character with no count");
+
+      // ...and the count is still owed where it was typed: two copies of "ab" remain of the three, one having been
+      // typed. Length rather than a count of "ab", because the copies land inside the run they repeat.
+      int charactersBefore = second.text().length();
+      first.presses("Escape");
+      assertEquals(charactersBefore + 4, first.text().length(),
+        "the first window still gets the copies its own count owes");
+      assertEquals(1, occurrences(first.text(), "z"), "and the other window's typing is not this window's to repeat");
+    }
+  }
+
+  static int occurrences(String haystack, String needle) {
+    int found = 0;
+    for (int at = haystack.indexOf(needle); at >= 0; at = haystack.indexOf(needle, at + 1)) {
+      found++;
+    }
+    return found;
+  }
+
+  @Test
   void oneDocumentIsOneDocument() {
     try (WireClient first = new WireClient(vertx, port, 40, 10);
          WireClient second = new WireClient(vertx, port, 40, 10)) {

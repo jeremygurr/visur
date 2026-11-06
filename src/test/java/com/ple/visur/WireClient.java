@@ -111,6 +111,16 @@ final class WireClient implements AutoCloseable {
     return view().getInteger("cursorQuantumStart");
   }
 
+  /** The document as it was painted, rows joined, styling gone. */
+  String text() {
+    var rows = view().getJsonArray("rows");
+    StringBuilder text = new StringBuilder();
+    for (int i = 0; i < rows.size(); i++) {
+      text.append(rows.getJsonObject(i).getString("text"));
+    }
+    return text.toString();
+  }
+
   int cursorCol() {
     return view().getInteger("cursorCol");
   }
