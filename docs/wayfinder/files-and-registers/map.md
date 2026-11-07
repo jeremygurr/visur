@@ -151,7 +151,7 @@ Facts established before a ticket was written, each of which changes how a ticke
 | ~~02~~ [closed](issues/02-viewport-per-client.md) | Viewport per client: `canvasWidth`/`canvasHeight` stop being global; fixes a live two-client bug | — |
 | ~~03~~ [closed](issues/03-document-session-split.md) | The split: `Document` owns content/path/undo/swap, `Session` owns cursor/quantum/span/viewport/mode/command line | 02 |
 | ~~04~~ [closed](issues/04-dirty-tracking.md) | Dirty is a comparison against the saved baseline; `*` in the mode line; undo back to saved clears it | 03 |
-| [05](issues/05-command-key-and-grammar.md) | `:` replaces `;`, bare paths, `:w` `:open` `:q` `:q!`, and the keypress test `;` never had | 01, 04 |
+| ~~05~~ [closed](issues/05-command-key-and-grammar.md) | `:` replaces `;`, bare paths, `:w` `:open` `:q` `:q!`, and the keypress test `;` never had | 01, 04 |
 | [06](issues/06-swap-files.md) | Swap files: nameless pool, browser state dir, never overwrite, delete on save, vim's three-way prompt for named files | 01, 04, 05 |
 | [07](issues/07-launch-argument.md) | `visur /path/to/file`, with a warning when a server is already running | 05 |
 | [08](issues/08-clipboard-transport.md) | Clipboard transport: outbound write request, inbound contents, server-side cache, one write per command | 01 |
@@ -181,6 +181,19 @@ that any command can leave words on, and two file commands read arguments out of
 05's grammar is where that gets settled, and `clearEDS` (used by exactly two commands today) is the precedent it will
 either generalize or throw away.
 
+**05 changed two things about this table while it was open.** First, `:q` is a window leaving and not the server stopping —
+the socket that asked closes normally, the terminal exits 0, the launcher keeps the process, and `ZD` remains the only way
+to stop it. [07](issues/07-launch-argument.md) inherits that split: the launcher owns the process, and the editor can only
+ever let go of a window. Second, `:open` now takes a bare path, so `visur /path/to/file` has somewhere to hand the path
+that already works, and 07 is a launcher argument rather than a new command.
+
+It also did not do what the ticket sketched: the bare-path matcher is not in `compile`'s matcher list, because a matcher
+that claims any unrecognised word would turn every typo in every keymap sentence into a string literal — the bug the
+ticket was written to fix, moved rather than fixed. The command line got its own grammar
+(`CommandCompileService.compileCommandLine`). Anything that wants to be a `:` command in future — `:reg`, `:freeze`, a
+clipboard command from [08](issues/08-clipboard-transport.md) — is a case in that switch and not a word in the sentence
+grammar.
+
 ## Known broken, nobody's ticket yet
 
 Found while working, verified, and left alone because nothing above owns it. Each entry says how it was seen, because
@@ -197,6 +210,14 @@ Found while working, verified, and left alone because nothing above owns it. Eac
   it became a known failure rather than a regression. It is opt-in (`VISUR_E2E=1`), which is why it survives: a test
   nobody runs cannot rot loudly. What it needs is what [07](issues/07-launch-argument.md) will make possible — a server
   per test, its own port, its own seed file — so it is recorded at the test as well as here.
+- **`ZZ` does not save, in the terminal.** `zseq::resolve` maps `Z` `Z` to `Effect::SaveAndDetach`, and `main::finish`
+  handles every non-`Quit` effect by exiting 0 — so the terminal detaches and nothing is ever sent to the server. The
+  server *has* had a `ZZ → saveFile` binding the whole time (ticket 04 pressed it over a raw socket and it wrote the file),
+  so the behaviour differs depending on whether a terminal is in the way, and `docs/reference/keys.md` says `ZZ` saves the
+  file. The comment in `zseq.rs` is honest about why: "saving has nothing to save until file I/O exists" — file I/O
+  exists. The fix is three lines: forward `ZZ` as a key, then finish with the same 0, and a pty test that the fake server
+  was sent a `ZZ` key frame before the client exited. Not done here because ticket 05 owns `:`, not the `Z` prefix; if the
+  next touch of `zseq.rs` is not soon, `keys.md` should stop promising a save.
 - **Boot prints `operator previousSearchTarget not recognized.` twice.** The `n`/`N` keymap sentences are compiled once
   at startup, `NativeOpWord` is tried before `RecallWord` and prints for any word it does not know, and the search target
   is not a search target until a search has happened. Cosmetic at boot, but it is the same matcher-list shape 05 is
