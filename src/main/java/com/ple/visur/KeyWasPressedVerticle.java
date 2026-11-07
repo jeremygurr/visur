@@ -47,6 +47,14 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
     // Before the key runs, not after: a message reports what the last thing the user asked for did, and the key they
     // are pressing now is what makes it stale. Clearing afterwards would erase the message this very key reports.
     emc.session().clearMessage();
+    if(emc.session().getPendingOffer() != null) {
+      // The question owns the keyboard. Three keys answer it and every other key is the safe answer — not swallowed by
+      // accident and not obeyed either, because a user who meant `j` and finds a version of a file chosen deserves
+      // better than either, and `j` is not one of the three.
+      RecoveryOffer pending = emc.session().getPendingOffer();
+      pending.answer(RecoveryOffer.answerFor(key));
+      return;
+    }
     if(CountPrefix.record(emc, key)) {
       return; // a digit in navigate mode is the count for the next key, not a command of its own
     }

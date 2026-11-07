@@ -7,6 +7,10 @@ public class ServiceHolder {
   }
 
   ServiceHolder() {
+    // A new model means no windows on it, and the sessions live in a static map because a socket id is the only name
+    // they have. Without this the session outlives the model it was reading: the next test in the JVM inherits the last
+    // one's cursor, its command line and — the case that proved it — a question it was never asked and cannot unhear.
+    Connections.closeAll();
     editorModelCoupler = EditorModelCoupler.make();
     commandCompileService = CommandCompileService.make();
     initializerService = InitializerService.make(editorModelCoupler);

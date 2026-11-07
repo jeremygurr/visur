@@ -47,38 +47,52 @@ public class LoadFileOp implements Operator {
         emc.session().reportError("loadFile: not a regular file: " + filePath);
         return;
       }
-      byte[] bytes = Files.readAllBytes(path);
-      String content = new String(bytes, StandardCharsets.UTF_8);
-      // Replace the document content. As-saved: this text is what the file holds, so it is not unsaved work.
-      emc.document().putContentAsSaved(content);
-
-      // Reset cursor to (0,0)
-      emc.session().putCA(0);
-      emc.session().putVirtualCX(0);
-      emc.session().putCanvasStart(0);
-      emc.session().putFY(0);
-
-      // Recompute line indices (this handles newline tracking)
-      emc.document().updateNextLineIndices();
-
-      // Update span based on content length
-      if (content.length() > 0) {
-        emc.session().putSpan(1);
-      } else {
-        emc.session().putSpan(0);
+      Path swap = SwapFiles.beside(path.toFile());
+      if (Files.exists(swap)) {
+        // The file is not the whole story, and there is no safe guess about which half to believe. The open stops here
+        // rather than loading and complaining afterwards, because afterwards there is only one version left to choose.
+        RecoveryOffer offer = new RecoveryOffer(filePath, swap);
+        emc.session().putPendingOffer(offer);
+        emc.session().putMessage(offer.question());
+        return;
       }
 
-      // This file becomes the new remembered source
-      emc.document().setSourceFilePath(filePath);
-
-      // A different document is not this document's history: u would paste one file's text into another's.
-      emc.document().getUndoHistory().clear();
-
-      // Exit command state (it's been executed successfully)
-      // Note: CommandStateService.exitCommandState() handles this
-
+      String content = Files.readString(path, StandardCharsets.UTF_8);
+      install(emc, filePath, content, true);
     } catch (IOException e) {
       emc.session().reportError("loadFile: " + e.getMessage());
     }
+  }
+
+  /**
+   * Make this text be this file's document: content, cursor, scroll window, undo history, source path.
+   *
+   * <p>{@code asSaved} is the whole difference between opening a file and recovering a swap: one is what the disk
+   * holds, the other is text the disk has never seen, and only the first earns a clean mode line.
+   *
+   * <p>Static and public to the package because an answer to a {@link RecoveryOffer} opens a file too, and a second
+   * copy of this reset is a second chance for the two doors to disagree about where the cursor goes.
+   */
+  static void install(EditorModelCoupler emc, String filePath, String content, boolean asSaved) {
+    emc.document().putReadOnly(false);
+    if (asSaved) {
+      emc.document().putContentAsSaved(content);
+    } else {
+      emc.document().putContent(content);
+    }
+
+    emc.session().putCA(0);
+    emc.session().putVirtualCX(0);
+    emc.session().putCanvasStart(0);
+    emc.session().putFY(0);
+
+    emc.document().updateNextLineIndices();
+    emc.session().putSpan(content.length() > 0 ? 1 : 0);
+
+    // This file becomes the new remembered source, which also puts down the swap of the name before it.
+    emc.document().setSourceFilePath(filePath);
+
+    // A different document is not this document's history: u would paste one file's text into another's.
+    emc.document().getUndoHistory().clear();
   }
 }

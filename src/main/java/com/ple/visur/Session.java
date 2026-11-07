@@ -29,6 +29,21 @@ public class Session {
   private Connections.Viewport viewport = UNTOLD;
 
   /**
+   * A question this window has been asked and not answered: a file whose swap still holds work, waiting for the three
+   * keys that mean something. While one is pending the keyboard belongs to it, which is the only way an answer can be
+   * guaranteed to be an answer.
+   */
+  private RecoveryOffer pendingOffer;
+
+  public RecoveryOffer getPendingOffer() {
+    return pendingOffer;
+  }
+
+  public void putPendingOffer(RecoveryOffer offer) {
+    pendingOffer = offer;
+  }
+
+  /**
    * What kind of client is on the other end, as soon as it says so. It decides one thing: the directory a nameless
    * buffer's swap is claimed from. Null until the window declares itself, which is the state most tests live in.
    */
@@ -395,9 +410,13 @@ public class Session {
    * indistinguishable to anyone not reading the server log. The log half stays because a message on screen is gone on
    * the next keypress and a bug report outlives it.
    */
+  public void putMessage(String message) {
+    this.message = message;
+  }
+
   public void reportError(String problem) {
     System.out.println(problem);
-    message = problem;
+    putMessage(problem);
   }
 
   /** The message to draw, or empty when there is none: the field is always present on the wire. */

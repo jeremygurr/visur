@@ -147,6 +147,20 @@ public class Document {
   }
 
   /** Null means this text has no name yet, which is a document that has never been saved rather than a missing value. */
+  /**
+   * Whether this window was told it is only looking, which is the answer someone gives when they are not sure. It
+   * refuses a plain {@code :w} and nothing else: a path typed out, or a new file opened, are both louder than a flag.
+   */
+  private boolean readOnly;
+
+  public boolean isReadOnly() {
+    return readOnly;
+  }
+
+  public void putReadOnly(boolean readOnly) {
+    this.readOnly = readOnly;
+  }
+
   public String getSourceFilePath() {
     return sourceFilePath;
   }

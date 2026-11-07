@@ -28,7 +28,14 @@ public class SaveFileOp implements Operator {
     }
 
     String filePath = targetPath;
-    if (filePath == null || filePath.isEmpty()) {
+    boolean toldWhere = targetPath != null && !targetPath.isEmpty();
+    if (!toldWhere && emc.document().isReadOnly()) {
+      // The window said it was only looking, and that answer was about this file. A path typed out is a different
+      // statement, so `:w elsewhere` still works: the way out of a read-only file is to say which file you mean.
+      emc.session().reportError("read-only: :w a path writes somewhere else");
+      return;
+    }
+    if (!toldWhere) {
       filePath = emc.document().getSourceFilePath();
     }
     if (filePath == null || filePath.isEmpty()) {
@@ -65,6 +72,9 @@ public class SaveFileOp implements Operator {
       // The text in memory is now the text in that file, so the mode line stops saying otherwise. Only here: the
       // catch below reports and returns, and a save that failed has not made anything safe.
       emc.document().markSaved();
+      // Text that has been written is not being looked at any more, whichever file it went to: the read-only answer
+      // was about not making a file worse, and this one just got the text.
+      emc.document().putReadOnly(false);
     } catch (IOException e) {
       if (tempFile != null) {
         try { Files.deleteIfExists(tempFile); } catch (IOException ignored) {}
