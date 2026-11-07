@@ -256,10 +256,12 @@ class CommandLineTest {
   void colonQBangDiscardsTheSwapFileAndLeaves() throws IOException {
     Path file = tempDir.resolve("discard.txt");
     Files.writeString(file, "what the file has\n");
-    Path swap = Path.of(file + ".visur-swap");
-    Files.writeString(swap, "what only the buffer has\n");
     emc.document().setSourceFilePath(file.toString());
     emc.document().putContentAsSaved("what the file has\n");
+    // Written after the path is set, because taking a name throws away the swap of the name before it, and this file is
+    // the swap of *this* name: the crash that left it is the thing `:q!` is answering.
+    Path swap = tempDir.resolve(".discard.txt.swp");
+    Files.writeString(swap, "what only the buffer has\n");
     press("i");
     press("x");
     press("Escape");

@@ -1,34 +1,22 @@
 package com.ple.visur;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-
 /**
  * {@code :q!} — leave, and throw away what was never saved.
  *
- * <p>The swap file goes with the work, and leaving it behind is a bug with a delay attached: the swap is what the next
- * boot loads instead of the file, so discarding text in one session would resurrect it in the next. The file being
- * edited is not touched — discarding the buffer says nothing about what is on disk, and only a save ever speaks for that.
+ * <p>The swap goes with the work, and only when the work really is being thrown away. That last part is what a shared
+ * document forces: a swap belongs to the document, and {@code :q!} closes a window, so while another window is still
+ * editing this text its insurance stays — deleting it would leave the window that stayed behind one crash away from
+ * losing the file, which is not what anybody who typed {@code :q!} into a second tab agreed to.
  *
- * <p>The path is the disk's name for the swap, spelled out here as it is in two other places; ticket 06 replaces this
- * one-swap-per-document scheme with a nameless pool, and that is when the spelling gets one owner.
+ * <p>The file being edited is never touched. Discarding a buffer says nothing about what is on disk, and only a save
+ * ever speaks for that.
  */
 public class QuitDiscardingOp implements Operator {
   @Override
   public void execute(Object opInfo) {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
-    String source = emc.document().getSourceFilePath();
-    if(source != null && !source.isEmpty()) {
-      Path swap = Paths.get(source + ".visur-swap");
-      try {
-        Files.deleteIfExists(swap);
-      } catch (IOException failure) {
-        // Worth a message and not worth refusing the quit for: the window is leaving either way, and the text it was
-        // discarding is out of memory regardless of what the disk says about its copy.
-        emc.session().reportError(":q! could not delete the swap file: " + failure.getMessage());
-      }
+    if (Connections.count() <= 1) {
+      emc.document().deleteSwap();
     }
     emc.session().putQuitWasRequested(true);
   }

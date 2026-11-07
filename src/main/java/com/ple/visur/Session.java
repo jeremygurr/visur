@@ -29,6 +29,12 @@ public class Session {
   private Connections.Viewport viewport = UNTOLD;
 
   /**
+   * What kind of client is on the other end, as soon as it says so. It decides one thing: the directory a nameless
+   * buffer's swap is claimed from. Null until the window declares itself, which is the state most tests live in.
+   */
+  private ClientKind clientKind;
+
+  /**
    * The window's named variables — the ones the keymap grammar shuffles by name.
    *
    * <p>Commands are written as strings, and a string names a variable: {@code "span" "tempSpan" ->} stashes the
@@ -58,6 +64,15 @@ public class Session {
    * that a count of zero can mean zero rather than "no count".
    */
   private Integer pendingCount;
+
+  /** What the client said it is, when it declared its viewport. */
+  public void declareClientKind(ClientKind kind) {
+    clientKind = kind;
+  }
+
+  public ClientKind getClientKind() {
+    return clientKind;
+  }
 
   Session() {
     openFresh();

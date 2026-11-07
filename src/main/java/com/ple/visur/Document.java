@@ -3,6 +3,7 @@ package com.ple.visur;
 import CursorPositionDC.CursorPositionDCHolder;
 import DataClass.PrimitiveDataClassBrick;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -40,6 +41,13 @@ public class Document {
   private String savedContent = "";
 
   private String sourceFilePath;
+
+  /**
+   * The pool slot holding this document's text while it has no name, claimed by the first swap write and dropped when
+   * the document gets a name. A document keeps the slot it got: the nameless buffer worked on for an hour is still
+   * there tomorrow, in the same file.
+   */
+  private Path swapSlot;
   private final UndoHistory undoHistory = new UndoHistory();
 
   /**
@@ -139,27 +147,107 @@ public class Document {
     return sourceFilePath;
   }
 
+  /**
+   * Which file this text came from and goes back to.
+   *
+   * <p>Changing it abandons the old swap: a `.oldname.swp` left behind would offer its work for a file that is no
+   * longer the one on screen, and the offer would be answered by whoever opened that old name next.
+   */
   public void setSourceFilePath(String path) {
-    sourceFilePath = path;
-  }
-
-  private void writeSwapFileDebounced(String text) {
-    if (sourceFilePath == null || sourceFilePath.isEmpty()) {
+    String next = path == null ? "" : path;
+    String current = sourceFilePath == null ? "" : sourceFilePath;
+    if (next.equals(current)) {
+      // Still the same file, still the same swap. `:open` of the file that is already open gets here, and treating
+      // that as a rename would delete the swap of a document that has not changed hands.
       return;
     }
+    deleteSwap();
+    sourceFilePath = next;
+  }
+
+  /**
+   * Mirror the text to disk, at most twice a second.
+   *
+   * <p>The half-second hole is real and accepted: a swap per keystroke is a disk write per keystroke, so the last
+   * half-second of typing is what a crash costs. The write is also the only thing that claims a pool slot, so a
+   * document that was opened and never typed into leaves no trace.
+   */
+  private void writeSwapFileDebounced(String text) {
     long now = System.currentTimeMillis();
     if (now - lastSwapWriteTime < SWAP_DEBOUNCE_MS) {
       return;
     }
+    // Nothing to recover, nothing to leave a file for: a nameless empty buffer opening at boot must not claim a pool
+    // slot before the user has typed anything.
+    if (text.isEmpty()) {
+      return;
+    }
     lastSwapWriteTime = now;
     try {
-      Path swapPath = Paths.get(sourceFilePath + ".visur-swap");
-      Files.write(swapPath, text.getBytes(StandardCharsets.UTF_8),
+      Path swap = swapToWrite();
+      if (swap == null) {
+        return;
+      }
+      Files.createDirectories(swap.getParent());
+      Files.write(swap, text.getBytes(StandardCharsets.UTF_8),
         StandardOpenOption.WRITE, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
     } catch (IOException failure) {
       // Non-fatal: if the swap write fails the document is still correct, and there is nothing on screen to put
       // the failure in until the next keypress anyway.
       System.out.println("Swap write failed: " + failure.getMessage());
+    }
+  }
+
+  /**
+   * Where the text is mirrored. A document with a name mirrors beside it; a nameless one takes a slot from the pool of
+   * whichever window is typing, and holds that slot for as long as it is nameless.
+   *
+   * <p>Null is an answer and a safety: it means nowhere is known, which is what a window that has never introduced
+   * itself gets. Without it every test that edits a document without a socket would be writing into the tree.
+   */
+  private Path swapToWrite() throws IOException {
+    Path swap = swapPath();
+    if (swap != null) {
+      return swap;
+    }
+    Session window = ServiceHolder.editorModelCoupler == null ? null : ServiceHolder.editorModelCoupler.session();
+
+    Path pool = SwapFiles.poolDir(window);
+    if (pool == null) {
+      return null;
+    }
+    swapSlot = SwapFiles.claimSlot(pool);
+    return swapSlot;
+  }
+
+  /**
+   * This document's swap, whether it is a slot claimed from the pool or a file beside the one it came from. Null for a
+   * nameless document that has never written anything, which is the only kind that has no swap.
+   */
+  public Path swapPath() {
+    if (sourceFilePath != null && !sourceFilePath.isEmpty()) {
+      return SwapFiles.beside(new File(sourceFilePath));
+    }
+    return swapSlot;
+  }
+
+  /**
+   * Delete the swap, because it has stopped being true: the text reached a file, or the user said to throw it away.
+   *
+   * <p>A swap that outlives its text is worse than no swap, since it is offered as work someone has already either
+   * saved or rejected. The failure is printed and not fatal — the document is correct either way, and this runs at
+   * moments (a save, a quit) where refusing the user's actual request would be the worse outcome.
+   */
+  public void deleteSwap() {
+    Path swap = swapPath();
+    swapSlot = null;
+    if (swap == null) {
+      return;
+    }
+    try {
+      Files.deleteIfExists(swap);
+    } catch (IOException failure) {
+      System.out.println("Swap not deleted: " + failure.getMessage());
     }
   }
 }
