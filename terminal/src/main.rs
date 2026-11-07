@@ -240,7 +240,13 @@ fn act(socket: &mut transport::Socket, pending: &mut Pending, event: Event) -> S
       Step::Continue
     }
     Effect::Nothing => Step::Continue,
-    quit => Step::Finish(quit),
+    leaving @ (Effect::Detach | Effect::SaveAndDetach) => {
+      // Both of these leave the server running with no window, which is exactly when it stops holding a document — and
+      // it can only tell this from a dead network if it is told. `ZD` says nothing, because the server is being stopped.
+      transport::send_goodbye(socket);
+      Step::Finish(leaving)
+    }
+    Effect::Quit => Step::Finish(Effect::Quit),
   }
 }
 

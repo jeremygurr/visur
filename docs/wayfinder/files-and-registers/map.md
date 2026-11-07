@@ -307,3 +307,15 @@ Found while working, verified, and left alone because nothing above owns it. Eac
 - **A general chord vocabulary.** Clipboard keys are ordinary characters, so the terminal's deliberate
   drop-every-CONTROL/ALT/SUPER-chord rule is untouched.
 
+
+**A missing file is a document, and an idle server holds nothing.** Two rules went the other way once this map's first
+eight tickets were closed, and both are vim's. `:open /no/such/file` used to be an error — "a typo's answer is not a new
+document" — while `visur notes.txt` created one; the doors now agree, because the thing that actually protected the typo
+was never the refusal but `:open` refusing to replace unsaved work. And a server whose last window has gone no longer
+goes on holding the document: unsaved work goes to the file it belongs to, work with no file is dropped with its swap
+left to be asked about, and a socket that merely died — killed terminal, dropped network, a browser reloading its tab —
+is not a client that has decided anything, so it keeps everything. `ZQ` therefore says goodbye on the wire before it
+drops the socket: `windowWasClosed` is the whole difference between leaving and falling over, and the browser sends no
+such word, which is why a reload does not lose a document. The launcher's refusal came back with that in place, in the
+form the original ticket wanted: "is somebody editing?" is a question only the server can answer, `/status` answers it,
+and the refusal is exit 1 naming the document in the way. [07](issues/07-launch-argument.md) carries the detail.

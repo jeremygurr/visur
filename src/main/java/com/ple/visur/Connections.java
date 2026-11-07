@@ -39,6 +39,15 @@ public final class Connections {
 
   private static final Map<String, Session> byId = new ConcurrentHashMap<>();
 
+  /**
+   * The windows that said they were leaving.
+   *
+   * <p>A socket that merely died is not in here, and the difference is what the document's fate hangs off: a client
+   * that has gone away asked for its work to be put somewhere, and a connection that fell over is a client that never
+   * got the chance. See {@link ReleaseDocument}.
+   */
+  private static final Set<String> saidGoodbye = ConcurrentHashMap.newKeySet();
+
   private Connections() {
   }
 
@@ -82,6 +91,20 @@ public final class Connections {
   /** A socket closed. Its session goes with it, which is what keeps this map from growing by one per browser reload. */
   public static void close(String id) {
     byId.remove(id);
+    saidGoodbye.remove(id);
+  }
+
+  /** A client said it was going before it dropped the socket. */
+  public static void markLeftOnPurpose(String id) {
+    saidGoodbye.add(id);
+  }
+
+  /**
+   * Whether this window said goodbye, forgetting the answer: a connection is asked once, as it goes, and a dead id in
+   * that set is a fact about a socket that no longer exists.
+   */
+  public static boolean takeLeftOnPurpose(String id) {
+    return saidGoodbye.remove(id);
   }
 
   public static void resize(String id, int cols, int rows) {
@@ -105,6 +128,7 @@ public final class Connections {
    */
   public static void closeAll() {
     byId.clear();
+    saidGoodbye.clear();
   }
 
   /** How many sockets are being remembered. Zero means nothing has accumulated. */

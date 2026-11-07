@@ -10,6 +10,11 @@ public enum BusEvent {
   //sent by a client that received a bracketed paste; consumed by KeyWasPressedVerticle
   pasteWasReceived,
 
+  //sent by a client immediately before it closes its own socket, to say that this window is leaving rather than being
+  //lost. Answered by the socket that received it rather than by a verticle, because the answer is read by that socket's
+  //close handler and a bus message can arrive after it; see MainVerticle.
+  windowWasClosed,
+
   //sent by anything that changed the model; consumed by ModelWasChangedVerticle
   modelWasChanged,
 

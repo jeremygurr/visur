@@ -128,6 +128,22 @@ check "no second server was started" "$(grep -c 'starting one' "$LOG.out")" "0"
 check "the running server was left alone" "$(answering && echo up || echo down)" "up"
 stop_any_server
 
+echo "a file argument, when a window is already editing"
+# The stub answers /status the way a real server does, and says a window is attached. This is the launcher's one
+# refusal: one document per process, so a second window cannot be given a different file.
+STUB="$(stub_server)"
+printf '{"windows":1,"document":"/somewhere/else.txt"}' > "$SCRATCH/web/status"
+VISUR_SERVER="$STUB" VISUR_CLIENT="$(client_that_says_it_ran 21)" VISUR_LOG="$LOG" \
+  "$LAUNCHER" "$SCRATCH/notes.txt" >"$LOG.out" 2>&1
+status=$?
+check "it refuses" "$([ "$status" -ne 0 ] && echo refused || echo accepted)" "refused"
+check "the code for a file that was not opened" "$status" "1"
+check "no client was started" "$([ -e "$SCRATCH/client-21-ran" ] && echo ran || echo not-run)" "not-run"
+check "it names the document in the way" "$(grep -c '/somewhere/else.txt' "$LOG.out")" "1"
+check "and says what to do instead" "$(grep -c ':open' "$LOG.out")" "1"
+rm -f "$SCRATCH/web/status"
+stop_any_server
+
 echo "the file named for a window is the path the command was typed with"
 mkdir -p "$SCRATCH/project"
 (cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_that_records_its_url 11)" VISUR_LOG="$LOG" \

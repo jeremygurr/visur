@@ -554,6 +554,31 @@ fn the_client_detaches_when_the_server_lets_this_window_go() {
   );
 }
 
+/// `ZQ` is the client's own decision, and a socket dropping without a word looks exactly like a network that stopped.
+/// The server only puts a document down for a window that said it was going, so a client that detaches in silence would
+/// leave a server holding somebody's file indefinitely.
+#[test]
+fn detaching_says_goodbye_before_the_socket_goes() {
+  let (port, frames) = fake_server(Fake::Listen);
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+  let sink = Arc::clone(&frames);
+
+  // Keys written before the client has taken the terminal raw are eaten by the line discipline, so this waits for the
+  // first paint rather than racing the spawn.
+  assert!(terminal.wait_for(Duration::from_secs(2), |t| t.frames() > 0));
+  terminal.send("Z");
+  terminal.send("Q");
+  let said = terminal.wait_for(Duration::from_secs(3), |_| {
+    sink
+      .lock()
+      .unwrap()
+      .iter()
+      .any(|frame| frame.contains("\"windowWasClosed\""))
+  });
+  assert!(said, "ZQ has to say it is leaving: {:?}", frames.lock().unwrap());
+  assert_eq!(terminal.quit().code(), Some(0), "and it still leaves the server running");
+}
+
 #[test]
 fn the_client_leaves_and_restores_the_terminal_when_the_server_dies() {
   let (port, _) = fake_server(Fake::HangUp);
@@ -693,6 +718,29 @@ fn the_launcher_opens_the_file_it_was_given() {
   terminal.send("Z");
   terminal.send("Q");
   assert_eq!(terminal.quit().code(), Some(0), "ZQ should detach");
+
+  // The rule this check exists for as much as for the opening: once the last client is gone the server keeps no
+  // document. It arrived as a bug no Java test could see, because a Java test closes its socket properly and our own
+  // client simply exits — and a server answers those two events in different handlers.
+  let mut status = String::new();
+  for _ in 0..40 {
+    status = server_status();
+    if status.contains("\"windows\":0") && status.contains("\"document\":\"\"") {
+      break;
+    }
+    std::thread::sleep(std::time::Duration::from_millis(100));
+  }
+  assert!(status.contains("\"document\":\"\""), "the server is still holding a file: {status}");
+}
+
+/// What a server on the default port says about itself, which is how the launcher decides a file cannot be opened and
+/// how this check can see whether a document was put down.
+fn server_status() -> String {
+  std::process::Command::new("curl")
+    .args(["-sf", "--max-time", "1", "http://127.0.0.1:8888/status"])
+    .output()
+    .map(|answered| String::from_utf8_lossy(&answered.stdout).to_string())
+    .unwrap_or_default()
 }
 
 #[test]

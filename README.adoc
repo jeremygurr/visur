@@ -85,10 +85,15 @@ starting one if none is running, and stops only a server it started itself:
 ```
 
 A file argument is resolved against the directory the command is typed in, and it travels with the window that asked for
-it rather than with the server: `visur notes.txt` opens that file whether the server started a second ago or this morning,
-and a file that does not exist yet is the document you are about to write. The one thing that stops it is a window
-already editing — one document per process — and that is said on the screen where the newcomer can read it, not in the
-shell.
+it rather than with the server: `visur notes.txt` opens that file whether the server started a second ago or this morning.
+A file that does not exist yet is the document you are about to write, from either door — `:open notes.txt` says the same
+thing about the same missing file, and `:w` is what puts it on disk. The one thing that stops `visur path` is a window
+already editing: one document per process, so the launcher asks the running server whether anybody is attached and refuses
+with the name of what is in the way (exit 1 means your file was not opened).
+
+A server whose last window has gone holds no document: unsaved work goes to the file it belongs to, and work with no file
+is dropped with its swap left behind. That is why `ZQ` says goodbye on the wire before it drops the socket — a connection
+that merely died, including a browser tab reloading, keeps the document exactly where it was.
 
 `ZZ` saves and detaches, `ZQ` detaches, `ZD` quits (a detach leaves a server the launcher started still running).
 `./gradlew run` remains the way to start a server that watches `src/` and reloads; see

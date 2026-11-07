@@ -87,6 +87,16 @@ pub fn send_clipboard(socket: &mut Socket, text: Option<&str>) {
   send(socket, "clipboardContents", body);
 }
 
+/// This window is leaving, as opposed to this socket having stopped.
+///
+/// The server holds a document only while a window is looking at it, and this frame is the whole difference between
+/// "the last window went away" — when it may save the text and let it go — and "the last window vanished", when it may
+/// not. A close frame cannot carry the news: the server cannot read why a socket closed, and a browser tab that reloads
+/// closes its socket too.
+pub fn send_goodbye(socket: &mut Socket) {
+  send(socket, "windowWasClosed", serde_json::json!({}));
+}
+
 pub fn send_paste(socket: &mut Socket, text: &str) {
   send(socket, "pasteWasReceived", json!({ "text": text }));
 }

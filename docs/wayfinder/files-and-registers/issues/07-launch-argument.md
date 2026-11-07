@@ -168,3 +168,18 @@ touched), `tests/launcher.sh` asserts the URL handed to the client including a p
 one pty test asserts the handshake still says `/ws?open=%2F…` after the client's URL parsing is done with it.
 What is *not* checked live is the refusal in front of a second terminal, because two real clients in two ptys is a
 fixture nobody asked for and the Java test does it with two real sockets and a real server.
+
+## Reversed, and put back, the same week
+
+**The ask moved from the process to the socket, then the refusal came back to the shell.** `visur.file` and the take-once
+latch are still gone — the file a window came for is a query on that window's socket — but "a window is already editing"
+is a refusal the launcher makes again, because the server can now be asked (`GET /status`: how many windows, and the name
+of the document) instead of being guessed at from an open port. So the message that used to be printed for *every* running
+server, idle or busy, is printed only for a busy one, and it names the file in the way.
+
+**`:open` of a path that is not on disk is no longer an error.** The line above this one, written while the ticket was
+open, made the two doors differ by a boolean on purpose; they now agree that a name with no file behind it is an empty
+document at that name, which is what vim does and what a person typing `:open notes.txt` expects to happen. What stops a
+typo costing anything is the other refusal, which stayed: `:open` does not replace unsaved work. `StartupFileTest` and
+`CommandLineTest` lost the assertions that pinned the old answer and gained the new ones; `ErrorMessageTest`'s failed load
+is now a directory, which is still a load that cannot happen.

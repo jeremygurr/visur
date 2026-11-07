@@ -88,6 +88,7 @@ public class MainVerticle extends AbstractVerticle {
     // no loopback check, and it could not carry a connection id, which is the thing a per-client viewport is made of.
     router.get("/static/*").handler(this::staticHandler);
     router.get("/ws").handler(this::webSocket);
+    router.get("/status").handler(this::statusHandler);
 
     router.get("/").handler(routingContext -> {
       // Get the response object
@@ -104,6 +105,30 @@ public class MainVerticle extends AbstractVerticle {
     });
 
     return router;
+  }
+
+  /**
+   * Who is attached, for the launcher to ask before it attaches.
+   *
+   * <p>{@code visur notes.txt} has to decide whether a server that is already running is idle or busy, and nothing
+   * outside the process says: an open port is not a window. One document per process, so "a window is editing
+   * something" is the launcher's one good reason to refuse a file rather than pretend to open it — and it can name what
+   * is in the way instead of sending off the person who typed the command to guess.
+   *
+   * <p>Loopback like the socket, because the answer is the name of somebody's file.
+   */
+  private void statusHandler(RoutingContext context) {
+    if (!isLoopback(context.request())) {
+      context.response().setStatusCode(403).end();
+      return;
+    }
+    String document = ServiceHolder.editorModelCoupler.document().getSourceFilePath();
+    context.response()
+      .putHeader("Content-Type", "application/json")
+      .end(new JsonObject()
+        .put("windows", Connections.count())
+        .put("document", document == null ? "" : document)
+        .encode());
   }
 
   /**
@@ -138,6 +163,9 @@ public class MainVerticle extends AbstractVerticle {
           if(!connection.equals(message.headers().get(Connections.HEADER))) {
             return;
           }
+          // This close was asked for, which is the same fact a client's goodbye frame carries: the document may be
+          // put down when this is the last window, and may not when a socket merely stops.
+          Connections.markLeftOnPurpose(connection);
           // A normal close, deliberately: the client tells "you asked to leave" apart from "the server died" by the
           // status code, and only the first of them may tell the launcher to leave the server running.
           socket.close((short) 1000, ":q");
@@ -151,23 +179,40 @@ public class MainVerticle extends AbstractVerticle {
           relay(BusEvent.clipboardWriteRequested, socket, connection),
           relay(BusEvent.clipboardReadRequested, socket, connection),
           farewell);
-        // Both paths: a socket can fail without ever reporting a close, and a consumer left pointing at a dead
-        // socket would keep swallowing published views. The connection goes with the socket either way, which is
-        // what stops a day of browser reloads from leaving a day of viewports behind.
+        // A consumer left pointing at a dead socket would keep swallowing published views, so the consumers go with
+        // the socket: this is what stops a day of browser reloads from leaving a day of viewports behind.
         Runnable detach = () -> outbound.forEach(MessageConsumer::unregister);
         socket.textMessageHandler(frame -> {
           JsonObject message = new JsonObject(frame);
-          vertx.eventBus().send(message.getString("address"), message.getValue("body"),
+          String address = message.getString("address");
+          if (BusEvent.windowWasClosed.name().equals(address)) {
+            // The one address this socket answers itself instead of putting on the bus, and the reason is an order that
+            // only a socket can give: the fact is read by this socket's close handler, and a bus hop is a queue the
+            // close can jump. A client that said goodbye and then had its socket close two microseconds early is a
+            // document that stays in memory for nothing.
+            Connections.markLeftOnPurpose(connection);
+            return;
+          }
+          vertx.eventBus().send(address, message.getValue("body"),
             new DeliveryOptions().addHeader(Connections.HEADER, connection));
         });
-        socket.closeHandler(closed -> {
+        // Both handlers do the same thing, and that is not duplication to merge away: a client that hangs up politely
+        // arrives at the first and a client that simply stops — which is what our own terminal client does when it
+        // exits, and what a killed terminal does — arrives at the second without ever reporting a close. A rule about
+        // the last window leaving that only ran for the polite half of them would look like it worked in every test
+        // that closed a socket on purpose and do nothing in the one case it was written for.
+        Runnable gone = () -> {
           detach.run();
+          boolean leftOnPurpose = Connections.takeLeftOnPurpose(connection);
           Connections.close(connection);
-        });
-        socket.exceptionHandler(failure -> {
-          detach.run();
-          Connections.close(connection);
-        });
+          if (leftOnPurpose && Connections.count() == 0) {
+            // The last window said goodbye, so the server has no reason to go on holding this document: it saves what
+            // has a file and lets the rest go. See ReleaseDocument for what each case owes whom.
+            ReleaseDocument.afterTheLastWindowLeft(ServiceHolder.editorModelCoupler);
+          }
+        };
+        socket.closeHandler(closed -> gone.run());
+        socket.exceptionHandler(failure -> gone.run());
       },
       error -> LOGGER.error("websocket upgrade failed", error));
   }

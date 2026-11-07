@@ -17,6 +17,10 @@ public class QuitDiscardingOp implements Operator {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     if (Connections.count() <= 1) {
       emc.document().deleteSwap();
+      // And the buffer goes with it, before the server notices the window is gone: the release that follows saves what
+      // is unsaved, and "throw it away" cannot be answered by a write. While another window is still editing this text
+      // it is not this window's to throw away, so nothing here happens.
+      ReleaseDocument.dispose(emc);
     }
     emc.session().putQuitWasRequested(true);
   }

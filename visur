@@ -15,7 +15,7 @@
 # to the `lsof` this script uses to stop what it owns — fourteen on one machine at once, all of them burning CPU.
 # `./gradlew run` stays the way to run a server that watches src/ and reloads; this script is the way to edit a file.
 #
-# Exit codes: the client's; 2 for a command line visur does not take.
+# Exit codes: the client's; 1 for a file that was not opened; 2 for a command line visur does not take.
 #
 # Uses the server already listening on :8888. If there is none it starts one and owns it, and a server it started is
 # stopped again when the client exits — unless the client detached (ZZ or ZQ, exit code 0), which asks for the server
@@ -144,6 +144,19 @@ else
 fi
 
 if [ -n "$OPEN_ARG" ]; then
+  # Is a window attached? Only the server knows: an open port is not a window, and one document per process means
+  # "somebody is editing" is the one reason this command cannot open the file it was given. A server with no answer is
+  # read as idle and the ask goes to the window, where a busy document says so on its own message line.
+  attached_status="$(curl -sf --max-time 1 "http://127.0.0.1:$PORT/status")"
+  windows="$(printf '%s' "$attached_status" | sed -n 's/.*"windows":\([0-9][0-9]*\).*/\1/p')"
+  if [ -n "$windows" ] && [ "$windows" != 0 ]; then
+    editing="$(printf '%s' "$attached_status" | sed -n 's/.*"document":"\([^"]*\)".*/\1/p')"
+    echo "visur: $ABS was not opened: a window is already editing ${editing:-another file}" >&2
+    echo "       one document per server — type ":open $ABS" in that window, or leave it (:q, or ZQ) and run visur again" >&2
+    # The code for "your file was not opened", so a script wrapping this can tell that apart from a client that edited
+    # something and left.
+    exit 1
+  fi
   # The ask goes to the client, not to the server: it is this window that wants the file, and the server that has been
   # up for a day has no idea which window the command was typed in.
   export VISUR_WS="ws://127.0.0.1:$PORT/ws?open=$OPEN_ARG"

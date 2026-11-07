@@ -115,7 +115,7 @@ end in a line break those are different characters, and the second is what the q
 |---|---|
 | `:w` | write the file the document came from |
 | `:w path` | write there, and make it the file the document came from |
-| `:open path` | load a file. Refused while there is unsaved work — `:w` first. If a swap says the file is not the whole story, it stops and asks |
+| `:open path` | load a file, or start an empty document at a name that is not on disk yet. Refused while there is unsaved work — `:w` first. If a swap says the file is not the whole story, it stops and asks |
 | `:q` | leave this window. Refused while there is unsaved work |
 | `:q!` | leave, and throw the unsaved work away — its swap file too, so it does not come back at the next boot |
 
@@ -153,13 +153,17 @@ above are a language of their own instead. Keys are the rest of the interface.
 
 The file you name travels with the window you are about to open — a query on its socket — rather than with the server,
 so `visur path` means the same thing against a server that started two seconds ago and one that has been up since
-morning. One thing stops it: a window already editing. There is one document per process, so the newcomer is told why on
-its own message line, where it can read it, instead of in a shell where the answer was the same whether the old server
-was idle or busy. Exit 2 means the command line was a flag, which is not a file either.
+morning.
 
-A path that is not there is a document you are about to write when you name it to `visur`, and a refusal when you type
-`:open`. The same missing file, the opposite answer, and the difference is that inside a session there is already a
-document standing where the typo would go.
+**A path that is not on disk is a document with no text**, whichever door you came through: `visur notes.txt` and
+`:open notes.txt` both give an empty buffer named `notes.txt`, and `:w` is what puts the file on disk. A mistyped name
+costs a buffer you did not want rather than a file you did not want, and it is caught before it can eat anything because
+`:open` is refused while there is unsaved work — you cannot walk off a document without having decided about it.
+
+What stops `visur path` is a window already editing. One document per process, so the launcher asks the running server
+whether anybody is attached and, if somebody is, refuses and names what is in the way, along with the two ways round it.
+A server too old to answer is read as idle and the ask goes to the window, where a busy document says so on its own
+message line. Exit 1 means your file was not opened; 2 means the command line was a flag, which is not a file either.
 
 ## Swap files and recovery
 
@@ -206,6 +210,12 @@ Intercepted by the terminal before the server sees them:
 | `ZD` | quit, stopping a server the launcher started |
 
 `Ctrl-C` is a byte in raw mode, not a signal, which is why quitting needs its own binding.
+
+**A server with no window holds no document.** The last window to leave takes the text with it: unsaved work goes to the
+file it belongs to, and work with no file to go to is dropped, with the swap it wrote while you typed left behind to be
+asked about next time. `ZQ` says goodbye before it drops the socket, and that word is the whole difference between a
+window that left and a connection that fell over — a dropped socket, a killed terminal and a browser reloading its tab
+keep the document exactly where it was.
 
 ## The clipboard
 
