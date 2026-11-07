@@ -143,6 +143,21 @@ above are a language of their own instead. Keys are the rest of the interface.
 | `Enter` | compile and run the command, push it onto history |
 | `Escape` | leave command state without running |
 
+## Opening a file
+
+| you type | you get |
+|---|---|
+| `visur` | whatever the server on `:8888` already has |
+| `visur ~/notes/ideas.txt` | that file, from any directory — the path is resolved where you typed it, not where the server was started |
+| `:open notes.txt` | that file, in the window you are typing in |
+
+With a server already running, `visur path` opens nothing and says so: that server is editing somebody's document, and
+`:open path` inside it is the way. Exit 1 means "your file was not opened"; exit 2 means the command line was a flag,
+which is not a file either.
+
+A path that is not there is a file you are about to write when you launched on it, and a typo when you typed `:open`.
+The same missing file, the opposite answer.
+
 ## Swap files and recovery
 
 A document with work in it is mirrored to disk, at most twice a second. The last half second of typing is what a crash

@@ -1,6 +1,19 @@
 #!/usr/bin/env bash
 # visur — one command to use Visur.
 #
+#     visur                 edit whatever the server on :8888 already has
+#     visur /path/to/file   edit that file, starting a server for it when there is no server
+#
+# `visur /path` with a server already running opens nothing: that server is editing somebody's document, and the honest
+# answer is a warning and exit 1 rather than a silent edit of something else. `:open path` inside it is the way.
+#
+# The server is started as `java -jar` on the fat jar, built first when a source file is newer than it. Not
+# `./gradlew run`: that starts a `--redeploy` watcher, a JVM that owns no socket, outlives its client, and is invisible
+# to the `lsof` this script uses to stop what it owns — fourteen of one machine at once, all of them burning CPU.
+# `./gradlew run` stays the way to run a server that watches src/ and reloads; this script is the way to edit a file.
+#
+# Exit codes: the client's; 1 for "your file was not opened"; 2 for a command line visur does not take.
+#
 # Uses the server already listening on :8888. If there is none it starts one and owns it, and a server it started is
 # stopped again when the client exits — unless the client detached (ZZ or ZQ, exit code 0), which asks for the server
 # to stay. A server that was already running is never ours to stop.
@@ -13,10 +26,25 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT=8888
+FILE_ARG="" # the JVM argument the server is started with, when a file was named
 CLIENT="${VISUR_CLIENT:-$ROOT/terminal/target/release/visur-term}"
 LOG="${VISUR_LOG:-${TMPDIR:-/tmp}/visur-server.log}"
 
 owned="" # the process we started, empty when the server was already running
+
+resolve_path() { # absolute, against where the command was typed, and without needing the file to exist
+  local dir base
+  dir="$(dirname "$1")"
+  base="$(basename "$1")"
+  # `cd` and `pwd` rather than realpath, because realpath refuses a path that does not exist yet and `visur notes.txt`
+  # on a file that is not written yet is the point of the whole thing. Logical pwd, so a symlinked directory stays
+  # symlinked, which is what vim does to a path.
+  if cd "$dir" 2>/dev/null; then
+    printf '%s/%s\n' "$PWD" "$base"
+  else
+    printf '%s/%s\n' "$PWD" "$1"
+  fi
+}
 
 # Is Visur answering? The app's own URL, not just an open port: something else could be on 8888, and the verticles
 # only exist once the server can answer.
@@ -25,7 +53,7 @@ probe() { curl -sf -o /dev/null --max-time 1 "http://127.0.0.1:$PORT/static/visu
 stop_owned() {
   [ -n "$owned" ] || return 0
   kill "$owned" 2>/dev/null
-  # Gradle forks the JVM, so the port is the reliable handle on the process to end.
+  # The port is the reliable handle on the process to end: whatever started the server may have forked it.
   local pids
   pids="$(lsof -ti "tcp:$PORT" 2>/dev/null)"
   [ -n "$pids" ] && kill $pids 2>/dev/null
@@ -45,18 +73,20 @@ build_client() {
 # A fat jar needs no Gradle daemon and no compile check, so it starts in about a second; it is only used when it is
 # newer than every source file, so a stale jar can never serve yesterday's editor.
 start_server() {
+  # The file argument goes on whichever server command runs, overridden or not, so "did it reach the JVM?" has one
+  # answer instead of one answer per start path.
   if [ -n "${VISUR_SERVER:-}" ]; then
-    sh -c "$VISUR_SERVER" >"$LOG" 2>&1 &
+    sh -c "$VISUR_SERVER $FILE_ARG" >"$LOG" 2>&1 &
     owned=$!
     return
   fi
   local jar
-  jar="$(ls -1 "$ROOT"/build/libs/*-fat.jar 2>/dev/null | head -1)"
-  if [ -n "$jar" ] && [ -z "$(find "$ROOT/src" -newer "$jar" -print -quit)" ]; then
-    java -jar "$jar" >"$LOG" 2>&1 &
-  else
-    ( cd "$ROOT" && ./gradlew run -q >"$LOG" 2>&1 ) &
+  jar="$ROOT/build/libs/visur-1.0.0-SNAPSHOT-fat.jar"
+  if [ ! -f "$jar" ] || [ -n "$(find "$ROOT/src" "$ROOT/build.gradle.kts" -newer "$jar" -print -quit)" ]; then
+    echo "building the server jar" >&2
+    ( cd "$ROOT" && ./gradlew shadowJar -q ) >&2 || return 1
   fi
+  java ${FILE_ARG:+"$FILE_ARG"} -jar "$jar" >"$LOG" 2>&1 &
   owned=$!
 }
 
@@ -68,6 +98,32 @@ wait_for_server() {
   done
   return 1
 }
+
+if [ $# -gt 1 ]; then
+  echo "visur opens one file: visur /path/to/file" >&2
+  exit 2
+fi
+
+case "${1:-}" in
+  -*)
+    # There is no --help to reach, and a flag taken for a filename is a file called "--help" sitting in the cwd,
+    # openable and surprising to find there later.
+    echo "visur opens one file: visur /path/to/file" >&2
+    exit 2
+    ;;
+  '') ;;
+  *)
+    # Resolved here, in the directory the command was typed in: the server's cwd is whichever directory happened to
+    # launch it first, so a relative path would mean one thing to the person who started the server and another to
+    # whoever types the command next.
+    FILE_ARG="-Dvisur.file=$(resolve_path "$1")"
+    if probe; then
+      echo "visur is already running on :$PORT with another document — $1 was not opened." >&2
+      echo "Type ':open $(resolve_path "$1")' inside it, or stop that server first: lsof -ti tcp:$PORT | xargs kill" >&2
+      exit 1
+    fi
+    ;;
+esac
 
 build_client
 

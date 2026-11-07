@@ -80,17 +80,22 @@ To run your application:
 starting one if none is running, and stops only a server it started itself:
 
 ```
-./visur          # from the repo root
+./visur                        # whatever is already open
+./visur ~/notes/ideas.txt      # that file, from any directory
 ```
 
+A file argument is resolved against the directory the command is typed in, and with a server already running it opens
+nothing: that server is editing somebody's document, so `visur` says so and exits 1. `:open path` inside it is the way.
+
 `ZZ` saves and detaches, `ZQ` detaches, `ZD` quits (a detach leaves a server the launcher started still running).
-`./gradlew run` remains the way to start the server on its own; see
+`./gradlew run` remains the way to start a server that watches `src/` and reloads; see
 [terminal/README.md](terminal/README.md) for the client itself.
 
-**Packaging.** The launcher prefers the prebuilt fat jar (`./gradlew shadowJar` → `build/libs/visur-*-fat.jar`)
-because it needs no Gradle daemon and no compile check — about a second to start instead of several. It uses the jar
-only when it is newer than everything under `src/`, and otherwise falls back to `./gradlew run`, so a stale jar can
-never serve yesterday's editor. No binary is committed.
+**Packaging.** The launcher starts the server with `java -jar` on the fat jar (`./gradlew shadowJar` →
+`build/libs/visur-*-fat.jar`) and builds it first when any source file is newer, so a stale jar can never serve
+yesterday's editor. It does not fall back to `./gradlew run`: that starts a `--redeploy` watcher, a JVM with no socket
+that outlives its client and cannot be found by the `lsof` the launcher uses to stop what it owns. No binary is
+committed.
 
 The launcher, its tests (`./tests/launcher.sh`) and the client build on Java, Rust and bash only.
 

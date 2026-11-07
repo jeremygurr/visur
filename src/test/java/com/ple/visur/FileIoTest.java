@@ -303,10 +303,10 @@ class FileIoTest {
 
   @Test
   void startupContentWithNoPathMeansEmptyUnnamedDocument() {
-    // Verify source path is empty or null (no named file when no VISUR_FILE).
+    // Verify source path is empty or null (nothing was named, neither on the command line nor in a property).
     String path = ServiceHolder.editorModelCoupler.document().getSourceFilePath();
     assertTrue(path == null || path.isEmpty(),
-      "source path should be empty or null when no VISUR_FILE is set, got: " + path);
+      "source path should be empty or null when nothing named a file, got: " + path);
   }
 
   /**
