@@ -187,6 +187,24 @@ class SessionsOnOneDocumentTest {
     }
   }
 
+  /**
+   * {@code :q!} is one window leaving, not the server stopping, and the other window is what proves the difference: its
+   * socket stays open and keeps being painted. A command that ends a session and a command that ends a process have to
+   * be different commands, and this is the test that keeps them so.
+   */
+  @Test
+  void quittingOneWindowLeavesTheOtherEditing() {
+    try (WireClient first = new WireClient(vertx, port, 40, 10);
+         WireClient second = new WireClient(vertx, port, 40, 10)) {
+      first.presses(":");
+      first.types("q!");
+      first.presses("Enter");
+
+      assertTrue(first.waitsToBeClosedByTheServer(), "the window that asked to leave was closed");
+      assertEquals("navigate", second.submode(), "the window that did not ask keeps its server");
+    }
+  }
+
   @Test
   void aSubmodeBelongsToTheWindowThatEnteredIt() {
     try (WireClient first = new WireClient(vertx, port, 40, 10);

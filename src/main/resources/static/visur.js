@@ -65,8 +65,18 @@ socket.onmessage = function(received) {
 
 /* A socket that has closed does not reopen itself: the page reloads, and a page whose server is down sits there
    instead of reloading itself forever. */
-socket.onclose = function() {
-  console.log("the server closed this page's socket; reload to reconnect")
+socket.onclose = function(closed) {
+  // The status code is the difference between `:q`, which closed this window on purpose, and the server having gone
+  // away, and a page that simply stops painting looks like a crash either way. The mode line is where the server would
+  // have said it, so that is where it is said. A page that never got a first view has no mode line to write on.
+  const reason = closed.code === 1000
+    ? "detached — the server is still running; reload to come back"
+    : "the server is gone"
+  console.log("the server closed this page's socket: " + reason)
+  if(view != null) {
+    view.message = reason
+    drawModeLine()
+  }
 }
 
 function send(address, body) {

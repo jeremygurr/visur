@@ -218,7 +218,14 @@ Client: any WebSocket implementation (the spike used `tungstenite`). Use WS ping
 
 Bound to `127.0.0.1`. No auth, no TLS, no remote attach.
 
-SockJS at `/eventbus` stays for the browser. It is **not** the terminal's transport: a SockJS client must reimplement `o`/`h`/`a[...]` framing plus a 5 s ping or the session is reaped at 10 s with `c[3000,"Go away!"]`.
+**Corrected 2026-11-06 (ticket 02):** SockJS at `/eventbus` is gone, and the browser uses this same `/ws`. The bridge
+could not carry a connection id, so it could not carry a per-client viewport, and one transport means one loopback check
+instead of two that could disagree.
+
+**Close codes mean something.** A close frame with status `1000` is the server letting this window go because it asked
+(`:q`), and the client exits `0` — detach, server still running, every other window untouched. A socket that fails, or a
+close frame with any other status, is `4`: the server went away, and the launcher stops a server it started. A close frame
+carrying no status is not a farewell; a peer that hangs up without saying why has not asked to be left running.
 
 ### 5.3 Components
 
@@ -316,9 +323,17 @@ Canvas keeps what the terminal cannot express, and the spec does not try to unif
 
 **Should** — kitty `DISAMBIGUATE_ESCAPE_CODES` push; `?2026` on every frame; overscan/local scroll; page-scroll without moving the cursor; truecolor once `VisurColor` is wired up.
 
-**Won't** — mouse, panes, tabs, images; opening the `;` command line (no keybinding can — P4); search-and-replace (doesn't exist); file I/O (doesn't exist); per-client viewports (needs P1).
+**Won't** — mouse, panes, tabs, images, search-and-replace (does not exist). Three things that were on this line when it
+was written have since shipped: per-client viewports ([ticket 02](../files-and-registers/issues/02-viewport-per-client.md)),
+the `:` command line ([ticket 05](../files-and-registers/issues/05-command-key-and-grammar.md)) and file I/O
+([ticket 04](../files-and-registers/issues/04-dirty-tracking.md)).
 
-`ZZ`/`ZQ`/`ZD` is the *terminal's* binding, not a Visur command: raw mode makes `Ctrl-C` a byte, and **nothing in Visur quits** — `CommandStateService.exitCommandState` only leaves the command line. A `:q` equivalent waits for P4. Decided by the user 2026-11-01, replacing the earlier `Ctrl-C`/`Ctrl-Q` proposal, because in a shell those read as "kill this command".
+`ZZ`/`ZQ`/`ZD` is the *terminal's* binding, not a Visur command: raw mode makes `Ctrl-C` a byte, and it was decided on
+2026-11-01 (replacing a `Ctrl-C`/`Ctrl-Q` proposal) that stopping things belongs to the terminal, because in a shell those
+read as "kill this command". **Corrected 2026-11-06 (ticket 05):** `:q` and `:q!` now exist and reach the same
+detach — they close one window's socket, which the client reads as a normal close and exits `0` on. What has not changed
+is that **nothing in Visur stops the server**: `ZD` is still the only way, and it is a key rather than a command because
+the launcher owns the process.
 
 - **`ZZ`** saves and detaches, **`ZQ`** detaches, **`ZD`** quits. *Detach* leaves the server running; *quit* asks for it to stop. `ZZ`'s save has nothing to save until file I/O exists (P5), so today it equals `ZQ` with intent — bound now so it starts working the day saving does.
 - The distinction reaches the launcher as the **exit code**: `0` detach, `3` quit, `4` the server went away ([ticket 08](../terminal-build/issues/08-launcher.md)). `4` is not a decision the client made: any non-zero code tells the launcher to stop a server it started, and `4` says why the terminal came back.

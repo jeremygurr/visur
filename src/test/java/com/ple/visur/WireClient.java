@@ -4,6 +4,7 @@ import io.vertx.core.json.JsonObject;
 import io.vertx.rxjava3.core.Vertx;
 import io.vertx.rxjava3.core.http.WebSocket;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -21,6 +22,7 @@ final class WireClient implements AutoCloseable {
 
   private final WebSocket socket;
   private final LinkedBlockingQueue<String> frames = new LinkedBlockingQueue<>();
+  private final CountDownLatch closedByServer = new CountDownLatch(1);
   private final int port;
   private int cols;
   private int rows;
@@ -37,6 +39,7 @@ final class WireClient implements AutoCloseable {
     this.port = port;
     socket = vertx.createHttpClient().webSocket(port, "localhost", "/ws").blockingGet();
     socket.textMessageHandler(frames::add);
+    socket.closeHandler(closed -> closedByServer.countDown());
   }
 
   void send(String address, JsonObject body) {
@@ -144,6 +147,19 @@ final class WireClient implements AutoCloseable {
 
   String message() {
     return view().getString("message");
+  }
+
+  /**
+   * Whether the server ended this connection, which is how a client learns that {@code :q} was typed: a close is not a
+   * view, so nothing else in this class would notice one.
+   */
+  boolean waitsToBeClosedByTheServer() {
+    try {
+      return closedByServer.await(5, TimeUnit.SECONDS);
+    } catch (InterruptedException interrupted) {
+      Thread.currentThread().interrupt();
+      return false;
+    }
   }
 
   /** The next view this socket was sent, without asking for one: for a client that must not declare a grid. */

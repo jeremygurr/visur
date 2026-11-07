@@ -14,6 +14,9 @@ public enum BusEvent {
   modelWasChanged,
 
   //sent by ModelWasChangedVerticle once per connection, and relayed to that connection's client by its socket
-  viewWasChanged
+  viewWasChanged,
+
+  //sent by a command the window asked to leave with (:q, :q!), and answered by that connection's socket closing it
+  connectionShouldClose
 }
 

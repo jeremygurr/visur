@@ -18,7 +18,21 @@ pub type Socket = WebSocket<MaybeTlsStream<TcpStream>>;
 pub enum Incoming {
   Frame(String),
   Idle,
+  /// The peer sent a close frame, and `code` is why. It is not the same as [`Incoming::Closed`], which is the socket
+  /// failing: one is a door shutting, the other is the building leaving.
+  Detached { code: u16 },
   Closed,
+}
+
+/// RFC 6455's "normal closure", which is what the server sends when a window asks to leave (`:q`).
+pub const NORMAL_CLOSE: u16 = 1000;
+
+/// Whether this close is the server letting this window go, as opposed to closing for a reason nobody asked for.
+///
+/// It decides an exit code, and the launcher reads that as "keep the server running", so a close that merely happens to
+/// carry no code — a peer hanging up — must not answer true.
+pub fn is_farewell(code: u16) -> bool {
+  code == NORMAL_CLOSE
 }
 
 pub fn connect() -> Result<Socket, tungstenite::Error> {
@@ -64,10 +78,29 @@ pub fn send_paste(socket: &mut Socket, text: &str) {
   send(socket, "pasteWasReceived", json!({ "text": text }));
 }
 
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  /// The whole contract of an exit code, and worth a test of its own because the launcher's behaviour branches on it:
+  /// a close that was not asked for must not look like one that was.
+  #[test]
+  fn only_a_normal_close_is_the_server_letting_this_window_go() {
+    assert!(is_farewell(NORMAL_CLOSE), "`:q` closes with the protocol's normal-closure code");
+    assert!(!is_farewell(1011), "a server closing because it broke is not a detach");
+    assert!(!is_farewell(u16::MAX), "and a peer that hung up without a code is not one either");
+  }
+}
+
 /// Whatever the socket has right now, one frame at a time.
 pub fn next(socket: &mut Socket) -> Incoming {
   match socket.read() {
     Ok(Message::Text(text)) => Incoming::Frame(text.to_string()),
+    Ok(Message::Close(frame)) => Incoming::Detached {
+      // No code in the frame is not "code 1000"; it is a peer that hung up without saying why, and the client must not
+      // tell the launcher to leave that server running.
+      code: frame.map(|close| u16::from(close.code)).unwrap_or(u16::MAX),
+    },
     Ok(_) => Incoming::Idle,
     Err(tungstenite::Error::Io(error))
       if matches!(

@@ -120,6 +120,10 @@ fn run(socket: &mut transport::Socket, out: &mut impl Write, mut cols: usize, mu
     match take_view(socket) {
       // The socket is gone: there is no server left to paint for, so the terminal goes back to the shell now rather
       // than spinning on a dead socket until somebody kills the client.
+      // `:q` in the editor: this window is gone and the server is not, so the client leaves by the same door `ZQ` does.
+      // Zero is the launcher's "leave the server running", and the only thing that keeps a quit from stopping a process
+      // other windows are still using.
+      Taken::Detached => return 0,
       Taken::Gone => return SERVER_GONE,
       Taken::Views(Some(newer)) => {
         view = newer;
@@ -207,6 +211,8 @@ fn finish(effect: Effect) -> i32 {
 enum Taken {
   /// Whatever views were waiting; the newest of them, if any.
   Views(Option<protocol::ViewUpdate>),
+  /// The server let this window go, at the window's own request (`:q`), and is still running for everybody else.
+  Detached,
   /// The server hung up. Not the same as "nothing waiting": one is idle, the other is over.
   Gone,
 }
@@ -221,6 +227,13 @@ fn take_view(socket: &mut transport::Socket) -> Taken {
         }
       }
       transport::Incoming::Idle => return Taken::Views(newest),
+      transport::Incoming::Detached { code } => {
+        return if transport::is_farewell(code) {
+          Taken::Detached
+        } else {
+          Taken::Gone
+        }
+      }
       transport::Incoming::Closed => return Taken::Gone,
     }
   }

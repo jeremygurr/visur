@@ -288,6 +288,8 @@ fn server_is_up() -> bool {
 enum Fake {
   /// Hang up at once: the server died under a client that was already attached.
   HangUp,
+  /// Paint one view, then close the connection the way `:q` does: normally, on purpose, with the server still up.
+  Detach,
   /// Stay and record what the client sends.
   Listen,
   /// Answer each message the client sends with the next view in the list, then keep listening.
@@ -304,11 +306,15 @@ fn fake_server(behaviour: Fake) -> (u16, Arc<Mutex<Vec<String>>>) {
   std::thread::spawn(move || {
     let Ok((stream, _)) = listener.accept() else { return };
     let Ok(mut socket) = tungstenite::accept(stream) else { return };
+    // Captured before `behaviour` is consumed below, because the loop has to know whether it is meant to let go.
+    let lets_this_window_go = matches!(behaviour, Fake::Detach);
     let mut script = match behaviour {
       Fake::HangUp => {
         let _ = socket.close(None);
         return;
       }
+      // One view first: a client that never painted anything would be exiting on a race rather than on a close.
+      Fake::Detach => vec![view("bye", true)],
       Fake::Listen => Vec::new(),
       Fake::Script(views) => views,
     };
@@ -317,6 +323,13 @@ fn fake_server(behaviour: Fake) -> (u16, Arc<Mutex<Vec<String>>>) {
         sink.lock().unwrap().push(text.to_string());
         if !script.is_empty() {
           let _ = socket.send(tungstenite::Message::Text(script.remove(0).into()));
+          if lets_this_window_go {
+            let _ = socket.close(Some(tungstenite::protocol::CloseFrame {
+              code: tungstenite::protocol::frame::coding::CloseCode::Normal,
+              reason: ":q".into(),
+            }));
+            return;
+          }
         }
       }
     }
@@ -519,6 +532,22 @@ fn declared(frames: &Arc<Mutex<Vec<String>>>, cols: usize, rows: usize) -> bool 
       && value["body"]["cols"] == cols
       && value["body"]["rows"] == rows
   })
+}
+
+/// The other half of `:q`. The server closed this one window and is still running, so the client has to leave the way
+/// `ZQ` does — exit code 0, which is the launcher's instruction to keep the server up. A close frame that meant
+/// something else arrives as `Gone` instead, three lines of code away and one exit code apart.
+#[test]
+fn the_client_detaches_when_the_server_lets_this_window_go() {
+  let (port, _) = fake_server(Fake::Detach);
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+
+  let status = terminal.wait_exit(Duration::from_secs(3));
+  assert_eq!(
+    status.code(),
+    Some(0),
+    "a normal close is a detach, and any other code tells the launcher to stop a server other windows are using"
+  );
 }
 
 #[test]

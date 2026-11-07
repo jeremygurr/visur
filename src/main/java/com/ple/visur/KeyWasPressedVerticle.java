@@ -1,6 +1,6 @@
 package com.ple.visur;
 
-import io.vertx.core.Future;
+import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.json.JsonObject;
 import io.vertx.rxjava3.core.eventbus.Message;
 
@@ -27,6 +27,14 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
       CountPrefix.retireUnlessDigit(emc, key);
     }
     bus.send(BusEvent.modelWasChanged.name(), null);
+    // After the repaint, so the window that is leaving is painted once more before it goes. Published rather than sent:
+    // every socket is listening and each closes only the one the header names, which is how a view is addressed too —
+    // `:q` in one browser tab closing another tab's editor would be a bug with a new name.
+    if(emc.session().getQuitWasRequested()) {
+      emc.session().putQuitWasRequested(false);
+      bus.publish(BusEvent.connectionShouldClose.name(), null,
+        new DeliveryOptions().addHeader(Connections.HEADER, emc.getConnection()));
+    }
   }
 
   /**

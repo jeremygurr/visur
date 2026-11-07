@@ -52,7 +52,7 @@ Quantum keys are shared by every command that takes one:
 | `P` | insert the yank register at the **start** of the selection without deleting anything; the selection keeps covering the same text, shifted right | `P` with three words selected puts the register in front and leaves those three selected |
 | `u` | undo **one command** — the whole command, so an insert session comes back with the line it opened, and everything a count repeated comes back at once. Movement is not an edit: `u` after `5 l` walks back to the last edit, cursor and all. Nothing to undo is a no-op | `s d` then `u`; `3 g`, type, `Escape`, then `u` |
 | `R` | redo one command. A new edit clears what `R` can walk forward to, and the top of the stack is a no-op | `u` then `R` |
-'| `:` | open **command state**: type a command and run it — `:w`, `:open path`. `;` used to be this key and now does nothing at all | `:` `w` `Enter` |
+| `:` | open **command state**: type a command and run it — `:w`, `:open path`. `;` used to be this key and now does nothing at all | `:` `w` `Enter` |
 | `ZZ` | save the file | `ZZ` |
 
 `i`, `a`, `o`, `g` and `G` all stash the current span and cursor quantum, force the span to 0 and the quantum to
@@ -111,13 +111,18 @@ end in a line break those are different characters, and the second is what the q
 
 ## Command state (after `:`)
 
-Two commands today:
-
 | command | does |
 |---|---|
 | `:w` | write the file the document came from |
 | `:w path` | write there, and make it the file the document came from |
 | `:open path` | load a file. Refused while there is unsaved work — `:w` first |
+| `:q` | leave this window. Refused while there is unsaved work |
+| `:q!` | leave, and throw the unsaved work away — its swap file too, so it does not come back at the next boot |
+
+**:q closes the window, not the server.** It leaves through the same door as the terminal's `ZQ` — the socket closes
+normally, the client exits 0, the launcher keeps the server running — and every other window keeps editing. Stopping the
+process stays `ZD`'s: the launcher started it, a browser tab has no business ending a process it cannot see, and a
+command that ends other people's sessions is not a quit.
 
 **A path is the rest of the line.** No quotes, no escaping: `:open ~/notes/ideas.txt` is one path. Quotes still work and
 now mean exactly one thing — keep this space, including at the end — so a path whose last character is a space cannot be

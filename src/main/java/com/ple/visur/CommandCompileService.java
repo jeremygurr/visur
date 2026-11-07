@@ -48,6 +48,14 @@ public class CommandCompileService {
           name.equals("w") ? (Operator) new SaveFileOp() : (Operator) new LoadFileOp(), null});
         return command;
       }
+      case "q": {
+        command.addOperatorWithInfo(new Object[] {new QuitOp(), null});
+        return command;
+      }
+      case "q!": {
+        command.addOperatorWithInfo(new Object[] {new QuitDiscardingOp(), null});
+        return command;
+      }
       default: {
         command.addOperatorWithInfo(new Object[] {new UnknownCommandOp(), name});
         return command;

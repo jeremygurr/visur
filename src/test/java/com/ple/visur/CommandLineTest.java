@@ -217,6 +217,70 @@ class CommandLineTest {
   }
 
   /**
+   * `:q` over unsaved work is the same refusal as `:open`: visur has no surface for a question, so the command says no
+   * and names the key that means "I know". Naming `:q!` in the message is what makes the refusal one keystroke from an
+   * answer rather than a dead end the user has to look up.
+   */
+  @Test
+  void colonQRefusesWhileThereIsUnsavedWork() {
+    press("i");
+    press("x");
+    press("Escape");
+
+    typeCommand("q");
+
+    assertTrue(message().contains(":q!"), "the refusal names the way past it: " + message());
+    assertFalse(emc.session().getQuitWasRequested(), "and nobody is on their way out");
+    assertEquals("x" + CONTENT, emc.document().getContent(), "the work is still there to save");
+  }
+
+  /**
+   * Leaving is a window leaving, not the server stopping: the flag is per session, and the socket that set it is the one
+   * that closes. Who stops the server is {@code ZD} and the launcher, because a browser tab typing {@code :q!} must not
+   * be able to end another window's session, and stopping a process nobody started is not the editor's job.
+   */
+  @Test
+  void colonQOnASavedDocumentAsksToBeLetGo() {
+    typeCommand("q");
+
+    assertTrue(emc.session().getQuitWasRequested(), "the window asked, and the socket that asked is what goes away");
+    assertEquals("", message(), "a command that worked has nothing to report");
+  }
+
+  /**
+   * `:q!` is the discard, and the discard has to reach the disk: the swap file is how discarded text comes back at the
+   * next boot, which is the opposite of what was just asked for. The file being edited is left alone — discarding the
+   * buffer says nothing about what is on disk.
+   */
+  @Test
+  void colonQBangDiscardsTheSwapFileAndLeaves() throws IOException {
+    Path file = tempDir.resolve("discard.txt");
+    Files.writeString(file, "what the file has\n");
+    Path swap = Path.of(file + ".visur-swap");
+    Files.writeString(swap, "what only the buffer has\n");
+    emc.document().setSourceFilePath(file.toString());
+    emc.document().putContentAsSaved("what the file has\n");
+    press("i");
+    press("x");
+    press("Escape");
+
+    typeCommand("q!");
+
+    assertTrue(emc.session().getQuitWasRequested(), "the refusal that `:q` would have given is not given");
+    assertFalse(Files.exists(swap), "a swap is how discarded work comes back, and this work was discarded on purpose");
+    assertEquals("what the file has\n", Files.readString(file), "the file on disk was never part of the bargain");
+  }
+
+  /** A document that has never had a name has no swap to forget, and leaving is still leaving. */
+  @Test
+  void colonQBangOnAnUnnamedDocumentStillLeaves() {
+    typeCommand("q!");
+
+    assertTrue(emc.session().getQuitWasRequested());
+    assertEquals("", message(), "having nothing to discard is not an error");
+  }
+
+  /**
    * Distinguishable in the compiled command, not only at execution: `:w` with a path carries the path, `:w` without one
    * carries nothing, so "no argument" and "empty argument" are not the same command and cannot silently become each
    * other. `clearEDS` is the head of both, which is what makes the test above pass.

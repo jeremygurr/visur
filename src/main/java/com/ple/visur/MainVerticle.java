@@ -133,6 +133,16 @@ public class MainVerticle extends AbstractVerticle {
           socket.writeTextMessage(
             new JsonObject().put("address", BusEvent.viewWasChanged.name()).put("body", message.body()).encode());
         });
+        MessageConsumer<JsonObject> farewell = vertx.eventBus().consumer(BusEvent.connectionShouldClose.name(), message -> {
+          // The view's addressing again: this socket closes the window whose id it minted, and no other. `:q` typed in
+          // one client ending a second client's session would be the same bug this connection id was introduced to fix.
+          if(!connection.equals(message.headers().get(Connections.HEADER))) {
+            return;
+          }
+          // A normal close, deliberately: the client tells "you asked to leave" apart from "the server died" by the
+          // status code, and only the first of them may tell the launcher to leave the server running.
+          socket.close((short) 1000, ":q");
+        });
         socket.textMessageHandler(frame -> {
           JsonObject message = new JsonObject(frame);
           vertx.eventBus().send(message.getString("address"), message.getValue("body"),
@@ -143,10 +153,12 @@ public class MainVerticle extends AbstractVerticle {
         // what stops a day of browser reloads from leaving a day of viewports behind.
         socket.closeHandler(closed -> {
           outbound.unregister();
+          farewell.unregister();
           Connections.close(connection);
         });
         socket.exceptionHandler(failure -> {
           outbound.unregister();
+          farewell.unregister();
           Connections.close(connection);
         });
       },

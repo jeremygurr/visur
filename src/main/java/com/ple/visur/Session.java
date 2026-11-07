@@ -80,6 +80,7 @@ public class Session {
     commandStateContent = "";
     commandCursor = 0;
     message = null;
+    quitWasRequested = false;
     lineWrapping = LineWrapping.wrapped;
     previousSearchDirectionWasForward = false;
     vars.put("span", ObjectVisurVar.make(0));
@@ -393,6 +394,22 @@ public class Session {
     message = null;
   }
 
+  /**
+   * Whether this window has asked to leave, and the reason it is a flag rather than a close: an operator has no bus, and
+   * {@code press} has no socket. The op sets it, {@code KeyWasPressedVerticle.handle} — which has both — spends it on
+   * the way out, and the socket that made the request is the one that closes.
+   *
+   * <p>Per window on purpose. {@code :q} is a window leaving and the server staying; stopping the process is {@code ZD}
+   * and the launcher, which own it. See {@link QuitOp}.
+   */
+  public boolean getQuitWasRequested() {
+    return quitWasRequested;
+  }
+
+  public void putQuitWasRequested(boolean leaving) {
+    quitWasRequested = leaving;
+  }
+
   public boolean getIsInCommandState() {
     return isInCommandState;
   }
@@ -460,6 +477,7 @@ public class Session {
    * a command.
    */
   private boolean isInCommandState;
+  private boolean quitWasRequested;
   private String commandStateContent = "";
   private int commandCursor;
 
