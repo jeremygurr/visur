@@ -77,3 +77,11 @@ different" rule this feature was specified with.
   one test so nobody "fixes" it by trimming.
 - Whether `|` should also work as a *prefix* (`|2y`, vim's `"2y`) is undecided and out of scope: the sticky selector covers
   the use case with two keystrokes instead of one, and a prefix grammar is a change to how every operator reads state.
+- What [08](08-clipboard-transport.md) hands over, three things. **A caller:** an operator has neither a bus nor a
+  `Vertx`, which is why a clipboard *write* is offered during the command and sent after it — `|0 p` wants the same shape
+  for the read: mark the need on the window, and let `ClipboardContents.ask(vertx, connection)` run at the end of the key
+  rather than from inside the operator. **Three states, not two:** the cache holds text, or it holds nothing, and a failed
+  read *empties* it — so pasting from `|0` has to treat "unknown" as its own case, message and no paste, because falling
+  back to a value the server can no longer check is the stale paste that ticket refuses to allow. **The two halves of its
+  fifth Done-when box:** 08 pinned that a yank lands in the cache with nothing asked of the client, and left the `p` half
+  to this ticket, which is where `|0 p` pastes from the cache without a round trip and the tests say so.
