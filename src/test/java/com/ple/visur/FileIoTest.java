@@ -233,25 +233,6 @@ class FileIoTest {
     assertFalse(ServiceHolder.editorModelCoupler.document().isDirty(), "the buffer now holds exactly what the file holds");
   }
 
-  /**
-   * The baseline moves in three places — startup load, {@code loadFile}, save — and this is the test that catches
-   * somebody writing it in one. Recovery reads text out of a file on disk, so a baseline set wherever text is read
-   * would clear the marker here; but a swap file exists precisely because its text never reached the file, so a
-   * recovered document is unsaved work by definition.
-   */
-  @Test
-  void recoveringASwapFileLeavesTheDocumentDirty() throws IOException {
-    Path file = tempDir.resolve("crash.txt");
-    Files.write(file, "what the file has\n".getBytes(StandardCharsets.UTF_8));
-    Files.write(Paths.get(file + ".visur-swap"), "what only the swap has\n".getBytes(StandardCharsets.UTF_8));
-    ServiceHolder.editorModelCoupler.document().setSourceFilePath(file.toString());
-
-    ServiceHolder.initializerService.recoverFromSwapFiles();
-
-    assertEquals("what only the swap has\n", ServiceHolder.editorModelCoupler.document().getContent());
-    assertTrue(ServiceHolder.editorModelCoupler.document().isDirty(),
-      "this text has never been in the file, whatever else has happened to it");
-  }
 
   @Test
   void roundTripSaveThenLoadIsIdentity() throws IOException {

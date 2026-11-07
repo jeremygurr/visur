@@ -67,8 +67,8 @@ public class Document {
   /**
    * New text, with the line offsets recomputed from it.
    *
-   * <p>The one place content changes, which is why the swap file hangs off it: every path that can lose the user's
-   * work — startup load, save, load, edit — goes through here or it does not change the document.
+   * <p>The one place the user's own text lands, which is why the swap hangs off it: text that has not reached a file
+   * is the only kind worth mirroring, so this is the entry point that mirrors and {@link #putContentAsSaved} is not.
    */
   public void putContent(String newContent) {
     content = newContent;
@@ -82,7 +82,11 @@ public class Document {
    * not one, since a swap is what survives a crash and its text has provably never reached the file.
    */
   public void putContentAsSaved(String newContent) {
-    putContent(newContent);
+    // Not `putContent`, and the swap is why: text that came off the file has nothing unsaved to mirror, and mirroring
+    // it would overwrite the swap that says the buffer once held something else. That swap is evidence, and booting
+    // onto a file is not a licence to destroy it.
+    content = newContent;
+    updateNextLineIndices();
     savedContent = content;
   }
 

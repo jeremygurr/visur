@@ -96,8 +96,6 @@ public class InitializerService {
     } else {
       emc.document().putContent(content);
     }
-    // Recover from any swap files left by a crash.
-    recoverFromSwapFiles();
     emc.document().updateNextLineIndices();
     emc.session().putVirtualCX(0);
     emc.session().putCanvasStart(0);
@@ -180,7 +178,12 @@ public class InitializerService {
    * Returns the startup file path if {@code VISUR_FILE} is set, {@code null} otherwise.
    */
   private String startupFile() {
-    String filePath = System.getenv("VISUR_FILE");
+    // The property first, as with `visur.port`: a test cannot change the environment of the process it is already in,
+    // and the only alternative was a test that starts a JVM to boot the thing properly.
+    String filePath = System.getProperty("visur.file");
+    if (filePath == null || filePath.isBlank()) {
+      filePath = System.getenv("VISUR_FILE");
+    }
     return (filePath == null || filePath.isBlank()) ? null : filePath;
   }
 
@@ -207,67 +210,6 @@ public class InitializerService {
       return content;
     } catch (IOException e) {
       throw new IllegalStateException("Cannot read VISUR_FILE (" + filePath + "): " + e.getMessage(), e);
-    }
-  }
-
-  /**
-   * Recovers from swap files left after a crash.
-   *
-   * <p>Recovery policy: side-by-side. If a swap file (.visur-swap) exists at startup:
-   * - For a named document: recover the swap content into the buffer, write a copy
-   *   as {@code sourcePath.visur-recovery}, report to console. The swap file stays
-   *   so the user can inspect it.
-   * - For an unnamed document: recover the swap content into the buffer (now named),
-   *   write a copy as a .visur-recovery file next to the source path.
-   * - A stale swap (one whose source file already exists and is newer) still gets
-   *   recovered but with a separate report.
-   * - After recovery, delete the swap file to avoid repeated prompts on future starts.
-   *
-   * <p>Package-private so the recovery's dirty behaviour is testable: ticket 04 needs the case where text arrives
-   * from a file on disk and is still unsaved, and no other caller reaches it before the port opens.
-   *
-   * <p>A swap file is identifiable as stale by its {@code .visur-swap} extension and by
-   * checking whether the source file exists. A purely orphaned swap (no source path
-   * at all) is recovered as an unnamed document.
-   */
-  void recoverFromSwapFiles() {
-    String sourcePath = emc.document().getSourceFilePath();
-    if (sourcePath == null || sourcePath.isEmpty()) {
-      // No source path: look for orphaned swap files in the working directory.
-      // This is unlikely in normal use but handles the case of an unsaved document
-      // whose swap was left behind.
-      return;
-    }
-    Path swapPath = Paths.get(sourcePath + ".visur-swap");
-    if (!Files.exists(swapPath)) {
-      return;
-    }
-    try {
-      // Read swap content
-      byte[] swapBytes = Files.readAllBytes(swapPath);
-      String swapContent = new String(swapBytes, StandardCharsets.UTF_8);
-      Path sourceFile = Paths.get(sourcePath);
-
-      if (Files.exists(sourceFile)) {
-        // Source file exists: this swap may be stale or from a crash.
-        // Recover into buffer, write recovery copy, delete swap.
-        String recoveryName = sourcePath + ".visur-recovery";
-        Files.write(Paths.get(recoveryName), swapBytes);
-        System.out.println("Swap file found at startup: " + swapPath
-          + " -> recovered to buffer, copy at " + recoveryName);
-        emc.document().putContent(swapContent);
-        emc.document().updateNextLineIndices();
-        Files.delete(swapPath);
-      } else {
-        // Source file doesn't exist: recover into buffer as empty file with name.
-        emc.document().putContent(swapContent);
-        emc.document().updateNextLineIndices();
-        Files.delete(swapPath);
-        System.out.println("Orphaned swap file found: " + swapPath
-          + " -> recovered to buffer (empty document for path " + sourcePath + ")");
-      }
-    } catch (IOException e) {
-      System.out.println("Failed to recover swap file: " + swapPath + " - " + e.getMessage());
     }
   }
 
