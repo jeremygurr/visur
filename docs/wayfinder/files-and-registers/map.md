@@ -152,7 +152,7 @@ Facts established before a ticket was written, each of which changes how a ticke
 | ~~03~~ [closed](issues/03-document-session-split.md) | The split: `Document` owns content/path/undo/swap, `Session` owns cursor/quantum/span/viewport/mode/command line | 02 |
 | ~~04~~ [closed](issues/04-dirty-tracking.md) | Dirty is a comparison against the saved baseline; `*` in the mode line; undo back to saved clears it | 03 |
 | ~~05~~ [closed](issues/05-command-key-and-grammar.md) | `:` replaces `;`, bare paths, `:w` `:open` `:q` `:q!`, and the keypress test `;` never had | 01, 04 |
-| [06](issues/06-swap-files.md) | Swap files: nameless pool, browser state dir, never overwrite, delete on save, vim's three-way prompt for named files | 01, 04, 05 |
+| ~~06~~ [closed](issues/06-swap-files.md) | Swap files: nameless pool, browser state dir, never overwrite, delete on save, vim's three-way prompt for named files | 01, 04, 05 |
 | [07](issues/07-launch-argument.md) | `visur /path/to/file`, with a warning when a server is already running | 05 |
 | [08](issues/08-clipboard-transport.md) | Clipboard transport: outbound write request, inbound contents, server-side cache, one write per command | 01 |
 | [09](issues/09-register-model.md) | `|` selects a register: `|0` clipboard, `|1`–`|9` rotation, `|a`–`|z` named, freeze toggle | 03, 08 |
@@ -193,6 +193,18 @@ ticket was written to fix, moved rather than fixed. The command line got its own
 (`CommandCompileService.compileCommandLine`). Anything that wants to be a `:` command in future — `:reg`, `:freeze`, a
 clipboard command from [08](issues/08-clipboard-transport.md) — is a case in that switch and not a word in the sentence
 grammar.
+
+**06 changed three things for the tickets after it.** The viewport declaration now carries one word of self-description
+(`client: "terminal" | "browser"`), which is the first thing a client has ever told the server about itself and the shape
+[08](issues/08-clipboard-transport.md) should expect: a client states, the server remembers, and an absent word is a
+default rather than an error. `~/.local/state/visur/` exists as a notion, so [10](issues/10-browser-clipboard.md) has a
+place to put browser-shaped state. And `visur.file` is now a thing boot reads, so
+[07](issues/07-launch-argument.md) has a startup path that boots in a test — the launch argument becomes a launcher
+script passing a property the tests already prove works.
+
+It also left one question for 08 to answer rather than invent: a clipboard write is addressed to *a* client, and
+`ClientKind` says what a window is, not which window to ask. The window that ran the command is the one whose socket the
+write goes down, which is the same `Connections.HEADER` addressing `:q` and `viewWasChanged` already use.
 
 ## Known broken, nobody's ticket yet
 

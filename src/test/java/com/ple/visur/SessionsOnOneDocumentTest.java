@@ -74,7 +74,8 @@ class SessionsOnOneDocumentTest {
    * "loaded from disk is clean", and the `x` is the ticket's "one character typed is dirty".
    */
   @Test
-  void theUnsavedMarkerShowsInEveryWindowAndOneSaveClearsItEverywhere(@TempDir Path tempDir) throws IOException {
+  void theUnsavedMarkerShowsInEveryWindowAndOneSaveClearsItEverywhere(@TempDir Path tempDir)
+    throws IOException, InterruptedException {
     Path file = tempDir.resolve("work.txt");
     emc.document().setSourceFilePath(file.toString());
     emc.document().putContentAsSaved(CONTENT);
@@ -84,12 +85,17 @@ class SessionsOnOneDocumentTest {
       assertFalse(first.isDirty(), "the text is the file's text, so there is nothing to warn about");
       assertFalse(second.isDirty(), "and neither window has anything the other does not");
 
+      // The setup wrote content a moment ago, and a swap is allowed to be half a second behind the buffer.
+      Thread.sleep(600);
+      Path swap = file.resolveSibling(".work.txt.swp");
+
       first.presses("i");
       first.types("x");
       first.presses("Escape");
 
       assertTrue(first.isDirty(), "this window typed a character");
       assertTrue(second.isDirty(), "and the window that watched is warned too: the work is the document's");
+      assertTrue(Files.exists(swap), "unsaved work in one window is unsaved work of the document, so it is mirrored");
 
       first.presses("ZZ");
 
@@ -99,6 +105,10 @@ class SessionsOnOneDocumentTest {
       boolean secondAfter = second.isDirty();
 
       assertEquals("x" + CONTENT, Files.readString(file), "the save wrote what one window typed");
+      // The swap the typing wrote is gone with the save: `ZZ` is `:w`, and a document whose text is in a file has
+      // nothing left to recover. Checked through the terminal's own key because this is the file's rule, not the
+      // command's.
+      assertTrue(Files.notExists(swap), "a save takes the swap with it");
       assertFalse(firstAfter, "the window that saved is clean");
       assertFalse(secondAfter, "and so is the window that only watched");
     }

@@ -115,7 +115,7 @@ end in a line break those are different characters, and the second is what the q
 |---|---|
 | `:w` | write the file the document came from |
 | `:w path` | write there, and make it the file the document came from |
-| `:open path` | load a file. Refused while there is unsaved work — `:w` first |
+| `:open path` | load a file. Refused while there is unsaved work — `:w` first. If a swap says the file is not the whole story, it stops and asks |
 | `:q` | leave this window. Refused while there is unsaved work |
 | `:q!` | leave, and throw the unsaved work away — its swap file too, so it does not come back at the next boot |
 
@@ -142,6 +142,40 @@ above are a language of their own instead. Keys are the rest of the interface.
 | `Backspace` | delete a character from the command line |
 | `Enter` | compile and run the command, push it onto history |
 | `Escape` | leave command state without running |
+
+## Swap files and recovery
+
+A document with work in it is mirrored to disk, at most twice a second. The last half second of typing is what a crash
+costs, which is the price of not writing a file on every keystroke.
+
+| the document | its swap is |
+|---|---|
+| opened from `notes.txt` | `.notes.txt.swp`, beside the file |
+| never given a name | a slot from a pool: `.swa`, `.swb` … `.swz`, then `.swa1`, and so on |
+
+A pool slot is claimed by existing, so two windows reaching for the pool at once cannot both be told they got `.swa`,
+and a slot is never overwritten. A document keeps the slot it got, so the nameless buffer you worked on for an hour is
+still `.swa` tomorrow. The pool is in the directory the terminal was launched in — a browser tab has no directory of its
+own, so its slots go to `~/.local/state/visur/browser/` — and the first window to type decides which, because a nameless
+buffer has one swap however many windows are looking at it. A `.swa` in `git status` is your own unsaved buffer and not
+corruption; `-Dvisur.swapDir=/path` moves the pool somewhere else.
+
+A slot goes away when a save gives the buffer a name, and when `:q!` closes the **last** window on that document.
+`:q!` in one tab leaves it for the window that stayed, since the swap belongs to the document and `:q!` closes a window.
+
+**Nothing is recovered without being asked.** A booting server loads the file it was given and pays no attention to any
+swap. `:open path` is where a swap gets answered, and the open waits for the answer rather than opening and complaining
+afterwards, because afterwards there is only one version left to choose:
+
+| key | means |
+|---|---|
+| `r` | recover: the swap's text comes into the buffer, and it comes in unsaved — that is what a swap is |
+| `d` | delete: that work is rejected, the swap goes with it, and the file opens clean |
+| `o` | read-only: open the file and look; `:w` refuses, `:w path` writes where you tell it |
+| any other key, `Escape` | change nothing — the file stays closed, the swap stays where it is, the question goes away |
+
+While visur is asking, the keyboard belongs to the question: the three keys answer it and every other key is the safe
+answer, so a stray key cannot choose a version of a file for you.
 
 ## Terminal client only
 

@@ -39,20 +39,20 @@ in the read-only case, and in both cases the user was told first.
 
 ## Done when
 
-- A nameless document with content **has a `.sw*` file** within the debounce window, and it is asserted at the path the
+- [x] A nameless document with content **has a `.sw*` file** within the debounce window, and it is asserted at the path the
   rule names — cwd for the terminal, `~/.local/state/visur/browser/` for the browser. The two paths are different tests.
-- Two nameless documents get two different slots. With `.swa`…`.swz` occupied, the next is `.swa1`, asserted rather than
+- [x] Two nameless documents get two different slots. With `.swa`…`.swz` occupied, the next is `.swa1`, asserted rather than
   reasoned about.
-- Nothing ever overwrites a pool slot, asserted by occupying one and opening a third document.
-- `:w ideas.txt` deletes the slot. `:q!` deletes it. `ZZ` deletes it. A failed save does **not**.
-- Opening a named file whose `.<name>.sw*` exists offers exactly three answers and does all three correctly: **recover**
+- [x] Nothing ever overwrites a pool slot, asserted by occupying one and opening a third document.
+- [x] `:w ideas.txt` deletes the slot. `:q!` deletes it. `ZZ` deletes it. A failed save does **not**.
+- [x] Opening a named file whose `.<name>.sw*` exists offers exactly three answers and does all three correctly: **recover**
   loads the swap and marks the document dirty; **delete** removes the swap and opens the file clean; **read-only** opens
   the file and refuses to write it.
-- **Nothing is recovered silently.** A test asserts that no path exists where a buffer's content changes at boot without
+- [x] **Nothing is recovered silently.** A test asserts that no path exists where a buffer's content changes at boot without
   the user having chosen it, which is the current behaviour's defining bug.
-- The `neverSavedDocumentRecoverableFromSwap` and `crashDuringSaveRestoresPreviousFile` tests are rewritten against these
+- [x] The `neverSavedDocumentRecoverableFromSwap` and `crashDuringSaveRestoresPreviousFile` tests are rewritten against these
   rules rather than left asserting the old ones, and `FileIoTest` says which rule each test holds.
-- The half-second hole is stated out loud: content typed in the last 500 ms is not in the swap. Accepted, because a
+- [x] The half-second hole is stated out loud: content typed in the last 500 ms is not in the swap. Accepted, because a
   swap write per keystroke is a disk write per keystroke.
 
 ## Notes
@@ -80,3 +80,65 @@ in the read-only case, and in both cases the user was told first.
   than the one during it. Whatever this ticket decides about staleness, the recovery copy needs a lifetime.
 - If `.visur-swap`/`.visur-recovery` and the `.sw*` pool both ship, there are three naming schemes on disk. The old two
   are deleted in this ticket — no compatibility window, and a swap file nobody can name is a swap file nobody recovers.
+
+## What landed
+
+**Two kinds of swap, one owner of the spelling.** `SwapFiles` answers "where does this document's text get mirrored":
+`.<name>.swp` beside a named file, or a slot from the pool for a nameless one, claimed create-exclusive off `.swa`
+through `.swz` and then `.swa1`. Three places used to spell `<path>.visur-swap` by hand; all three are gone, along with
+`.visur-recovery`, so there are two names on disk and both are in `keys.md`.
+
+**The pool directory is the typing window's, and the first window to type decides it.** The ticket says cwd for the
+terminal and `~/.local/state/visur/browser/` for the browser, and with one document shared by every client there is no
+per-client answer available: the buffer has one swap, so the first window that types into it claims its slot in *its*
+directory and the document keeps that slot while it is nameless. What a client is arrives as one word on the viewport
+declaration (`client: "terminal" | "browser"`), because that message already says who the window is and there is nothing
+else for the word to ride in on. Absent or unrecognised means no nameless swap — which is also what keeps every test that
+edits a document without a socket out of the working tree, and is why the pool directory had to be a property
+(`visur.swapDir`) before any of this could be tested at all.
+
+**Nothing is recovered silently, and the way to get there was subtraction.** `recoverFromSwapFiles` is deleted: boot
+loads the file it was given, writes nothing, deletes nothing. The three-way prompt then never had to become the thing the
+Notes were braced for — a server waiting on a client that has not connected yet — because recovery is only ever a
+question about *opening* a file, and `:open` happens with a window attached. So there is no boot-time prompt, and the
+fallback in the Notes ("open read-only and put the offer on screen") was never needed.
+
+**The question is a session state, not a message, but it is drawn in the message row.** It has three keys and a safe
+answer, `r`/`d`/`o` and everything else, and while it is pending `press()` spends the next keypress on answering it. The
+pixels are the message row because that is the only line visur has; what makes it a question is that the next key has an
+answer. Any key that is not one of the three is the safe answer — abandon the open, change nothing, swallow the key —
+which is Escape with the door left open, and cheaper to survive than a keyboard that half-works during a question.
+
+**The answers**: `r` loads the swap and leaves it dirty (a swap is a record of text that never arrived), `d` deletes the
+swap and opens the file clean, `o` opens the file and sets read-only, which refuses a plain `:w` and not `:w path`, since
+naming a file is a louder statement than a flag. All three go through the one `LoadFileOp.install` reset, because two
+copies of "make this text be this file's document" is two chances for the cursor to land in different places.
+
+**`:q!` deletes the swap only as the last window on the document.** The ticket says `:q!` deletes it, written before the
+document was shared: the swap belongs to the document and `:q!` closes a window, so `:q!` in one tab taking away the
+insurance of a tab still editing is not what anyone there agreed to. Checked in both directions by mutation, since
+"always" and "never" each break exactly one half of the test.
+
+**A load that works deletes the swap of the name it left, and never the swap of the name it arrived at** — a
+`.newname.swp` is somebody else's crash, and `:w newname` has no business eating it. `setSourceFilePath` with the path it
+already had does nothing at all, which is a bug this ticket found on its own: `:open` of the open file was throwing away
+that file's swap.
+
+**Tests.** `SwapFilesTest` (7): the pool in order, no slot twice, an occupied slot left alone, `.swa1`, and both default
+directories named. `StartupFileTest` (3): the first tests in the repo to boot the real verticle, because everything else
+initialised the model by hand and that is how the silent recovery outlived everything around it. `RecoveryOfferTest` (6):
+the offer, the three answers, the safe answer, and read-only giving way to a path. `FileIoTest` now states a rule per
+test instead of a vim scenario: an unsaved edit survives beside its file, a failed save leaves both the old bytes and the
+swap alone, a successful save takes the swap with it. `SessionsOnOneDocumentTest` (+2): two windows on a nameless buffer
+is one slot, and `:q!` discards as the last window only.
+
+**Checked live** (fat jar, scratch cwd, node client): boot ignored a swap and left it on disk; `:open` offered, `Escape`
+changed nothing, `d` deleted and opened clean, `o` opened and `:w` refused with the file unchanged while `:w elsewhere.txt`
+wrote; a save deleted the swap; typing into a nameless buffer in a terminal's launch directory created `.swa` holding the
+typed text, and booting created nothing. The literal browser path is asserted in a unit test and not created live, since
+the check would have written into the home directory of whoever ran it.
+
+**One thing the suite was hiding.** Sessions live in a static map keyed by socket id, and the id-less session a test
+uses is created on demand and never thrown away — so a question asked in one test class was pending in the next class's,
+swallowing its keys, and one test had been inheriting another's cursor. `ServiceHolder.init` now closes every connection,
+which is what a new model means and what `MainVerticle` already did.
