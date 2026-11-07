@@ -27,7 +27,12 @@ public class PasteYankRegisterOp implements Operator {
     String displaced = content.substring(start, end);
     emc.document().putContent(content.substring(0, start) + pasted + content.substring(end));
     // The register records what this keypress removed, and only then.
-    if (!displaced.isEmpty()) emc.session().putGlobalVar("yankRegister", ObjectVisurVar.make(displaced));
+    if (!displaced.isEmpty()) {
+      emc.session().putGlobalVar("yankRegister", ObjectVisurVar.make(displaced));
+      // The text a paste covered goes out too, which is the map's rule even when it means the clipboard ends up holding
+      // something the user never copied: a register you paste from that is not the register you paste into is worse.
+      Clipboard.offer(emc.session(), displaced);
+    }
     // Paste finishes at span 0 with the caret on the last pasted character, so the next p — or the next d — meets the
     // text the paste left, not the selection the first one consumed. The span is s's to set, and this is the one
     // command whose post-condition is a span of zero rather than a range that happened to come back empty.

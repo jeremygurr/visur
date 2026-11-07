@@ -44,6 +44,50 @@ public class Session {
   }
 
   /**
+   * What this window's running command wants on the user's clipboard, until the command ends and one frame is sent.
+   *
+   * <p>Held here rather than in {@link Clipboard} because it belongs to one pair of hands: two windows copying at once
+   * are two requests to two machines' clipboards, and a global holding the pending text would let either flush send
+   * both.
+   */
+  private String pendingClipboardWrite;
+
+  public void offerClipboardWrite(String text) {
+    pendingClipboardWrite = text;
+  }
+
+  /** What to write, and forget it: a command's clipboard offer is spent whether or not it made it to a client. */
+  public String takeClipboardWrite() {
+    String offered = pendingClipboardWrite;
+    pendingClipboardWrite = null;
+    return offered;
+  }
+
+  /**
+   * The clipboard question this window was asked and has not answered: the timer that will give up on it.
+   *
+   * <p>Atomic, where the rest of this class is not, because the two things that end a question — the client's reply and
+   * the timer running out — are run by the event loop without reference to each other, and a window that both answers
+   * and times out would paste one and apologise for the other. Whoever takes the slot wins; the other does nothing.
+   */
+  private final java.util.concurrent.atomic.AtomicReference<Long> clipboardReadTimer =
+    new java.util.concurrent.atomic.AtomicReference<>();
+
+  public void putClipboardReadTimer(Long timerId) {
+    clipboardReadTimer.set(timerId);
+  }
+
+  /** The outstanding question, if any, and this window no longer having one. */
+  public Long takeClipboardReadTimer() {
+    return clipboardReadTimer.getAndSet(null);
+  }
+
+  /** Give up the question only if it is still the one this window is waiting on. */
+  public boolean clearClipboardReadTimerIf(Long timerId) {
+    return clipboardReadTimer.compareAndSet(timerId, null);
+  }
+
+  /**
    * What kind of client is on the other end, as soon as it says so. It decides one thing: the directory a nameless
    * buffer's swap is claimed from. Null until the window declares itself, which is the state most tests live in.
    */

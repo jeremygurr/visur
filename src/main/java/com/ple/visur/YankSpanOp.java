@@ -11,6 +11,7 @@ public class YankSpanOp implements Operator {
     String text = content.substring(extent[0], extent[1]);
     if (!text.isEmpty()) {
       emc.session().putGlobalVar("yankRegister", ObjectVisurVar.make(text));
+      Clipboard.offer(emc.session(), text);
     }
   }
 }

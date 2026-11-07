@@ -11,6 +11,7 @@ public class ServiceHolder {
     // they have. Without this the session outlives the model it was reading: the next test in the JVM inherits the last
     // one's cursor, its command line and — the case that proved it — a question it was never asked and cannot unhear.
     Connections.closeAll();
+    Clipboard.reset();
     editorModelCoupler = EditorModelCoupler.make();
     commandCompileService = CommandCompileService.make();
     initializerService = InitializerService.make(editorModelCoupler);

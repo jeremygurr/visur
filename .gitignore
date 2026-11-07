@@ -9,6 +9,8 @@ tmp/
 *.tmp
 *.bak
 *.swp
+.sw[a-z]
+.sw[a-z][0-9]
 *~.nib
 local.properties
 .settings/

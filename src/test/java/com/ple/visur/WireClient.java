@@ -189,6 +189,30 @@ final class WireClient implements AutoCloseable {
     return fail("no view arrived on this socket after it declared a " + cols + " by " + rows + " grid");
   }
 
+  /**
+   * The next request this socket was sent for one address, or null if none arrives.
+   *
+   * <p>A request is not a view: a view tells this client what to paint, a request asks it to do something on the
+   * machine it is running on — write its clipboard, read it — and the two share one queue in the order the server
+   * published them. Frames for other addresses are dropped rather than kept, so ask for what you are waiting for
+   * before calling {@link #view()}, which drains everything.
+   */
+  JsonObject nextRequest(String address, long patienceInMillis) {
+    long deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MILLISECONDS.toNanos(patienceInMillis);
+    while (System.nanoTime() < deadline) {
+      String frame = poll(100);
+      if (frame == null) {
+        continue;
+      }
+      JsonObject envelope = new JsonObject(frame);
+      if (address.equals(envelope.getString("address"))) {
+        Object body = envelope.getValue("body");
+        return body instanceof JsonObject asObject ? asObject : new JsonObject((String) body);
+      }
+    }
+    return null;
+  }
+
   private String poll(long patienceInMillis) {
     try {
       return frames.poll(patienceInMillis, TimeUnit.MILLISECONDS);

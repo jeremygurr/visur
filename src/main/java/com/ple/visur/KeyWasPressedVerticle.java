@@ -2,6 +2,7 @@ package com.ple.visur;
 
 import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.core.json.JsonObject;
+import io.vertx.rxjava3.core.eventbus.EventBus;
 import io.vertx.rxjava3.core.eventbus.Message;
 
 public class KeyWasPressedVerticle extends AbstractVisurVerticle {
@@ -27,6 +28,7 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
       CountPrefix.retireUnlessDigit(emc, key);
     }
     bus.send(BusEvent.modelWasChanged.name(), null);
+    flushClipboard(emc, bus);
     // After the repaint, so the window that is leaving is painted once more before it goes. Published rather than sent:
     // every socket is listening and each closes only the one the header names, which is how a view is addressed too —
     // `:q` in one browser tab closing another tab's editor would be a bug with a new name.
@@ -87,6 +89,29 @@ public class KeyWasPressedVerticle extends AbstractVisurVerticle {
     emc.putConnection(Connections.headerOf(event)); // a paste wraps text at the width the client asked to be wrapped at
     pasteText(emc, body.getString("text", ""));
     bus.send(BusEvent.modelWasChanged.name(), null);
+    flushClipboard(emc, bus); // a paste that displaced a yank is one command, and one clipboard write
+  }
+
+  /**
+   * The clipboard offer this command left, in one frame, after the command is over.
+   *
+   * <p>A yank, a delete, and the text a paste covered are each a thing that wants writing, and a command that did
+   * several of them — or {@code 3 p}, which displaces three times — still gets one frame: terminals beep at a stream of
+   * paste requests, and every one of them throws away something the user had. Sent after the repaint, so the window
+   * shows what was copied before its terminal goes and asks the clipboard.
+   *
+   * <p>With no socket behind the command — the headless server, a unit test that presses keys — there is no clipboard
+   * to write and no memory of one worth trusting, so the offer is spent and nothing is sent. Spending it is the point:
+   * a later command must not find an earlier one's text waiting to be sent to a client that arrives in between.
+   */
+  static void flushClipboard(EditorModelCoupler emc, EventBus bus) {
+    String text = emc.session().takeClipboardWrite();
+    if (text == null || Connections.NONE.equals(emc.getConnection())) {
+      return;
+    }
+    Clipboard.cache(text);
+    bus.publish(BusEvent.clipboardWriteRequested.name(), new JsonObject().put("text", text),
+      new DeliveryOptions().addHeader(Connections.HEADER, emc.getConnection()));
   }
 
   /** A pasted block arrives on the bus rather than as a key; static for the same reason {@link #press} is. */

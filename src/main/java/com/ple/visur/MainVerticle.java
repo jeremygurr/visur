@@ -5,6 +5,7 @@ import io.vertx.core.eventbus.DeliveryOptions;
 import io.vertx.rxjava3.core.AbstractVerticle;
 import io.vertx.rxjava3.core.http.HttpServerRequest;
 import io.vertx.rxjava3.core.http.HttpServerResponse;
+import io.vertx.rxjava3.core.http.ServerWebSocket;
 import io.vertx.rxjava3.core.eventbus.MessageConsumer;
 import io.vertx.rxjava3.ext.web.Router;
 import io.vertx.rxjava3.ext.web.RoutingContext;
@@ -17,6 +18,7 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -43,6 +45,7 @@ public class MainVerticle extends AbstractVerticle {
     vertx.deployVerticle(new KeyWasPressedVerticle())
       .flatMap(ignored -> vertx.deployVerticle(new ViewportWasChangedVerticle()))
       .flatMap(ignored -> vertx.deployVerticle(new ModelWasChangedVerticle()))
+      .flatMap(ignored -> vertx.deployVerticle(new ClipboardContents()))
       .subscribe(
         ignored -> vertx.createHttpServer().requestHandler(router()).listen(serverPort())
           .subscribe(listening -> started.complete(), failure -> couldNotListen(failure, started)),
@@ -129,15 +132,6 @@ public class MainVerticle extends AbstractVerticle {
         Session window = Connections.open(connection);
         ServiceHolder.initializerService.startSession(window);
         ServiceHolder.initializerService.openLaunchFile(window);
-        MessageConsumer<JsonObject> outbound = vertx.eventBus().consumer(BusEvent.viewWasChanged.name(), message -> {
-          // Published to everybody, painted for one: the view whose header does not name this socket was rendered at
-          // some other client's width, and drawing it here is the bug this whole class of one-field-per-client fixed.
-          if (!connection.equals(message.headers().get(Connections.HEADER))) {
-            return;
-          }
-          socket.writeTextMessage(
-            new JsonObject().put("address", BusEvent.viewWasChanged.name()).put("body", message.body()).encode());
-        });
         MessageConsumer<JsonObject> farewell = vertx.eventBus().consumer(BusEvent.connectionShouldClose.name(), message -> {
           // The view's addressing again: this socket closes the window whose id it minted, and no other. `:q` typed in
           // one client ending a second client's session would be the same bug this connection id was introduced to fix.
@@ -148,26 +142,52 @@ public class MainVerticle extends AbstractVerticle {
           // status code, and only the first of them may tell the launcher to leave the server running.
           socket.close((short) 1000, ":q");
         });
+        // Everything this socket may be told, each address filtered down to the window it was addressed to. There are
+        // two kinds: a view, which says what to paint, and a request, which asks this client to do a thing on the
+        // machine it is running on. Both belong to one window — a clipboard write published to everybody would put the
+        // same text on several users' clipboards at once, beeping at each of them.
+        List<MessageConsumer<JsonObject>> outbound = List.of(
+          relay(BusEvent.viewWasChanged, socket, connection),
+          relay(BusEvent.clipboardWriteRequested, socket, connection),
+          relay(BusEvent.clipboardReadRequested, socket, connection),
+          farewell);
+        // Both paths: a socket can fail without ever reporting a close, and a consumer left pointing at a dead
+        // socket would keep swallowing published views. The connection goes with the socket either way, which is
+        // what stops a day of browser reloads from leaving a day of viewports behind.
+        Runnable detach = () -> outbound.forEach(MessageConsumer::unregister);
         socket.textMessageHandler(frame -> {
           JsonObject message = new JsonObject(frame);
           vertx.eventBus().send(message.getString("address"), message.getValue("body"),
             new DeliveryOptions().addHeader(Connections.HEADER, connection));
         });
-        // Both paths: a socket can fail without ever reporting a close, and a consumer left pointing at a dead
-        // socket would keep swallowing published views. The connection goes with the socket either way, which is
-        // what stops a day of browser reloads from leaving a day of viewports behind.
         socket.closeHandler(closed -> {
-          outbound.unregister();
-          farewell.unregister();
+          detach.run();
           Connections.close(connection);
         });
         socket.exceptionHandler(failure -> {
-          outbound.unregister();
-          farewell.unregister();
+          detach.run();
           Connections.close(connection);
         });
       },
       error -> LOGGER.error("websocket upgrade failed", error));
+  }
+
+  /**
+   * One address, forwarded to the one client whose id the bus header carries, and dropped for every other.
+   *
+   * <p>{@code publish} is the only way to reach the socket a frame is meant for — every accepted socket is listening,
+   * and each keeps the copy the header names it. A view is published this way for a reason that predates this method
+   * (see {@link ModelWasChangedVerticle}); a clipboard request is published this way for the same reason plus one of
+   * its own, which is that the wrong client writing its user's clipboard is not a repaint but a lie in somebody's
+   * paste buffer.
+   */
+  private MessageConsumer<JsonObject> relay(BusEvent address, ServerWebSocket socket, String connection) {
+    return vertx.eventBus().consumer(address.name(), message -> {
+      if (!connection.equals(message.headers().get(Connections.HEADER))) {
+        return;
+      }
+      socket.writeTextMessage(new JsonObject().put("address", address.name()).put("body", message.body()).encode());
+    });
   }
 
   private static boolean isLoopback(HttpServerRequest request) {
