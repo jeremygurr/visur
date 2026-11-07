@@ -153,7 +153,7 @@ Facts established before a ticket was written, each of which changes how a ticke
 | ~~04~~ [closed](issues/04-dirty-tracking.md) | Dirty is a comparison against the saved baseline; `*` in the mode line; undo back to saved clears it | 03 |
 | ~~05~~ [closed](issues/05-command-key-and-grammar.md) | `:` replaces `;`, bare paths, `:w` `:open` `:q` `:q!`, and the keypress test `;` never had | 01, 04 |
 | ~~06~~ [closed](issues/06-swap-files.md) | Swap files: nameless pool, browser state dir, never overwrite, delete on save, vim's three-way prompt for named files | 01, 04, 05 |
-| [07](issues/07-launch-argument.md) | `visur /path/to/file`, with a warning when a server is already running | 05 |
+| ~~07~~ [closed](issues/07-launch-argument.md) | `visur /path/to/file`, with a warning when a server is already running | 05 |
 | [08](issues/08-clipboard-transport.md) | Clipboard transport: outbound write request, inbound contents, server-side cache, one write per command | 01 |
 | [09](issues/09-register-model.md) | `|` selects a register: `|0` clipboard, `|1`–`|9` rotation, `|a`–`|z` named, freeze toggle | 03, 08 |
 | [10](issues/10-browser-clipboard.md) | Browser clipboard both ways: the `paste` event visur never wired, `writeText`, `readText` | 08 |
@@ -205,6 +205,14 @@ script passing a property the tests already prove works.
 It also left one question for 08 to answer rather than invent: a clipboard write is addressed to *a* client, and
 `ClientKind` says what a window is, not which window to ask. The window that ran the command is the one whose socket the
 write goes down, which is the same `Connections.HEADER` addressing `:q` and `viewWasChanged` already use.
+
+**07 left two things for the tickets after it.** An arriving window can now be handed something to *answer* — the launch
+load runs in the first window, and a swap question can be waiting there — so a later feature that has to greet a client
+has a place and a precedent (`InitializerService.openLaunchFile`) rather than an environment variable and a hope. And the
+launcher starts exactly one kind of process: `java -jar` on the fat jar, with `-Dvisur.file` in front of it. The server
+now has three levers (`visur.port`, `visur.file`, `visur.swapDir`), all JVM properties, all set by the launcher or by a
+test and none by an environment variable — which is the shape [08](issues/08-clipboard-transport.md) should copy if
+asking a client needs a knob at all.
 
 ## Known broken, nobody's ticket yet
 
@@ -271,3 +279,4 @@ Found while working, verified, and left alone because nothing above owns it. Eac
   User-configurable keys remain the map the last session deferred.
 - **A general chord vocabulary.** Clipboard keys are ordinary characters, so the terminal's deliberate
   drop-every-CONTROL/ALT/SUPER-chord rule is untouched.
+

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
+
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -153,6 +155,31 @@ class StartupFileTest {
       client.presses("Escape");
 
       assertTrue(client.text().contains("still usable"), "a failed launch is not a broken editor: " + client.text());
+    }
+  }
+
+  /**
+   * A file that will not open is a sentence on the window, not a stack trace in a log: the same door answers for a
+   * directory and for a permission refusal, so this is the second half of {@link #launchingOnADirectorySaysSoOnTheWindow}
+   * and it was green when written, because {@code LoadFileOp.open} already hands an {@code IOException} to the window
+   * that asked.
+   */
+  @Test
+  void launchingOnAFileThatCannotBeReadSaysSoOnTheWindow() throws IOException {
+    Path unreadable = dir.resolve("secret.txt");
+    Files.writeString(unreadable, "words you may not have\n");
+    assumeTrue(unreadable.toFile().setReadable(false) && !Files.isReadable(unreadable),
+      "this machine lets the test read it anyway");
+    System.setProperty("visur.file", unreadable.toString());
+
+    bootServer();
+
+    try (WireClient client = new WireClient(vertx, port, 60, 8)) {
+      // One line, naming the file, on the window that asked — which is the whole of it. The stack-trace version of this
+      // left the server up and the screen blank with no explanation anywhere.
+      assertTrue(client.message().startsWith("loadFile:"), "a sentence, not a trace: " + client.message());
+      assertTrue(client.message().contains("secret.txt"), "naming the file it could not read: " + client.message());
+      assertFalse(client.isDirty(), "and nothing was loaded, so there is no unsaved work");
     }
   }
 

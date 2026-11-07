@@ -132,6 +132,13 @@ test instead of a vim scenario: an unsaved edit survives beside its file, a fail
 swap alone, a successful save takes the swap with it. `SessionsOnOneDocumentTest` (+2): two windows on a nameless buffer
 is one slot, and `:q!` discards as the last window only.
 
+**07 narrowed the boot rule the day after it landed.** "Boot pays no attention to any swap" is a true statement about a
+server nobody connects to; `visur notes.txt` is a different thing, because whoever typed it is standing there. The launch
+load now happens when the first window arrives, through `:open`'s door, so launching onto a crash asks the question and
+`StartupFileTest.aSwapBesideTheFileIsNeitherLoadedNorDeletedAtBoot` became
+`launchingOnAFileWithASwapAsksTheWindowThatArrived`. Nothing about what a swap *is* changed, and the swap still survives
+an unanswered question.
+
 **Checked live** (fat jar, scratch cwd, node client): boot ignored a swap and left it on disk; `:open` offered, `Escape`
 changed nothing, `d` deleted and opened clean, `o` opened and `:w` refused with the file unchanged while `:w elsewhere.txt`
 wrote; a save deleted the swap; typing into a nameless buffer in a terminal's launch directory created `.swa` holding the

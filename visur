@@ -9,7 +9,7 @@
 #
 # The server is started as `java -jar` on the fat jar, built first when a source file is newer than it. Not
 # `./gradlew run`: that starts a `--redeploy` watcher, a JVM that owns no socket, outlives its client, and is invisible
-# to the `lsof` this script uses to stop what it owns — fourteen of one machine at once, all of them burning CPU.
+# to the `lsof` this script uses to stop what it owns — fourteen on one machine at once, all of them burning CPU.
 # `./gradlew run` stays the way to run a server that watches src/ and reloads; this script is the way to edit a file.
 #
 # Exit codes: the client's; 1 for "your file was not opened"; 2 for a command line visur does not take.
@@ -17,8 +17,6 @@
 # Uses the server already listening on :8888. If there is none it starts one and owns it, and a server it started is
 # stopped again when the client exits — unless the client detached (ZZ or ZQ, exit code 0), which asks for the server
 # to stay. A server that was already running is never ours to stop.
-#
-# `./gradlew run` stays the way to start the server on its own; this script is the way to use Visur.
 #
 # VISUR_SERVER overrides how the server is started (a command line), VISUR_CLIENT overrides the client, and VISUR_LOG
 # says where the server's output goes. The overrides exist so the lifecycle below can be tested without a terminal.
@@ -70,8 +68,8 @@ build_client() {
   }
 }
 
-# A fat jar needs no Gradle daemon and no compile check, so it starts in about a second; it is only used when it is
-# newer than every source file, so a stale jar can never serve yesterday's editor.
+# One jar, built when a source file is newer than it: a stale jar cannot serve yesterday's editor, and starting a
+# server needs no Gradle daemon in the way.
 start_server() {
   # The file argument goes on whichever server command runs, overridden or not, so "did it reach the JVM?" has one
   # answer instead of one answer per start path.
@@ -116,10 +114,11 @@ case "${1:-}" in
     # Resolved here, in the directory the command was typed in: the server's cwd is whichever directory happened to
     # launch it first, so a relative path would mean one thing to the person who started the server and another to
     # whoever types the command next.
-    FILE_ARG="-Dvisur.file=$(resolve_path "$1")"
+    ABS="$(resolve_path "$1")"
+    FILE_ARG="-Dvisur.file=$ABS"
     if probe; then
       echo "visur is already running on :$PORT with another document — $1 was not opened." >&2
-      echo "Type ':open $(resolve_path "$1")' inside it, or stop that server first: lsof -ti tcp:$PORT | xargs kill" >&2
+      echo "Type ':open $ABS' inside it, or stop that server first: lsof -ti tcp:$PORT | xargs kill" >&2
       exit 1
     fi
     ;;
