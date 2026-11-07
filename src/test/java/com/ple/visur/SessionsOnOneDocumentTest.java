@@ -281,4 +281,101 @@ class SessionsOnOneDocumentTest {
       assertEquals(5, first.pendingCount(), "and the first window is still counting what its own hands typed");
     }
   }
+
+  /**
+   * A buffer with no filename is the one kind that cannot be reopened by name, so it has to be written somewhere
+   * findable, and "somewhere" is the question the client's one word answers: the directory the terminal was launched
+   * in, or visur's own state directory for a browser tab.
+   *
+   * <p>Asserted over a socket rather than in a unit test because the word arrives on the wire, and the whole point of
+   * ticket 02's declaration is that it reaches the window that sent it.
+   */
+  @Test
+  void aNamelessBufferTypedByADeclaredWindowClaimsASlotInThePool(@TempDir Path dir) throws IOException, InterruptedException {
+    System.setProperty("visur.swapDir", dir.toString());
+    try (WireClient terminal = new WireClient(vertx, port, 40, 10, ClientKind.TERMINAL)) {
+      // The setup wrote content a moment ago, and the swap is allowed to be half a second behind the buffer.
+      Thread.sleep(600);
+
+      terminal.presses("i");
+      terminal.types("q");
+      terminal.presses("Escape");
+      terminal.text(); // a frame arrives after the command ran, which is the wait that makes the swap write certain
+
+      try (WireClient second = new WireClient(vertx, port, 40, 10, ClientKind.BROWSER)) {
+        second.presses("x");
+        second.text();
+        assertEquals("q" + CONTENT, Files.readString(dir.resolve(".swa")),
+          "the slot holds the document, and one document has one slot however many windows are typing into it");
+        try (var slots = Files.newDirectoryStream(dir, ".sw*")) {
+          int claimed = 0;
+          for (Path ignored : slots) {
+            claimed++;
+          }
+          assertEquals(1, claimed, "two windows on one buffer is one buffer, so one slot: " + slots);
+        }
+      }
+    } finally {
+      System.clearProperty("visur.swapDir");
+    }
+  }
+
+  /**
+   * `:q!` discards, and what it discards is a window. The swap belongs to the document, so while a second window is
+   * still editing that document its insurance stays — taking it away would leave the window that stayed behind one
+   * crash away from losing the file, which is not what typing `:q!` in the *other* tab agreed to.
+   */
+  @Test
+  void quittingTheLastWindowIsWhatDiscardsTheSwap(@TempDir Path dir) throws IOException, InterruptedException {
+    Path file = dir.resolve("shared.txt");
+    Files.writeString(file, CONTENT);
+    emc.document().setSourceFilePath(file.toString());
+    emc.document().putContentAsSaved(CONTENT);
+    Path swap = dir.resolve(".shared.txt.swp");
+
+    WireClient leaving = new WireClient(vertx, port, 40, 10);
+    WireClient staying = new WireClient(vertx, port, 40, 10);
+    try {
+      // The setup wrote content a moment ago, and a swap is allowed to be half a second behind the buffer: without this
+      // the first edit of the test is the one the debounce drops.
+      Thread.sleep(600);
+
+      leaving.presses("i");
+      leaving.types("!");
+      leaving.presses("Escape");
+      leaving.text();
+      assertTrue(Files.exists(swap), "unsaved work of one window is unsaved work of the document, and mirrored");
+
+      quitForcefully(leaving);
+      assertTrue(Files.exists(swap), "one window left; the window still here has not thrown anything away");
+
+      // The server closes the socket it was asked to let go, and the next answer depends on how many are left.
+      for (int waited = 0; waited < 200 && Connections.count() > 1; waited++) {
+        try {
+          Thread.sleep(10);
+        } catch (InterruptedException interrupted) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+      }
+
+      quitForcefully(staying);
+      assertTrue(Files.notExists(swap), "the last window on a document is the one that gets to discard it");
+    } finally {
+      leaving.close();
+      staying.close();
+    }
+  }
+
+  /**
+   * `:q!`, typed, and the wait is the socket closing: that is what the command asks for, it happens after the command
+   * has run, and the last frame a closed window paints is not something to read afterwards.
+   */
+  private void quitForcefully(WireClient window) {
+    window.presses(":");
+    window.presses("q");
+    window.presses("!");
+    window.presses("Enter");
+    assertTrue(window.waitsToBeClosedByTheServer(), "the window asked to be let go, and the socket that asked is what goes");
+  }
 }

@@ -12,5 +12,21 @@ package com.ple.visur;
  */
 public enum ClientKind {
   TERMINAL,
-  BROWSER
+  BROWSER;
+
+  /**
+   * The word the client sends for itself, or null when it said nothing useful.
+   *
+   * <p>A wrong word is not worth an error message: the only thing this decides is a directory, and a client that
+   * cannot say what it is gets no nameless swap, which is what it would have got for no declaration at all.
+   */
+  public static ClientKind parse(String word) {
+    if ("terminal".equals(word)) {
+      return TERMINAL;
+    }
+    if ("browser".equals(word)) {
+      return BROWSER;
+    }
+    return null;
+  }
 }

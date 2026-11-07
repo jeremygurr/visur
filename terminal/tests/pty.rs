@@ -524,13 +524,17 @@ fn synchronized_output_wraps_frames_when_the_terminal_says_yes() {
   );
 }
 
-/// Did the client send a viewport declaration of exactly this size?
+/// Did the client send a viewport declaration of exactly this size, saying what it is?
 fn declared(frames: &Arc<Mutex<Vec<String>>>, cols: usize, rows: usize) -> bool {
   frames.lock().unwrap().iter().any(|frame| {
     let Ok(value) = serde_json::from_str::<serde_json::Value>(frame) else { return false };
     value["address"] == "viewportWasChanged"
       && value["body"]["cols"] == cols
       && value["body"]["rows"] == rows
+      // The word that says which directory an unsaved nameless buffer belongs to. Asserted here because this is the
+      // one place a frame is inspected, and a client that stopped saying it would silently stop swapping in the
+      // project directory.
+      && value["body"]["client"] == "terminal"
   })
 }
 

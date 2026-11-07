@@ -67,7 +67,9 @@ fn send(socket: &mut Socket, address: &str, body: Value) {
 /// The viewport declaration. Once at attach is enough: the server binds it to this socket and remembers it until
 /// the socket closes, and another client declaring a different window no longer moves this one's lines.
 pub fn declare(socket: &mut Socket, cols: usize, rows: usize) {
-  send(socket, "viewportWasChanged", json!({ "cols": cols, "rows": rows }));
+  // `client` is one word of self-description: it decides which directory an unsaved nameless buffer's swap is claimed
+  // from, and for the terminal that is the directory it was launched in, the same reason a swap belongs beside a file.
+  send(socket, "viewportWasChanged", json!({ "cols": cols, "rows": rows, "client": "terminal" }));
 }
 
 pub fn send_key(socket: &mut Socket, token: &str) {

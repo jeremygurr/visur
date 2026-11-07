@@ -47,7 +47,10 @@ socket.onopen = function() {
   // Cells, not pixels, and content rows only: the last canvas row is chrome. The server lays out that many rows.
   send("viewportWasChanged", {
     cols: (canvas.width - cxContentOffset) / cellWidth + 1,
-    rows: (canvas.height - cyContentOffset) / cellHeight
+    rows: (canvas.height - cyContentOffset) / cellHeight,
+    // One word, and it decides where an unsaved buffer with no filename gets its swap: this page has no project
+    // directory, so its work belongs to visur's own state directory rather than to wherever the server was started.
+    client: "browser"
   })
 }
 

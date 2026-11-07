@@ -51,6 +51,17 @@ final class WireClient implements AutoCloseable {
   }
 
   /** This client's window is now this big, which is the only thing it ever sends unprompted. */
+  /**
+   * A window that says what it is, which today decides one thing: the directory a nameless document's swap is claimed
+   * from. Tests that never type into a nameless document do not need it, which is why it is a second constructor and
+   * not a parameter on the first.
+   */
+  WireClient(Vertx vertx, int port, int cols, int rows, ClientKind kind) {
+    this(vertx, port, cols, rows);
+    send(BusEvent.viewportWasChanged.name(), new JsonObject()
+      .put("cols", cols).put("rows", rows).put("client", kind.name().toLowerCase(java.util.Locale.ROOT)));
+  }
+
   void resizesTo(int cols, int rows) {
     this.cols = cols;
     this.rows = rows;
