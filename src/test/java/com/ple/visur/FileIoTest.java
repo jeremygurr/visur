@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *
  * <p>Covers: byte-exact UTF-8 save/load, round-trip identity, no-trailing-newline handling,
  * atomic write (old file survives), no-path error, explicit-path save-as,
- * and loadFile with missing file leaving the document untouched.
+ * and loadFile creating a document for a path that is not on disk yet.
  */
 class FileIoTest {
   private Vertx vertx;
@@ -153,14 +153,22 @@ class FileIoTest {
   }
 
   @Test
-  void loadFileMissingFileLeavesDocumentUntouched() {
+  void openingAMissingFileStartsANewDocumentAtThatPath() {
+    // What vim does, and the rule was reversed to match it: a path that is not there yet is a document with no text,
+    // not a typo worth an error. The file itself still waits for a save, so a mistyped name costs a buffer and not a
+    // file nobody meant to create.
+    Path missing = tempDir.resolve("notes.txt");
     ServiceHolder.editorModelCoupler.document().putContentAsSaved("stays");
-    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack("/nonexistent/path.txt");
+    ServiceHolder.editorModelCoupler.session().putOnExecutionDataStack(missing.toString());
     new LoadFileOp().execute(null);
 
-    assertEquals("stays", ServiceHolder.editorModelCoupler.document().getContent());
-    assertTrue(ServiceHolder.editorModelCoupler.session().getMessage().contains("/nonexistent/path.txt"),
-      "an error that does not name the file it failed on tells the user nothing");
+    assertEquals("", ServiceHolder.editorModelCoupler.document().getContent());
+    assertEquals("", ServiceHolder.editorModelCoupler.session().getMessage(), "nothing went wrong, so nothing is reported");
+    assertEquals(missing.toString(), ServiceHolder.editorModelCoupler.document().getSourceFilePath(),
+      "the name is remembered, so the next :w needs no argument");
+    assertFalse(ServiceHolder.editorModelCoupler.document().isDirty(),
+      "a document with no text at a path with no file has nothing unsaved");
+    assertFalse(Files.exists(missing), "visur creates the file when it saves, not when it opens");
   }
 
   @Test

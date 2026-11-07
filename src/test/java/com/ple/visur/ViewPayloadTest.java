@@ -91,8 +91,8 @@ class ViewPayloadTest {
   void aReportedErrorTravelsToThePayloadAndAnEditorThatReportedNothingShowsNothing() {
     assertEquals("", View.of(emc).render().getString("message"), "nothing reported is nothing shown");
 
-    emc.session().reportError("loadFile: file not found: /tmp/gone.txt");
+    emc.session().reportError("loadFile: not a regular file: /tmp/gone.txt");
 
-    assertEquals("loadFile: file not found: /tmp/gone.txt", View.of(emc).render().getString("message"));
+    assertEquals("loadFile: not a regular file: /tmp/gone.txt", View.of(emc).render().getString("message"));
   }
 }

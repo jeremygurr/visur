@@ -214,7 +214,7 @@ public class InitializerService {
       window.putMessage("another window is editing this document: :open " + filePath + " to see that file here");
       return;
     }
-    LoadFileOp.open(emc, window, filePath, true);
+    LoadFileOp.open(emc, window, filePath);
   }
 
   private void initializeKeymaps() {

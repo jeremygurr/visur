@@ -6,6 +6,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Stack;
 
@@ -71,13 +73,16 @@ class ErrorMessageTest {
   }
 
   @Test
-  void aFailedLoadSaysWhyOnTheScreenAndTheNextKeypressTakesTheComplaintAway() {
-    String missing = tempDir.resolve("gone.txt").toString();
+  void aFailedLoadSaysWhyOnTheScreenAndTheNextKeypressTakesTheComplaintAway() throws IOException {
+    // A path that does not exist used to be this test's failure, and it is not one any more: a name that is not on disk
+    // is a new document, which is the rule vim has. A directory is still a load that cannot happen.
+    String aDirectoryInsteadOfAFile = Files.createDirectory(tempDir.resolve("somewhere.txt.dir")).toString();
     assertEquals("", View.of(emc).render().getString("message"), "nothing has gone wrong yet");
 
-    load(missing);
+    load(aDirectoryInsteadOfAFile);
 
-    assertEquals("loadFile: file not found: " + missing, View.of(emc).render().getString("message"),
+    assertEquals("loadFile: not a regular file: " + aDirectoryInsteadOfAFile,
+      View.of(emc).render().getString("message"),
       "the key that failed says why, and is still on screen when it is drawn");
     assertEquals(CONTENT, emc.document().getContent(), "a failed load leaves the document alone");
 

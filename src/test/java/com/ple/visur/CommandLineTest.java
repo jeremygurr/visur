@@ -149,6 +149,22 @@ class CommandLineTest {
   }
 
   /**
+   * A name that is not on disk is a document with no text, which is what vim does. What makes this safe instead of a
+   * typo eating a buffer is the refusal below: {@code :open} does not replace unsaved work.
+   */
+  @Test
+  void colonOpenOfAPathThatIsNotThereYetStartsADocumentThere() {
+    Path missing = tempDir.resolve("brand-new.txt");
+
+    typeCommand("open " + missing);
+
+    assertEquals("", emc.document().getContent());
+    assertEquals(missing.toString(), emc.document().getSourceFilePath(), "the next :w has a name to write to");
+    assertEquals("", message(), "nothing went wrong, so nothing is reported");
+    assertFalse(Files.exists(missing), "the file waits for a :w");
+  }
+
+  /**
    * `:open` on a dirty document is the one command that would destroy work, and it is refused rather than confirmed:
    * visur has no question-and-answer surface yet, and a refusal that names the way round it needs none.
    */

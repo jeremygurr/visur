@@ -38,28 +38,27 @@ public class LoadFileOp implements Operator {
       return;
     }
 
-    open(emc, emc.session(), (String) eds.pop(), false);
+    open(emc, emc.session(), (String) eds.pop());
   }
 
   /**
    * Open a path in front of a window: the checks, then {@link #install}, and nothing else.
    *
-   * <p>{@code missingIsANewFile} is the one difference between the two doors. {@code :open} of a path that does not
-   * exist is a typo, and the answer is an error. Being launched on a path that does not exist is {@code visur
-   * notes.txt} meaning "edit this, and create it if it is not there" — the same file, the opposite question.
+   * <p>A path that is not on disk is a document with no text, whichever door it came through — the rule vim has, and
+   * the reason {@code visur notes.txt} and {@code :open notes.txt} cannot disagree. What protects a typo is elsewhere:
+   * {@code :open} is refused while the document has unsaved work, so walking away from a buffer takes a decision
+   * somebody has already made about it.
    *
    * <p>The window is an argument rather than {@code emc.session()} because a launch has no adopted connection yet:
    * the file boot was asked for is opened by the first window to arrive, and that window is not the one the keyboard
    * belongs to.
    */
-  static void open(EditorModelCoupler emc, Session window, String filePath, boolean missingIsANewFile) {
+  static void open(EditorModelCoupler emc, Session window, String filePath) {
     try {
       Path path = Paths.get(filePath);
       if (!Files.exists(path)) {
-        if (!missingIsANewFile) {
-          window.reportError("loadFile: file not found: " + filePath);
-          return;
-        }
+        // No file, so no text, and the name is kept so the first :w has somewhere to go. Nothing is created on disk:
+        // an empty buffer nobody saves leaves no trace, which is the other half of why a typo here is cheap.
         install(emc, window, filePath, "", true);
         return;
       }
