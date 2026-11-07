@@ -39,6 +39,8 @@ resolve_path() { # absolute, against where the command was typed, and without ne
   # symlinked, which is what vim does to a path.
   if cd "$dir" 2>/dev/null; then
     printf '%s/%s\n' "$PWD" "$base"
+  elif [[ "$1" == /* ]]; then
+    printf '%s\n' "$1" # no directory to resolve against, and an absolute path needs none
   else
     printf '%s/%s\n' "$PWD" "$1"
   fi

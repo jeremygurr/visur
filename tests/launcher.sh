@@ -120,6 +120,16 @@ mkdir -p "$SCRATCH/project"
   "$LAUNCHER" notes.txt) >"$LOG.out" 2>&1
 check "resolved against the shell's cwd, not the server's" "$(cat "$SCRATCH/stub-args")" \
   "-Dvisur.file=$SCRATCH/project/notes.txt"
+# A directory that is not there yet is not a reason to mistranslate the path: `cd` into it fails, and an absolute
+# argument still means what it said.
+(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_exiting 3)" VISUR_LOG="$LOG" \
+  "$LAUNCHER" "$SCRATCH/yet-to-be/notes.txt") >"$LOG.out" 2>&1
+check "an absolute path under a directory that does not exist stays itself" "$(cat "$SCRATCH/stub-args")" \
+  "-Dvisur.file=$SCRATCH/yet-to-be/notes.txt"
+(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_exiting 3)" VISUR_LOG="$LOG" \
+  "$LAUNCHER" not-written/notes.txt) >"$LOG.out" 2>&1
+check "and a relative one is still resolved against where it was typed" "$(cat "$SCRATCH/stub-args")" \
+  "-Dvisur.file=$SCRATCH/project/not-written/notes.txt"
 (cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_exiting 3)" VISUR_LOG="$LOG" \
   "$LAUNCHER") >"$LOG.out" 2>&1
 check "and with no argument, nothing is handed over" "$(cat "$SCRATCH/stub-args")" ""
