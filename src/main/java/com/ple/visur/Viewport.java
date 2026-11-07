@@ -65,6 +65,13 @@ public final class Viewport {
         && end - start < width
         && content.charAt(end) == '\n';
       start = newlineEndedThisRow ? end + 1 : end;
+      // The newline that ends a file opens one more line, empty, and that line is real: nothing is painted on it, but
+      // the caret stands on it. A layout without it has nowhere to put a cursor one past the last newline, and the
+      // renderer clamps it back onto the line before — which is Enter at the end of a file looking like a paint that
+      // missed a beat.
+      if (newlineEndedThisRow && start == content.length()) {
+        rows.add(new Row(start, ""));
+      }
     }
     return Collections.unmodifiableList(rows);
   }

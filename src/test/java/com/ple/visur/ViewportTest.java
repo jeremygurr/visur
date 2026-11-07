@@ -65,9 +65,34 @@ class ViewportTest {
     ), Viewport.rows(ALPHA, 10, 5, 5));
   }
 
+  /**
+   * The newline that ends a file opens a line, and the line is in the layout even though it has nothing to paint.
+   *
+   * <p>It costs a row of blanks, which is what a renderer clears anyway. What it buys is the only place a cursor one
+   * past the last newline can go: without it the caret for an empty last line clamps back onto the line before, which
+   * is Enter at the end of a file looking like a paint that missed a beat (see InsertNewlineTest).
+   */
   @Test
-  void trailingNewlineDoesNotAddAnEmptyRow() {
-    assertEquals(List.of(new Viewport.Row(0, "ab")), Viewport.rows("ab\n", 10, 0, 5));
+  void aFileEndingInANewlineHasItsEmptyLastRow() {
+    assertEquals(List.of(new Viewport.Row(0, "ab"), new Viewport.Row(3, "")), Viewport.rows("ab\n", 10, 0, 5));
+  }
+
+  /** Two final newlines are two empty lines, and only the last one needs the special case. */
+  @Test
+  void everyEmptyLineAtTheEndOfAFileIsARow() {
+    assertEquals(List.of(
+      new Viewport.Row(0, "ab"), new Viewport.Row(3, ""), new Viewport.Row(4, "")),
+      Viewport.rows("ab\n\n", 10, 0, 5));
+    assertEquals(List.of(new Viewport.Row(0, "ab")), Viewport.rows("ab", 10, 0, 5));
+  }
+
+  /** The caret on that row is its start, not the end of the row above. */
+  @Test
+  void positionOnePastATrailingNewlineIsTheEmptyRowAfterIt() {
+    List<Viewport.Row> rows = Viewport.rows("ab\n", 10, 0, 5);
+
+    assertEquals(new Viewport.Position(1, 0), Viewport.position(rows, 3));
+    assertEquals(new Viewport.Position(0, 2), Viewport.position(rows, 2), "an index on the newline itself still rests after the last character");
   }
 
   @Test
