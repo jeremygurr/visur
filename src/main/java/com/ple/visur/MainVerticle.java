@@ -123,7 +123,12 @@ public class MainVerticle extends AbstractVerticle {
         // The server names the connection, because that is the only name in the exchange worth believing: it is what
         // every later message is attributed to, including the one that says how big the window is.
         String connection = "ws-" + nextConnection.getAndIncrement();
-        ServiceHolder.initializerService.startSession(Connections.open(connection));
+        // A window arriving is two things: the window gets its own cursor and quantum, and it is asked to open the file
+        // the process was launched on, if anybody asked for one. See InitializerService#openLaunchFile for why that
+        // waits for an arrival instead of happening at boot.
+        Session window = Connections.open(connection);
+        ServiceHolder.initializerService.startSession(window);
+        ServiceHolder.initializerService.openLaunchFile(window);
         MessageConsumer<JsonObject> outbound = vertx.eventBus().consumer(BusEvent.viewWasChanged.name(), message -> {
           // Published to everybody, painted for one: the view whose header does not name this socket was rendered at
           // some other client's width, and drawing it here is the bug this whole class of one-field-per-client fixed.

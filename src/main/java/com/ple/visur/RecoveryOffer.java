@@ -68,7 +68,7 @@ public class RecoveryOffer {
       try {
         // Not as-saved, and that is the point of the whole feature: a swap exists because its text never reached the
         // file, so loading it in is unsaved work by definition.
-        LoadFileOp.install(emc, path, Files.readString(swap, StandardCharsets.UTF_8), false);
+        LoadFileOp.install(emc, window, path, Files.readString(swap, StandardCharsets.UTF_8), false);
       } catch (IOException unreadable) {
         window.reportError("recover: " + unreadable.getMessage());
       }
@@ -85,7 +85,7 @@ public class RecoveryOffer {
     }
     try {
       String content = Files.readString(Paths.get(path), StandardCharsets.UTF_8);
-      LoadFileOp.install(emc, path, content, true);
+      LoadFileOp.install(emc, window, path, content, true);
       if (answer == Answer.READ_ONLY) {
         emc.document().putReadOnly(true);
       }

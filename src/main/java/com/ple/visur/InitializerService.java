@@ -17,6 +17,15 @@ import static com.ple.visur.EditorMode.navigate;
 
 public class InitializerService {
 
+  /**
+   * The file this process was launched on, until a window opens it.
+   *
+   * <p>It waits here rather than on the document because it predates the document: the open is what gives the document
+   * its name. Taken and not read, and synchronised because two windows can arrive on two event-loop threads, and a
+   * launch that runs twice loads a file over whatever the first window had already typed.
+   */
+  private String pendingLaunchPath;
+
   private final EditorModelCoupler emc;
   private final String startingCursorQuantumName = "character";
   private final String startingScopeQuantumName = "line";
@@ -154,63 +163,24 @@ public class InitializerService {
   }
 
   /**
-   * Returns the startup content for this run.
+   * The text to start with: the benchmark seed if one was asked for, and otherwise nothing.
    *
-   * <p>If {@code VISUR_FILE} is set, loads from that file (empty buffer if missing - vim new-file).
-   * If {@code VISUR_CONTENT_BYTES} is set, uses that (large-doc benchmark).
-   * If neither is set, starts with an empty document (empty, unnamed).
+   * <p>The file the process was launched on is not read here. It is recorded and left for the first window to open:
+   * see {@link #openLaunchFile}, and the reason there.
    */
   private String startupContent() {
-    String filePath = startupFile();
-    if (filePath != null) {
-      // VISUR_FILE is set: load from file (empty buffer if missing)
-      String content = readStartupFile(filePath);
-      emc.document().setSourceFilePath(filePath);
-      return content;
-    }
-    // No VISUR_FILE: fall through to VISUR_CONTENT_BYTES or empty.
-    String content = contentForThisRun("");
-    // No source file: document is unnamed.
-    return content;
+    pendingLaunchPath = launchPath();
+    return contentForThisRun("");
   }
 
   /**
-   * Returns the startup file path if {@code VISUR_FILE} is set, {@code null} otherwise.
+   * The path {@code visur} handed this JVM, or null. A JVM property and not an environment variable, as with
+   * {@code visur.port}: a test cannot change the environment of the process it is already running in, and the launcher
+   * has a JVM argument to hand over anyway.
    */
-  private String startupFile() {
-    // The property first, as with `visur.port`: a test cannot change the environment of the process it is already in,
-    // and the only alternative was a test that starts a JVM to boot the thing properly.
+  private static String launchPath() {
     String filePath = System.getProperty("visur.file");
-    if (filePath == null || filePath.isBlank()) {
-      filePath = System.getenv("VISUR_FILE");
-    }
     return (filePath == null || filePath.isBlank()) ? null : filePath;
-  }
-
-  /**
-   * Reads the startup file if it exists. If the file is missing, starts with
-   * an empty buffer (vim's new-file behaviour). If the file exists but is
-   * unreadable or contains invalid UTF-8, fails loudly.
-   */
-  private String readStartupFile(String filePath) {
-    try {
-      Path path = Paths.get(filePath);
-      if (!Files.exists(path)) {
-        // Missing file is not an error: start with empty buffer (vim new-file).
-        // The file will be created at first save.
-        System.out.println("VISUR_FILE path does not exist yet: " + filePath + " (empty document, will be created at first save)");
-        return "";
-      }
-      if (!Files.isRegularFile(path)) {
-        throw new IllegalStateException("VISUR_FILE points to a non-regular file: " + filePath);
-      }
-      byte[] bytes = Files.readAllBytes(path);
-      String content = new String(bytes, StandardCharsets.UTF_8);
-      System.out.println("Loaded startup file: " + filePath + " (" + bytes.length + " bytes)");
-      return content;
-    } catch (IOException e) {
-      throw new IllegalStateException("Cannot read VISUR_FILE (" + filePath + "): " + e.getMessage(), e);
-    }
   }
 
   /**
@@ -231,6 +201,29 @@ public class InitializerService {
     emc.session().putCursorQuantumStartAndScroll(bounds[0]);
     emc.session().putCursorQuantumEnd(bounds[1]);
     emc.session().putIsAtQuantumStart(true);
+  }
+
+  /** The launched path, and the asking is spent: one launch, one open. */
+  private synchronized String takeLaunchPath() {
+    String filePath = pendingLaunchPath;
+    pendingLaunchPath = null;
+    return filePath;
+  }
+
+  /**
+   * Open the file this process was launched on, in the window that just arrived, if it has not been opened yet.
+   *
+   * <p>Boot cannot open it: a launch load answers with either a question about a swap or an error about a file, and
+   * both are things a window is told. The first window to arrive is the person who typed {@code visur notes.txt}, so it
+   * is theirs to ask, and the open is the one {@code :open} runs — including "a path that does not exist is a file you
+   * are about to write", which is what launching on a name means and what {@code :open} on a name does not.
+   */
+  public void openLaunchFile(Session window) {
+    String filePath = takeLaunchPath();
+    if (filePath == null) {
+      return;
+    }
+    LoadFileOp.open(emc, window, filePath, true);
   }
 
   private void initializeKeymaps() {

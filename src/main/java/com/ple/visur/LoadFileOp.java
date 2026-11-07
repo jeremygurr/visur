@@ -23,9 +23,11 @@ public class LoadFileOp implements Operator {
     EditorModelCoupler emc = ServiceHolder.editorModelCoupler;
     ExecutionDataStack eds = emc.session().getExecutionDataStack();
 
-    // Loading replaces the buffer, so it is the one command that would destroy work nobody has saved. Visur has no
-    // question to ask — a question needs an answer, and the message slot has never had one — so it refuses and names the
-    // way round it. The check lives here rather than in the grammar because this is the only door in.
+    // Loading replaces the buffer, so it is the one command that can destroy work nobody has saved. It refuses rather
+    // than asks: a swap is a question about which of two versions to believe, and this is not that question — the text
+    // in hand is the only version, and `:w` is three keys. The check lives here rather than in the grammar because this
+    // is the only door in, and it stays in the door rather than moving into `open`, because a launch load onto an empty
+    // document has no unsaved work to refuse and must not be told it does.
     if (emc.document().isDirty()) {
       emc.session().reportError(":open refused: unsaved work. :w saves it first.");
       return;
@@ -36,15 +38,33 @@ public class LoadFileOp implements Operator {
       return;
     }
 
-    String filePath = (String) eds.pop();
+    open(emc, emc.session(), (String) eds.pop(), false);
+  }
+
+  /**
+   * Open a path in front of a window: the checks, then {@link #install}, and nothing else.
+   *
+   * <p>{@code missingIsANewFile} is the one difference between the two doors. {@code :open} of a path that does not
+   * exist is a typo, and the answer is an error. Being launched on a path that does not exist is {@code visur
+   * notes.txt} meaning "edit this, and create it if it is not there" — the same file, the opposite question.
+   *
+   * <p>The window is an argument rather than {@code emc.session()} because a launch has no adopted connection yet:
+   * the file boot was asked for is opened by the first window to arrive, and that window is not the one the keyboard
+   * belongs to.
+   */
+  static void open(EditorModelCoupler emc, Session window, String filePath, boolean missingIsANewFile) {
     try {
       Path path = Paths.get(filePath);
       if (!Files.exists(path)) {
-        emc.session().reportError("loadFile: file not found: " + filePath);
+        if (!missingIsANewFile) {
+          window.reportError("loadFile: file not found: " + filePath);
+          return;
+        }
+        install(emc, window, filePath, "", true);
         return;
       }
       if (!Files.isRegularFile(path)) {
-        emc.session().reportError("loadFile: not a regular file: " + filePath);
+        window.reportError("loadFile: not a regular file: " + filePath);
         return;
       }
       Path swap = SwapFiles.beside(path.toFile());
@@ -52,15 +72,15 @@ public class LoadFileOp implements Operator {
         // The file is not the whole story, and there is no safe guess about which half to believe. The open stops here
         // rather than loading and complaining afterwards, because afterwards there is only one version left to choose.
         RecoveryOffer offer = new RecoveryOffer(filePath, swap);
-        emc.session().putPendingOffer(offer);
-        emc.session().putMessage(offer.question());
+        window.putPendingOffer(offer);
+        window.putMessage(offer.question());
         return;
       }
 
       String content = Files.readString(path, StandardCharsets.UTF_8);
-      install(emc, filePath, content, true);
+      install(emc, window, filePath, content, true);
     } catch (IOException e) {
-      emc.session().reportError("loadFile: " + e.getMessage());
+      window.reportError("loadFile: " + e.getMessage());
     }
   }
 
@@ -73,7 +93,7 @@ public class LoadFileOp implements Operator {
    * <p>Static and public to the package because an answer to a {@link RecoveryOffer} opens a file too, and a second
    * copy of this reset is a second chance for the two doors to disagree about where the cursor goes.
    */
-  static void install(EditorModelCoupler emc, String filePath, String content, boolean asSaved) {
+  static void install(EditorModelCoupler emc, Session window, String filePath, String content, boolean asSaved) {
     emc.document().putReadOnly(false);
     if (asSaved) {
       emc.document().putContentAsSaved(content);
@@ -81,13 +101,13 @@ public class LoadFileOp implements Operator {
       emc.document().putContent(content);
     }
 
-    emc.session().putCA(0);
-    emc.session().putVirtualCX(0);
-    emc.session().putCanvasStart(0);
-    emc.session().putFY(0);
+    window.putCA(0);
+    window.putVirtualCX(0);
+    window.putCanvasStart(0);
+    window.putFY(0);
 
     emc.document().updateNextLineIndices();
-    emc.session().putSpan(content.length() > 0 ? 1 : 0);
+    window.putSpan(content.length() > 0 ? 1 : 0);
 
     // This file becomes the new remembered source, which also puts down the swap of the name before it.
     emc.document().setSourceFilePath(filePath);
