@@ -24,7 +24,6 @@ public class InitializerService {
    * its name. Taken and not read, and synchronised because two windows can arrive on two event-loop threads, and a
    * launch that runs twice loads a file over whatever the first window had already typed.
    */
-  private String pendingLaunchPath;
 
   private final EditorModelCoupler emc;
   private final String startingCursorQuantumName = "character";
@@ -165,22 +164,11 @@ public class InitializerService {
   /**
    * The text to start with: the benchmark seed if one was asked for, and otherwise nothing.
    *
-   * <p>The file the process was launched on is not read here. It is recorded and left for the first window to open:
-   * see {@link #openLaunchFile}, and the reason there.
+   * <p>No file is read here, and none is remembered to be read later: a file to open belongs to the window that asked
+   * for it, and it arrives with that window. See {@link #openRequestedFile}.
    */
   private String startupContent() {
-    pendingLaunchPath = launchPath();
     return contentForThisRun("");
-  }
-
-  /**
-   * The path {@code visur} handed this JVM, or null. A JVM property and not an environment variable, as with
-   * {@code visur.port}: a test cannot change the environment of the process it is already running in, and the launcher
-   * has a JVM argument to hand over anyway.
-   */
-  private static String launchPath() {
-    String filePath = System.getProperty("visur.file");
-    return (filePath == null || filePath.isBlank()) ? null : filePath;
   }
 
   /**
@@ -203,24 +191,27 @@ public class InitializerService {
     emc.session().putIsAtQuantumStart(true);
   }
 
-  /** The launched path, and the asking is spent: one launch, one open. */
-  private synchronized String takeLaunchPath() {
-    String filePath = pendingLaunchPath;
-    pendingLaunchPath = null;
-    return filePath;
-  }
-
   /**
-   * Open the file this process was launched on, in the window that just arrived, if it has not been opened yet.
+   * The file an arriving window asked to edit, if it asked for one, opened in that window.
    *
-   * <p>Boot cannot open it: a launch load answers with either a question about a swap or an error about a file, and
-   * both are things a window is told. The first window to arrive is the person who typed {@code visur notes.txt}, so it
-   * is theirs to ask, and the open is the one {@code :open} runs — including "a path that does not exist is a file you
-   * are about to write", which is what launching on a name means and what {@code :open} on a name does not.
+   * <p>The ask is a query on the socket, which is the only place it can live: {@code visur notes.txt} against a server
+   * that has been up since morning names a file to *this* terminal, not to the process that started it, and a JVM
+   * argument cannot say that after the fact. It is read at arrival rather than at boot for the reason ticket 07 found:
+   * opening a file answers with a question about a swap or an error about a path, and both are things only a window can
+   * be told.
+   *
+   * <p>A path that does not exist is a document the user is about to write, which is what naming a file on the way in
+   * has always meant — and is deliberately not what {@code :open} does, where a typo should not replace the document
+   * you are standing in.
    */
-  public void openLaunchFile(Session window) {
-    String filePath = takeLaunchPath();
-    if (filePath == null) {
+  public void openRequestedFile(Session window, String filePath) {
+    if (filePath == null || filePath.isBlank()) {
+      return;
+    }
+    if (Connections.count() > 1) {
+      // One document per process, so a second window asking for a second file is a second person's editing session, and
+      // the answer is a message rather than the rug. :open is still the way, and it is said back verbatim.
+      window.putMessage("another window is editing this document: :open " + filePath + " to see that file here");
       return;
     }
     LoadFileOp.open(emc, window, filePath, true);

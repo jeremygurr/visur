@@ -664,6 +664,37 @@ fn live_multiline_paste_and_document_jumps() {
   assert_eq!(terminal.quit().code(), Some(0), "ZQ should detach");
 }
 
+/// `visur /path` in a real terminal, opening a real file, with the launcher in the middle instead of a stub of it.
+///
+/// Three pieces make that command work and none of them owns it: the launcher turns the argument into a query, the
+/// client carries it through a handshake, the server opens the file in the window that asked. Each has a test of its
+/// own at its own seam; this is the place they are in one process at once. It needs the built jar, port 8888 to
+/// itself, and it is gated on being asked for like the other live checks.
+#[test]
+fn the_launcher_opens_the_file_it_was_given() {
+  if std::env::var("VISUR_LIVE_LAUNCHER").is_err() {
+    eprintln!("skipped: set VISUR_LIVE_LAUNCHER=1 and VISUR_LIVE_WRAPPER to a script that execs ./visur with a file");
+    return;
+  }
+  // The wrapper goes in this process's environment, not the child's: `spawn_with` chooses the program it runs from here,
+  // and pointing the launcher at itself through an env entry it never reads is how this check failed while looking like
+  // the launcher was broken.
+  assert!(std::env::var("VISUR_WRAPPER").is_ok(), "VISUR_WRAPPER names a script that execs ./visur with a file argument");
+  let marker = std::env::var("VISUR_LIVE_MARKER").expect("VISUR_LIVE_MARKER is a word only that file has in it");
+
+  let mut terminal = Terminal::spawn();
+  assert!(
+    terminal.wait_for(Duration::from_secs(30), |t| t.screen().contains(&marker)),
+    "the launcher's file was never opened: {:?}",
+    terminal.screen()
+  );
+
+  terminal.press("\u{1b}");
+  terminal.send("Z");
+  terminal.send("Q");
+  assert_eq!(terminal.quit().code(), Some(0), "ZQ should detach");
+}
+
 #[test]
 fn the_client_paints_edits_searches_and_detaches() {
   if std::env::var("VISUR_E2E").is_err() {
@@ -789,6 +820,45 @@ fn clipboard_answer(frames: &Arc<Mutex<Vec<String>>>) -> Option<Option<String>> 
     }
     Some(value.get("body")?.get("text").and_then(|text| text.as_str()).map(str::to_string))
   })
+}
+
+/// The launcher turns `visur /path` into a socket with the path on it, so the client's job is to not lose it.
+///
+/// One line of `transport.rs` carries this whole feature — the endpoint comes from `VISUR_WS` and goes to the
+/// connector untouched — and "untouched" is a claim about a third party's URL parser, which is not something to
+/// find out by watching an editor open the wrong file.
+#[test]
+fn a_query_on_the_endpoint_arrives_at_the_server_untouched() {
+  let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).expect("bind a fake server");
+  let port = listener.local_addr().unwrap().port();
+  let asked_for = Arc::new(Mutex::new(String::new()));
+  let seen = Arc::clone(&asked_for);
+  std::thread::spawn(move || {
+    let Ok((stream, _)) = listener.accept() else { return };
+    // `accept_hdr` is the handshake with a look at the request, which is the only place a query exists.
+    let _ = tungstenite::accept_hdr(stream, |request: &tungstenite::handshake::server::Request, response| {
+      *seen.lock().unwrap() = request.uri().to_string();
+      Ok(response)
+    });
+  });
+
+  let terminal = Terminal::spawn_with(&[(
+    "VISUR_WS",
+    format!("ws://127.0.0.1:{port}/ws?open=%2Ftmp%2Fmy%20notes.txt"),
+  )]);
+
+  for _ in 0..200 {
+    if !asked_for.lock().unwrap().is_empty() {
+      break;
+    }
+    std::thread::sleep(Duration::from_millis(10));
+  }
+  assert_eq!(
+    "/ws?open=%2Ftmp%2Fmy%20notes.txt",
+    asked_for.lock().unwrap().as_str(),
+    "the ask is percent-decoded by the server, so it has to arrive encoded"
+  );
+  let _ = terminal;
 }
 
 #[test]

@@ -34,6 +34,18 @@ stop_any_server() {
   return 1
 }
 
+client_that_records_its_url() { # a client that writes down the socket it was handed, which is how a file is asked for
+  local script="$SCRATCH/client-url"
+  {
+    echo '#!/usr/bin/env bash'
+    echo "printf '%s' "\${VISUR_WS:-}" > "$SCRATCH/client-url-seen""
+    echo "touch "$SCRATCH/client-$1-ran""
+    echo "exit $1"
+  } >"$script"
+  chmod +x "$script"
+  echo "$script"
+}
+
 client_that_says_it_ran() { # a client that leaves a mark, so "did the launcher run me at all?" is answerable
   local script="$SCRATCH/client-marked-$1"
   {
@@ -105,42 +117,50 @@ stop_any_server
 echo "a file argument, with a server already running"
 VISUR_CLIENT="$(client_exiting 0)" VISUR_LOG="$LOG" "$LAUNCHER" >"$LOG.out" 2>&1 # one that stays
 : >"$SCRATCH/notes.txt"
-VISUR_CLIENT="$(client_that_says_it_ran 3)" VISUR_LOG="$LOG" "$LAUNCHER" "$SCRATCH/notes.txt" >"$LOG.out" 2>&1
+VISUR_CLIENT="$(client_that_records_its_url 3)" VISUR_LOG="$LOG" "$LAUNCHER" "$SCRATCH/notes.txt" >"$LOG.out" 2>&1
 status=$?
-check "it exits 1, the documented nothing-was-opened code" "$status" "1"
-check "it says the file was not opened" "$(grep -c 'was not opened' "$LOG.out")" "1"
-check "it names the way round it" "$(grep -c ':open' "$LOG.out")" "1"
-check "no client ran" "$([ -e "$SCRATCH/client-3-ran" ] && echo ran || echo not-run)" "not-run"
+check "the client runs, because a running server is not a reason a file cannot be opened" \
+  "$([ -e "$SCRATCH/client-3-ran" ] && echo ran || echo not-run)" "ran"
+check "the client's own exit code is what the launcher reports" "$status" "3"
+check "the ask went to the window, not to the server" "$(cat "$SCRATCH/client-url-seen")" \
+  "ws://127.0.0.1:8888/ws?open=$SCRATCH/notes.txt"
+check "no second server was started" "$(grep -c 'starting one' "$LOG.out")" "0"
 check "the running server was left alone" "$(answering && echo up || echo down)" "up"
 stop_any_server
 
-echo "a file argument reaches the server as an absolute path"
+echo "the file named for a window is the path the command was typed with"
 mkdir -p "$SCRATCH/project"
-(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_exiting 3)" VISUR_LOG="$LOG" \
+(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_that_records_its_url 11)" VISUR_LOG="$LOG" \
   "$LAUNCHER" notes.txt) >"$LOG.out" 2>&1
-check "resolved against the shell's cwd, not the server's" "$(cat "$SCRATCH/stub-args")" \
-  "-Dvisur.file=$SCRATCH/project/notes.txt"
+check "resolved against the shell's cwd, not the server's" "$(cat "$SCRATCH/client-url-seen")" \
+  "ws://127.0.0.1:8888/ws?open=$SCRATCH/project/notes.txt"
 # A directory that is not there yet is not a reason to mistranslate the path: `cd` into it fails, and an absolute
 # argument still means what it said.
-(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_exiting 3)" VISUR_LOG="$LOG" \
+(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_that_records_its_url 12)" VISUR_LOG="$LOG" \
   "$LAUNCHER" "$SCRATCH/yet-to-be/notes.txt") >"$LOG.out" 2>&1
-check "an absolute path under a directory that does not exist stays itself" "$(cat "$SCRATCH/stub-args")" \
-  "-Dvisur.file=$SCRATCH/yet-to-be/notes.txt"
-(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_exiting 3)" VISUR_LOG="$LOG" \
+check "an absolute path under a directory that does not exist stays itself" "$(cat "$SCRATCH/client-url-seen")" \
+  "ws://127.0.0.1:8888/ws?open=$SCRATCH/yet-to-be/notes.txt"
+(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_that_records_its_url 13)" VISUR_LOG="$LOG" \
   "$LAUNCHER" not-written/notes.txt) >"$LOG.out" 2>&1
-check "and a relative one is still resolved against where it was typed" "$(cat "$SCRATCH/stub-args")" \
-  "-Dvisur.file=$SCRATCH/project/not-written/notes.txt"
-(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_exiting 3)" VISUR_LOG="$LOG" \
+check "and a relative one is still resolved against where it was typed" "$(cat "$SCRATCH/client-url-seen")" \
+  "ws://127.0.0.1:8888/ws?open=$SCRATCH/project/not-written/notes.txt"
+# A path is bytes, and the ones that mean something to a URL have to be said in a way that does not.
+mkdir -p "$SCRATCH/project/my notes"
+(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_that_records_its_url 5)" VISUR_LOG="$LOG" \
+  "$LAUNCHER" "my notes/todo list.txt") >"$LOG.out" 2>&1
+check "a path is encoded for the query rather than pasted into it" "$(cat "$SCRATCH/client-url-seen")" \
+  "ws://127.0.0.1:8888/ws?open=$SCRATCH/project/my%20notes/todo%20list.txt"
+(cd "$SCRATCH/project" && VISUR_SERVER="$(stub_server)" VISUR_CLIENT="$(client_that_records_its_url 6)" VISUR_LOG="$LOG" \
   "$LAUNCHER") >"$LOG.out" 2>&1
-check "and with no argument, nothing is handed over" "$(cat "$SCRATCH/stub-args")" ""
+check "and with no argument, nothing is asked for" "$(cat "$SCRATCH/client-url-seen")" ""
 stop_any_server
 
 echo "a flag is not a file"
-VISUR_CLIENT="$(client_that_says_it_ran 3)" VISUR_LOG="$LOG" "$LAUNCHER" --help >"$LOG.out" 2>&1
+VISUR_CLIENT="$(client_that_says_it_ran 9)" VISUR_LOG="$LOG" "$LAUNCHER" --help >"$LOG.out" 2>&1
 status=$?
 check "it refuses" "$([ "$status" -ne 0 ] && echo refused || echo accepted)" "refused"
 check "it says what it takes" "$(grep -c 'one file' "$LOG.out")" "1"
-check "no client ran" "$([ -e "$SCRATCH/client-3-ran" ] && echo ran || echo not-run)" "not-run"
+check "no client ran" "$([ -e "$SCRATCH/client-9-ran" ] && echo ran || echo not-run)" "not-run"
 check "no server was started" "$(grep -c 'starting one' "$LOG.out")" "0"
 check "nothing is listening" "$(answering && echo up || echo down)" "down"
 

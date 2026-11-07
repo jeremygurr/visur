@@ -36,10 +36,27 @@ final class WireClient implements AutoCloseable {
 
   /** A client that connects and says nothing about its window, which is what a headless boot and a pty look like. */
   WireClient(Vertx vertx, int port) {
+    this(vertx, port, null);
+  }
+
+  /**
+   * A window that arrives asking to edit a file, which is what {@code visur /path} becomes on the wire: the ask is a
+   * query on the socket, so it belongs to the window that asked rather than to the process.
+   */
+  WireClient(Vertx vertx, int port, String openPath) {
     this.port = port;
-    socket = vertx.createHttpClient().webSocket(port, "localhost", "/ws").blockingGet();
+    String url = openPath == null ? "/ws" : "/ws?open=" + openPath;
+    socket = vertx.createHttpClient().webSocket(port, "localhost", url).blockingGet();
     socket.textMessageHandler(frames::add);
     socket.closeHandler(closed -> closedByServer.countDown());
+  }
+
+  /** A window that arrives asking to edit a file, and declares a terminal's window size. */
+  WireClient(Vertx vertx, int port, int cols, int rows, String openPath) {
+    this(vertx, port, openPath);
+    this.cols = cols;
+    this.rows = rows;
+    declaresItsViewport();
   }
 
   void send(String address, JsonObject body) {

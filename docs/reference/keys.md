@@ -48,7 +48,7 @@ Quantum keys are shared by every command that takes one:
 | `G` | open a line **below** the one the cursor is on, and type on it | `G` on the last line of a document with no trailing newline still gives a new empty line |
 | `d` | delete the selection, taken `count` times, leaving the highlight as the gap it made — the span survives, and the next move re-derives the window from it. What it removed goes to the yank register, so `p` puts it back. Nothing selected, or a count of zero, and nothing happens | `s d` delete the quantum under the cursor; `3 s` then `3 d` delete nine |
 | `y` | copy the selection, taken `count` times, to the yank register | `s y`; `2 s` then `3 y` copy six quanta |
-| `p` | **replace the selection** with the yank register, `count` copies, and put what the paste displaced into the register. Over nothing it displaces nothing, so the register keeps what it held and `p p` pastes twice. The caret ends on the last pasted character, span 0 | `s y` `] e` `p` move a quantum; `3 p` three copies over one selection |
+| `p` | **replace the selection** with the yank register, `count` copies, and put what the paste displaced into the register. What was selected stays selected, and what is selected is now the text that was pasted — counted in characters, the one quantum that can end where a paste ends. Over nothing it displaces nothing, so the register keeps what it held and `p p` pastes twice | `s y` `] e` `p` move a quantum; `3 p` three copies over one selection |
 | `P` | insert the yank register at the **start** of the selection without deleting anything; the selection keeps covering the same text, shifted right | `P` with three words selected puts the register in front and leaves those three selected |
 | `u` | undo **one command** — the whole command, so an insert session comes back with the line it opened, and everything a count repeated comes back at once. Movement is not an edit: `u` after `5 l` walks back to the last edit, cursor and all. Nothing to undo is a no-op | `s d` then `u`; `3 g`, type, `Escape`, then `u` |
 | `R` | redo one command. A new edit clears what `R` can walk forward to, and the top of the stack is a no-op | `u` then `R` |
@@ -151,12 +151,15 @@ above are a language of their own instead. Keys are the rest of the interface.
 | `visur ~/notes/ideas.txt` | that file, from any directory — the path is resolved where you typed it, not where the server was started |
 | `:open notes.txt` | that file, in the window you are typing in |
 
-With a server already running, `visur path` opens nothing and says so: that server is editing somebody's document, and
-`:open path` inside it is the way. Exit 1 means "your file was not opened"; exit 2 means the command line was a flag,
-which is not a file either.
+The file you name travels with the window you are about to open — a query on its socket — rather than with the server,
+so `visur path` means the same thing against a server that started two seconds ago and one that has been up since
+morning. One thing stops it: a window already editing. There is one document per process, so the newcomer is told why on
+its own message line, where it can read it, instead of in a shell where the answer was the same whether the old server
+was idle or busy. Exit 2 means the command line was a flag, which is not a file either.
 
-A path that is not there is a file you are about to write when you launched on it, and a typo when you typed `:open`.
-The same missing file, the opposite answer.
+A path that is not there is a document you are about to write when you name it to `visur`, and a refusal when you type
+`:open`. The same missing file, the opposite answer, and the difference is that inside a session there is already a
+document standing where the typo would go.
 
 ## Swap files and recovery
 
@@ -223,6 +226,11 @@ last thing it copied: a memory it can no longer check is a guess, and a guess pa
 answer worse than an error.
 
 Until then, paste with your terminal's own paste key. Bracketed paste arrives as text and needs no OSC 52 at all.
+
+## Selections and separators
+
+A paste that covered a selection leaves that selection lying over the text it inserted, so a second `p` is a paste onto a
+selection and puts back what the first one displaced. Over nothing, `p p` is still two copies.
 
 ## Selections and separators
 

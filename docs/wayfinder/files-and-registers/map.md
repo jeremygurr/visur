@@ -198,21 +198,29 @@ grammar.
 (`client: "terminal" | "browser"`), which is the first thing a client has ever told the server about itself and the shape
 [08](issues/08-clipboard-transport.md) should expect: a client states, the server remembers, and an absent word is a
 default rather than an error. `~/.local/state/visur/` exists as a notion, so [10](issues/10-browser-clipboard.md) has a
-place to put browser-shaped state. And `visur.file` is now a thing boot reads, so
-[07](issues/07-launch-argument.md) has a startup path that boots in a test — the launch argument becomes a launcher
-script passing a property the tests already prove works.
+place to put browser-shaped state. And a boot that reads a startup file was made testable, which is what
+[07](issues/07-launch-argument.md) needed to test a launch at all.
 
 It also left one question for 08 to answer rather than invent: a clipboard write is addressed to *a* client, and
 `ClientKind` says what a window is, not which window to ask. The window that ran the command is the one whose socket the
 write goes down, which is the same `Connections.HEADER` addressing `:q` and `viewWasChanged` already use.
 
-**07 left two things for the tickets after it.** An arriving window can now be handed something to *answer* — the launch
-load runs in the first window, and a swap question can be waiting there — so a later feature that has to greet a client
-has a place and a precedent (`InitializerService.openLaunchFile`) rather than an environment variable and a hope. And the
-launcher starts exactly one kind of process: `java -jar` on the fat jar, with `-Dvisur.file` in front of it. The server
-now has three levers (`visur.port`, `visur.file`, `visur.swapDir`), all JVM properties, all set by the launcher or by a
-test and none by an environment variable — which is the shape [08](issues/08-clipboard-transport.md) should copy if
-asking a client needs a knob at all.
+**07 left two things for the tickets after it.** An arriving window can now be handed something to *answer* — the load
+runs in the window that arrived, and a swap question can be waiting there — so a later feature that has to greet a client
+has a precedent rather than an environment variable and a hope. And the launcher starts exactly one kind of process:
+`java -jar` on the fat jar. The server has two levers, `visur.port` and `visur.swapDir`, both JVM properties, both set by
+a test and neither by an environment variable — which is the shape
+[08](issues/08-clipboard-transport.md) should copy if asking a client needs a knob at all.
+
+**07 was reopened the day it closed, by somebody typing the command.** `visur notes.txt` against a server that was
+already running refused: exit 1, "was not opened", go type `:open`. So the way to open a file that does not exist yet
+was `:open` — which refuses a file that does not exist. Two refusals, one for each door, and no way through. The
+question the ticket had been asking ("is this server editing somebody's document?") turns out not to be answerable in
+the shell: the launcher cannot see a window, and the honest thing it printed was the same whether the old server was idle
+or busy. So the ask moved to where the question can be answered: **the file travels with the window** — `/ws?open=/path`
+— and the server, which knows who is attached, opens it for the only window or refuses the second one on its own message
+line. `visur.file`, the JVM property and the take-once latch are gone: a process cannot own a request that belongs to a
+socket, and deleting them was smaller than guarding them. [07](issues/07-launch-argument.md) says what survived.
 
 **08 left three contracts for the tickets after it.** First for [09](issues/09-register-model.md): an operator has
 neither a bus nor a `Vertx`, which is why the clipboard write waits for the end of the command — and the read is asked
@@ -223,6 +231,15 @@ answer's shape is `{"text": …}` for an answer and `{}` for "my clipboard canno
 browser can answer both truthfully, which is what makes that ticket smaller than this one. The client's address list —
 three entries in `protocol::inbound`, and a pty test where the fake server plays the terminal — is where any new outbound
 address has to be added, or a client silently does nothing.
+
+**Three bugs came in from use, and two of them reversed a decision written above.** The caret stayed on the line Enter
+had split, because the layout had no row for the empty line a final newline opens (`Viewport`), which is a paint that
+looked like a beat missed. Pasting over a selection dropped the selection, because a previous map chose the empty span
+for `p p`'s sake — the pasted text is the selection now, and the consequence is in a test
+(`PasteTest.aSecondPasteReplacesWhatTheFirstOneLeft`). And `visur notes.txt` could not open notes.txt, because two doors
+each refused a missing file for their own good reason; that one is the paragraph above this one. What they have in common
+is that every one of them was a *decision* rather than a defect, and every one was found by typing the thing rather than
+by reading the ticket that made it.
 
 ## Known broken, nobody's ticket yet
 

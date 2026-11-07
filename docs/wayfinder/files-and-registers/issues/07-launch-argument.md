@@ -126,3 +126,45 @@ file and exited 1 with the server left alone; `visur --help` exited 2 having sta
 `first words` with no trailing newline — vim would write a newline. Found by the new-file test, which asserts where the
 bytes landed and strips when checking which bytes they were; no ticket has asked the newline question, so this one does
 not answer it either.
+
+## Reopened the day it closed: `visur notes.txt` still could not open notes.txt
+
+The rule was "with a server already running, `visur path` opens nothing, and `:open path` inside it is the way". It was
+said as advice, and it was impossible to follow: `:open` refuses a path that does not exist — a decision
+[05](05-command-key-and-grammar.md) made deliberately, and right on its own terms. So the two doors refused a new file
+for opposite reasons and nothing opened. That is the whole bug: the ticket was written as though "somebody is editing
+that document" were a question the launcher could ask, and it is not — it has a port, a process id and a `curl`, and no
+idea whether any window is attached.
+
+**The file now travels with the window that asked for it.** `visur path` hands the client a socket with the path on it
+(`/ws?open=/abs/path`) and the client arrives carrying it; `InitializerService.openRequestedFile` opens it in that window
+when nothing else is attached, and refuses with a message *on that window* when something is. Everything the old rule
+was protecting survives, and it moved to where the fact is knowable: one document per process means the second window
+must not swap the rug, and the server is the only party that can count windows. The everyday case — a server left running
+by `ZQ`, which is how every detach leaves one — is not a second window, and it was being refused like one.
+
+**Deleted, not guarded:** `visur.file`, `InitializerService.launchPath`, the synchronized take-once latch, and
+`openLaunchFile`. A JVM property is a thing a process owns, and this request belongs to a socket; the latch existed only
+because the property did. Two levers are left (`visur.port`, `visur.swapDir`), which is one fewer way for a test to
+launch something the launcher no longer does.
+
+**What survived the reversal**, and it is the part that was not a mistake: the launch load still runs at arrival rather
+than at boot, because opening a file answers with a swap question or a load error and both are things only a window can
+be told; a missing path is still a document at launch and still a refusal at `:open`, because inside a session there is
+already a document where a typo would go; the refusal a second window *does* get names the file it did not open and the
+key that works (`:open`), and says it where the user is looking. And "the ask is taken, not read" is now structural
+instead of synchronized: each window carries its own ask, so there is nothing for two event-loop threads to race over —
+the test that pinned the latch (`aWindowArrivingLaterDoesNotReopenTheFileTheFirstWindowCameFor`) still passes, and it
+passes because the joiner arrives with no ask rather than because somebody remembered to clear one.
+
+**What was checked, and at which seam.** The whole chain once, live: the real launcher in a pty, the real client, the
+real jar on `:8888`, and a file whose only claim is a word no other file has — `the_launcher_opens_the_file_it_was_given`
+in the pty suite, gated like the other live checks because it wants a port to itself. It runs through `VISUR_WRAPPER`,
+which is also how it found out it was checking nothing: the wrapper is read from the *test process's* environment, so the
+first version drove the client alone against a server that was never started, failed, and looked like a broken launcher.
+The pieces under it are each pinned where they are cheapest to break: `StartupFileTest` boots a real server and arrives
+with a real query (missing file opens, a second window is refused with its own message and nobody else's document
+touched), `tests/launcher.sh` asserts the URL handed to the client including a path whose spaces had to be encoded, and
+one pty test asserts the handshake still says `/ws?open=%2F…` after the client's URL parsing is done with it.
+What is *not* checked live is the refusal in front of a second terminal, because two real clients in two ptys is a
+fixture nobody asked for and the Java test does it with two real sockets and a real server.

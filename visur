@@ -4,15 +4,18 @@
 #     visur                 edit whatever the server on :8888 already has
 #     visur /path/to/file   edit that file, starting a server for it when there is no server
 #
-# `visur /path` with a server already running opens nothing: that server is editing somebody's document, and the honest
-# answer is a warning and exit 1 rather than a silent edit of something else. `:open path` inside it is the way.
+# The file you name travels with the window you are about to open — a query on the socket, /ws?open=/path — rather than
+# with the server, which may have been running since morning. So `visur notes.txt` means the same thing against a fresh
+# server and an old one, and a file that does not exist yet is the document you are about to write. The one thing that
+# stops it is a window already editing: one document per process, so the second window is told why in its own message
+# line, and `:open` is the key that works from inside a session.
 #
 # The server is started as `java -jar` on the fat jar, built first when a source file is newer than it. Not
 # `./gradlew run`: that starts a `--redeploy` watcher, a JVM that owns no socket, outlives its client, and is invisible
 # to the `lsof` this script uses to stop what it owns — fourteen on one machine at once, all of them burning CPU.
 # `./gradlew run` stays the way to run a server that watches src/ and reloads; this script is the way to edit a file.
 #
-# Exit codes: the client's; 1 for "your file was not opened"; 2 for a command line visur does not take.
+# Exit codes: the client's; 2 for a command line visur does not take.
 #
 # Uses the server already listening on :8888. If there is none it starts one and owns it, and a server it started is
 # stopped again when the client exits — unless the client detached (ZZ or ZQ, exit code 0), which asks for the server
@@ -24,7 +27,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT=8888
-FILE_ARG="" # the JVM argument the server is started with, when a file was named
+OPEN_ARG="" # the file to ask for, encoded for the socket's query
 CLIENT="${VISUR_CLIENT:-$ROOT/terminal/target/release/visur-term}"
 LOG="${VISUR_LOG:-${TMPDIR:-/tmp}/visur-server.log}"
 
@@ -44,6 +47,12 @@ resolve_path() { # absolute, against where the command was typed, and without ne
   else
     printf '%s/%s\n' "$PWD" "$1"
   fi
+}
+
+# The characters that would change how a URL parses, and only those: a path is otherwise bytes, and a server that has
+# to decode a query does not need a general encoder, it needs to be unable to be fooled by a space or an ampersand.
+url_encode() {
+  printf '%s' "$1" | sed -e 's/%/%25/g' -e 's/ /%20/g' -e 's/?/%3F/g' -e 's/#/%23/g' -e 's/&/%26/g' -e 's/+/%2B/g'
 }
 
 # Is Visur answering? The app's own URL, not just an open port: something else could be on 8888, and the verticles
@@ -73,10 +82,8 @@ build_client() {
 # One jar, built when a source file is newer than it: a stale jar cannot serve yesterday's editor, and starting a
 # server needs no Gradle daemon in the way.
 start_server() {
-  # The file argument goes on whichever server command runs, overridden or not, so "did it reach the JVM?" has one
-  # answer instead of one answer per start path.
   if [ -n "${VISUR_SERVER:-}" ]; then
-    sh -c "$VISUR_SERVER $FILE_ARG" >"$LOG" 2>&1 &
+    sh -c "$VISUR_SERVER" >"$LOG" 2>&1 &
     owned=$!
     return
   fi
@@ -86,7 +93,7 @@ start_server() {
     echo "building the server jar" >&2
     ( cd "$ROOT" && ./gradlew shadowJar -q ) >&2 || return 1
   fi
-  java ${FILE_ARG:+"$FILE_ARG"} -jar "$jar" >"$LOG" 2>&1 &
+  java -jar "$jar" >"$LOG" 2>&1 &
   owned=$!
 }
 
@@ -117,12 +124,7 @@ case "${1:-}" in
     # launch it first, so a relative path would mean one thing to the person who started the server and another to
     # whoever types the command next.
     ABS="$(resolve_path "$1")"
-    FILE_ARG="-Dvisur.file=$ABS"
-    if probe; then
-      echo "visur is already running on :$PORT with another document — $1 was not opened." >&2
-      echo "Type ':open $ABS' inside it, or stop that server first: lsof -ti tcp:$PORT | xargs kill" >&2
-      exit 1
-    fi
+    OPEN_ARG="$(url_encode "$ABS")"
     ;;
 esac
 
@@ -139,6 +141,12 @@ else
     exit 1
   fi
   echo "server ready"
+fi
+
+if [ -n "$OPEN_ARG" ]; then
+  # The ask goes to the client, not to the server: it is this window that wants the file, and the server that has been
+  # up for a day has no idea which window the command was typed in.
+  export VISUR_WS="ws://127.0.0.1:$PORT/ws?open=$OPEN_ARG"
 fi
 
 "$CLIENT"

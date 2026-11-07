@@ -84,8 +84,11 @@ starting one if none is running, and stops only a server it started itself:
 ./visur ~/notes/ideas.txt      # that file, from any directory
 ```
 
-A file argument is resolved against the directory the command is typed in, and with a server already running it opens
-nothing: that server is editing somebody's document, so `visur` says so and exits 1. `:open path` inside it is the way.
+A file argument is resolved against the directory the command is typed in, and it travels with the window that asked for
+it rather than with the server: `visur notes.txt` opens that file whether the server started a second ago or this morning,
+and a file that does not exist yet is the document you are about to write. The one thing that stops it is a window
+already editing — one document per process — and that is said on the screen where the newcomer can read it, not in the
+shell.
 
 `ZZ` saves and detaches, `ZQ` detaches, `ZD` quits (a detach leaves a server the launcher started still running).
 `./gradlew run` remains the way to start a server that watches `src/` and reloads; see

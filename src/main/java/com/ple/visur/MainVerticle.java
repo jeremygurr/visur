@@ -127,11 +127,11 @@ public class MainVerticle extends AbstractVerticle {
         // every later message is attributed to, including the one that says how big the window is.
         String connection = "ws-" + nextConnection.getAndIncrement();
         // A window arriving is two things: the window gets its own cursor and quantum, and it is asked to open the file
-        // the process was launched on, if anybody asked for one. See InitializerService#openLaunchFile for why that
-        // waits for an arrival instead of happening at boot.
+        // it came for, if it came for one. The ask rides as a query on this socket rather than as an argument to the
+        // process, because the server outlives the command: see InitializerService#openRequestedFile.
         Session window = Connections.open(connection);
         ServiceHolder.initializerService.startSession(window);
-        ServiceHolder.initializerService.openLaunchFile(window);
+        ServiceHolder.initializerService.openRequestedFile(window, context.request().getParam("open"));
         MessageConsumer<JsonObject> farewell = vertx.eventBus().consumer(BusEvent.connectionShouldClose.name(), message -> {
           // The view's addressing again: this socket closes the window whose id it minted, and no other. `:q` typed in
           // one client ending a second client's session would be the same bug this connection id was introduced to fix.

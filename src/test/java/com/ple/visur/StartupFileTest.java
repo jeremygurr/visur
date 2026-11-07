@@ -21,9 +21,9 @@ import static org.junit.jupiter.api.Assertions.*;
  * replaced. Every other test in the repo initialises the model by hand, which is exactly why the old recovery survived
  * as long as it did — nothing that ran in a test ever booted.
  *
- * <p>{@code visur.file} is the startup file as a system property, for the same reason {@code visur.port} is: a test
- * cannot set an environment variable for the process it is already running in, and the alternative was a test that
- * spawns a JVM.
+ * <p>The file a window came for is a query on its socket — {@code /ws?open=/path} — because that is what the launcher
+ * sends, and it is the shape that lets a file be opened against a server that was running long before the file was
+ * named. A test that boots a server is a test that connects to it.
  */
 class StartupFileTest {
 
@@ -60,11 +60,9 @@ class StartupFileTest {
   void bootingWithAFileLoadsThatFile() throws IOException {
     Path file = dir.resolve("booted.txt");
     Files.writeString(file, "the file's own words\n");
-    System.setProperty("visur.file", file.toString());
-
     bootServer();
 
-    try (WireClient client = new WireClient(vertx, port, 60, 8)) {
+    try (WireClient client = new WireClient(vertx, port, 60, 8, file.toString())) {
       assertTrue(client.text().contains("the file's own words"),
         "the whole point of naming a file on the way in: " + client.text());
       assertFalse(client.view().getBoolean("isDirty"), "text that came off the file is not unsaved work");
@@ -85,11 +83,9 @@ class StartupFileTest {
     Files.writeString(file, "what the file has\n");
     Path swap = dir.resolve(".crashed.txt.swp");
     Files.writeString(swap, "what only the swap has\n");
-    System.setProperty("visur.file", file.toString());
-
     bootServer();
 
-    try (WireClient client = new WireClient(vertx, port, 60, 8)) {
+    try (WireClient client = new WireClient(vertx, port, 60, 8, file.toString())) {
       assertEquals("crashed.txt has unsaved work: r recover  d delete  o read-only", client.message());
       assertFalse(client.text().contains("what the file has"), "the open waits for the answer: " + client.text());
       assertFalse(client.text().contains("what only the swap has"), "and neither version is picked on the user's behalf");
@@ -111,11 +107,10 @@ class StartupFileTest {
   @Test
   void launchingOnAPathThatDoesNotExistOpensANewFileAtThatPath() throws IOException {
     Path file = dir.resolve("notes.txt");
-    System.setProperty("visur.file", file.toString());
 
     bootServer();
 
-    try (WireClient client = new WireClient(vertx, port, 60, 8)) {
+    try (WireClient client = new WireClient(vertx, port, 60, 8, file.toString())) {
       assertEquals("", client.message().strip(), "a path you were asked to open and which is not there is not a failure: "
         + client.message());
       assertFalse(client.isDirty(), "an empty document at a path has nothing the file lacks");
@@ -142,11 +137,9 @@ class StartupFileTest {
   void launchingOnADirectorySaysSoOnTheWindow() throws IOException {
     Path somewhereElse = dir.resolve("elsewhere");
     Files.createDirectories(somewhereElse);
-    System.setProperty("visur.file", somewhereElse.toString());
-
     bootServer();
 
-    try (WireClient client = new WireClient(vertx, port, 60, 8)) {
+    try (WireClient client = new WireClient(vertx, port, 60, 8, somewhereElse.toString())) {
       assertTrue(client.message().contains("not a regular file"), "the launch failed out loud: " + client.message());
       assertFalse(client.isDirty(), "and nothing was loaded, so nothing is unsaved");
 
@@ -170,11 +163,9 @@ class StartupFileTest {
     Files.writeString(unreadable, "words you may not have\n");
     assumeTrue(unreadable.toFile().setReadable(false) && !Files.isReadable(unreadable),
       "this machine lets the test read it anyway");
-    System.setProperty("visur.file", unreadable.toString());
-
     bootServer();
 
-    try (WireClient client = new WireClient(vertx, port, 60, 8)) {
+    try (WireClient client = new WireClient(vertx, port, 60, 8, unreadable.toString())) {
       // One line, naming the file, on the window that asked — which is the whole of it. The stack-trace version of this
       // left the server up and the screen blank with no explanation anywhere.
       assertTrue(client.message().startsWith("loadFile:"), "a sentence, not a trace: " + client.message());
@@ -184,23 +175,21 @@ class StartupFileTest {
   }
 
   /**
-   * The launch file is opened once, by the first window, and never again: a window arriving later is somebody joining
-   * the document, not a second launch, and running the open again would drop what the first window typed.
+   * A window arriving later is somebody joining the document, not a second launch: it is asked nothing, and what the
+   * first window typed is still there when it arrives.
    *
-   * <p>The joiner is not asked about the launch either. That is the half that fails first when the request is read
-   * instead of taken, and it fails strangely: the window that joined gets the swap question — the first window's typing
-   * put a swap beside the file, so a second launch finds a conflict to ask about. A question about a launch you did
-   * not perform, in a document you did not open, is not a question an answer to is available for.
+   * <p>That used to be a latch on the process, and it fails strangely when the ask is read rather than taken: the window
+   * that joined gets the swap question — the first window's typing put a swap beside the file, so a second launch finds
+   * a conflict to ask about. A question about a launch you did not perform, in a document you did not open, is not a
+   * question an answer to is available for.
    */
   @Test
-  void aWindowArrivingLaterDoesNotReopenTheFileTheProcessWasLaunchedOn() throws IOException {
+  void aWindowArrivingLaterDoesNotReopenTheFileTheFirstWindowCameFor() throws IOException {
     Path file = dir.resolve("shared.txt");
     Files.writeString(file, "the file's own words\n");
-    System.setProperty("visur.file", file.toString());
-
     bootServer();
 
-    WireClient first = new WireClient(vertx, port, 40, 10);
+    WireClient first = new WireClient(vertx, port, 40, 10, file.toString());
     assertTrue(first.text().contains("the file's own words"), "the launch opened the file for the first window: ["
       + first.text().trim() + "]");
     first.presses("i");
@@ -214,6 +203,35 @@ class StartupFileTest {
       assertTrue(second.text().contains("work in progress"), "and it arrived at the work rather than at the file");
       assertTrue(second.isDirty(), "the work is the document's, so the window that only joined is warned too");
     }
+  }
+
+  /**
+   * Two windows, two files: the second one does not get its file, because there is one document per process and the
+   * first window is standing in it. The ask is answered where the asker can read it — its own window — and the answer
+   * names the key that works inside a session.
+   *
+   * <p>This is the case {@code visur /path} used to refuse in the shell, before it had any way to know that the server
+   * it found was idle. Refusing here is not a loss: the message is the advice, and it is said after the thing worth
+   * protecting (a live editing session) is actually known.
+   */
+  @Test
+  void aWindowArrivingForAnotherFileWhileAWindowIsEditingIsToldWhy() throws IOException {
+    Path firstFile = dir.resolve("first.txt");
+    Path secondFile = dir.resolve("second.txt");
+    Files.writeString(firstFile, "the first document\n");
+
+    bootServer();
+
+    WireClient first = new WireClient(vertx, port, 40, 10, firstFile.toString());
+    assertTrue(first.text().contains("the first document"), "the first window got its file: " + first.text());
+
+    try (WireClient second = new WireClient(vertx, port, 40, 10, secondFile.toString())) {
+      assertTrue(second.message().contains("another window is editing"), "the refusal says why: " + second.message());
+      assertTrue(second.message().contains("second.txt"), "and names the file it did not open: " + second.message());
+      assertTrue(second.text().contains("the first document"), "the document nobody asked to see is still the document");
+    }
+    assertFalse(first.text().contains("second.txt"), "the first window was not spoken to about the stranger's file");
+    assertFalse(secondFile.toFile().exists(), "and refusing a missing file does not leave a file behind");
   }
 
   /**
