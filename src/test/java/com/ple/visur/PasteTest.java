@@ -130,9 +130,9 @@ class PasteTest {
     assertEquals("X", yankRegister());
   }
 
-  /** Paste leaves no selection behind: the next {@code p} or {@code d} meets the text the paste put there. */
+  /** What you pasted over was a selection, so what you get back is a selection: the text the paste put there. */
   @Test
-  void pFinishesWithNoSelectionDrawn() {
+  void pastingOverASelectionLeavesThePastedTextSelected() {
     chooseCursorQuantum("word");
     press("3");
     press("s");
@@ -140,8 +140,78 @@ class PasteTest {
 
     press("p");
     JsonObject drawn = View.of(emc).render();
-    assertEquals(0, drawn.getInteger("span"), "paste finishes at span 0, not the three the selection had");
-    assertEquals(drawn.getInteger("cursorQuantumStart"), drawn.getInteger("cursorQuantumEnd"));
+    assertEquals("Xfour\nfive six\n\nlast line\n", emc.document().getContent());
+    assertEquals(1, drawn.getInteger("span"), "the span survives the paste as the paste, not as nothing");
+    assertEquals(0, drawn.getInteger("cursorQuantumStart"));
+    assertEquals(1, drawn.getInteger("cursorQuantumEnd"), "exactly the character that was pasted");
+  }
+
+  /**
+   * The span a paste leaves is a count of *characters*, which is the one quantum that can end where a paste ends.
+   *
+   * <p>Two words of the selection replaced by an "X" with no space after it: a word quantum here would select "Xtwo",
+   * because that is the word at the cursor, and the highlight would cover three characters nobody pasted. A span that
+   * paints one thing and deletes another is the bug this operator was written against, so the quantum gives way.
+   */
+  @Test
+  void theSpanAPasteLeavesIsExactlyThePastedTextAndNotTheWordAroundIt() {
+    chooseCursorQuantum("word");
+    press("s"); // "one " selected
+    yank("X");
+
+    press("p");
+    JsonObject drawn = View.of(emc).render();
+    assertEquals("Xtwo three four\nfive six\n\nlast line\n", emc.document().getContent());
+    assertEquals(1, drawn.getInteger("span"), "one character, not the four-letter word it landed inside");
+    assertEquals(1, drawn.getInteger("cursorQuantumEnd"));
+  }
+
+  /** The cursor goes to the start of what it pasted, because that is where a window with a span begins. */
+  @Test
+  void theCursorEndsUpAtTheStartOfTheTextItPasted() {
+    chooseCursorQuantum("word");
+    press("3");
+    press("s");
+    yank("XYZ");
+
+    press("p");
+    assertEquals(0, emc.session().getCA());
+    assertEquals(3, emc.session().getSpan());
+  }
+
+  /**
+   * The consequence of keeping the span: a second {@code p} pastes onto a selection, so it replaces the first paste
+   * with the text that paste displaced. A toggle, and the honest one — the register has been holding the original
+   * text since the first paste.
+   */
+  @Test
+  void aSecondPasteReplacesWhatTheFirstOneLeft() {
+    chooseCursorQuantum("word");
+    press("3");
+    press("s");
+    yank("X");
+
+    press("p");
+    assertEquals("Xfour\nfive six\n\nlast line\n", emc.document().getContent());
+    press("p");
+    assertEquals("one two three four\nfive six\n\nlast line\n", emc.document().getContent(),
+        "back to what the first paste covered");
+    assertEquals("X", yankRegister(), "and the paste is what the register holds now");
+  }
+
+  /** Over nothing there is nothing to preserve, and {@code p p} still means two copies. */
+  @Test
+  void pastingOverNothingStillLeavesNoSelectionAndPastesTwice() {
+    chooseCursorQuantum("word");
+    press("0");
+    press("s"); // an empty range at the document quantum: nothing selected
+    yank("X");
+
+    press("p");
+    JsonObject drawn = View.of(emc).render();
+    assertEquals(0, drawn.getInteger("span"), "no span for a paste that displaced nothing");
+    press("p");
+    assertEquals("XX" + CONTENT, emc.document().getContent(), "two copies, as it was before the span survived a paste");
   }
 
   /**

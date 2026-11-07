@@ -33,15 +33,29 @@ public class PasteYankRegisterOp implements Operator {
       // something the user never copied: a register you paste from that is not the register you paste into is worse.
       Clipboard.offer(emc.session(), displaced);
     }
-    // Paste finishes at span 0 with the caret on the last pasted character, so the next p — or the next d — meets the
-    // text the paste left, not the selection the first one consumed. The span is s's to set, and this is the one
-    // command whose post-condition is a span of zero rather than a range that happened to come back empty.
-    int cursor = start + pasted.length() - 1;
-    emc.session().putCA(cursor);
-    int[] bounds = emc.session().getCursorQuantum().getBoundaries(cursor, emc.document().getNextLineIndices(), 0, false);
-    emc.session().putCursorQuantumStartAndScroll(bounds[0]);
-    emc.session().putCursorQuantumEndAndScroll(bounds[1]);
-    emc.session().putSpan(0);
+    if (displaced.isEmpty()) {
+      // Over nothing there is no span to keep, and the caret goes on the last pasted character so the next p — or the
+      // next d — meets the text the paste left. This is the command whose post-condition is a span of zero rather than
+      // a range that happened to come back empty, and it is zero because nothing was selected to begin with.
+      int cursor = start + pasted.length() - 1;
+      emc.session().putCA(cursor);
+      emc.session().putSpan(0);
+      int[] bounds = emc.session().getCursorQuantum().getBoundaries(cursor, emc.document().getNextLineIndices(), 0, false);
+      emc.session().putCursorQuantumStartAndScroll(bounds[0]);
+      emc.session().putCursorQuantumEndAndScroll(bounds[1]);
+      emc.session().putIsAtQuantumStart(true);
+      return;
+    }
+    // What was selected is still selected, and what is selected is now the text that was pasted. So the span's quantum
+    // gives way to the character: it is the only quantum whose unit can end where a paste ends. An "X" pasted over
+    // "one " leaves "Xtwo three" behind, and a word quantum here selects "Xtwo" — three characters pasted over by
+    // nobody, highlighted, and the next d would take them. A span that paints one thing and deletes another is the
+    // bug this operator was written against, so exactness wins over the quantum the selection arrived with.
+    emc.session().putCursorQuantum(emc.getQuantumNameToQuantum().get("character"));
+    emc.session().putCA(start); // a window with a span begins at its start, and the cursor marks that
+    emc.session().putSpan(pasted.length());
+    emc.session().putCursorQuantumStartAndScroll(start);
+    emc.session().putCursorQuantumEndAndScroll(start + pasted.length());
     emc.session().putIsAtQuantumStart(true);
   }
 }

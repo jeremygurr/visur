@@ -96,3 +96,11 @@ nothing is the same lie in a different place. `P` never writes it: the selection
 `P` arrives through both clients already, as `F` and `N` do — no wire or renderer change, no new key token.
 
 The manual check passed: `p` replaced a line cleanly and `P` left the selection standing.
+
+---
+
+**Reversed after this map closed.** "The span is empty afterwards, chosen so `p p` pastes again" held, and it was the
+wrong trade: pasting over a selection and getting nothing selected back is what the editors a user already knows do not
+do. The pasted text is now the selection, counted in characters so it ends exactly where the paste ends, and `p p` keeps
+its old meaning only over nothing. The consequence is tested rather than argued —
+`PasteTest.aSecondPasteReplacesWhatTheFirstOneLeft`.
