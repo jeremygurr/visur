@@ -76,6 +76,17 @@ pub fn send_key(socket: &mut Socket, token: &str) {
   send(socket, "keyWasPressed", json!({ "key": token }));
 }
 
+/// The answer to the server's clipboard question: `text` when the terminal said what its clipboard holds — `""` is the
+/// clipboard answering that it holds nothing — and nothing at all when it would not or could not say, which the server
+/// turns into a message instead of a stale paste.
+pub fn send_clipboard(socket: &mut Socket, text: Option<&str>) {
+  let mut body = json!({});
+  if let Some(text) = text {
+    body["text"] = json!(text);
+  }
+  send(socket, "clipboardContents", body);
+}
+
 pub fn send_paste(socket: &mut Socket, text: &str) {
   send(socket, "pasteWasReceived", json!({ "text": text }));
 }

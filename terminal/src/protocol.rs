@@ -63,17 +63,51 @@ fn rows(body: &Value) -> Vec<Row> {
     .unwrap_or_default()
 }
 
-/// One frame in, one view out — or nothing if the frame is not a view.
-pub fn parse(frame: &str) -> Option<ViewUpdate> {
-  let envelope: Value = serde_json::from_str(frame).ok()?;
-  if envelope.get("address").and_then(Value::as_str) != Some("viewWasChanged") {
-    return None;
-  }
-  let raw = envelope.get("body")?;
-  let body: Value = match raw {
-    Value::String(text) => serde_json::from_str(text).ok()?,
-    other => other.clone(),
+/// What a frame from the server is, as far as this client is concerned.
+///
+/// Three addresses mean something here, and the list is short on purpose: the server publishes things at itself that a
+/// client has no business acting on, and a client that acted on frames it never asked for has a feature nobody designed.
+/// Dropping an unknown *reply* is harmless; dropping an unknown *request* is how a feature silently does nothing, which
+/// is why `clipboardWriteRequested` is routed here at all rather than pattern-matched in the loop.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Inbound {
+  /// What to paint: one complete viewport, every time.
+  View(ViewUpdate),
+  /// Put this text into the clipboard of the machine this client is running on.
+  WriteClipboard(String),
+  /// Say what that clipboard holds: the half a terminal mostly cannot do, and the half this client answers honestly by
+  /// saying nothing rather than something stale.
+  ReadClipboard,
+  /// Anything else, including every address a newer server invents.
+  Unknown,
+}
+
+/// One frame in, one thing to do out.
+pub fn inbound(frame: &str) -> Inbound {
+  let envelope = match serde_json::from_str::<Value>(frame) {
+    Ok(envelope) => envelope,
+    Err(_) => return Inbound::Unknown,
   };
+  match envelope.get("address").and_then(Value::as_str).unwrap_or_default() {
+    "viewWasChanged" => body_of(&envelope).and_then(|body| view(body).map(Inbound::View)).unwrap_or(Inbound::Unknown),
+    "clipboardWriteRequested" => body_of(&envelope)
+      .and_then(|body| body.get("text").and_then(Value::as_str).map(str::to_string))
+      .map_or(Inbound::Unknown, Inbound::WriteClipboard),
+    "clipboardReadRequested" => Inbound::ReadClipboard,
+    _ => Inbound::Unknown,
+  }
+}
+
+/// The body of a frame, decoded: plain, or double-encoded as a JSON string, which is what a server sends when it puts
+/// a payload on the bus as text.
+fn body_of(envelope: &Value) -> Option<Value> {
+  match envelope.get("body")? {
+    Value::String(text) => serde_json::from_str(text).ok(),
+    other => Some(other.clone()),
+  }
+}
+
+fn view(body: Value) -> Option<ViewUpdate> {
   Some(ViewUpdate {
     full: flag(&body, "full"),
     origin: number(&body, "origin"),
@@ -113,9 +147,17 @@ mod tests {
     "commandStateContent":"","commandCursor":0,"searchTarget":"necess","pendingCount":4,
     "message":"loadFile: file not found: /tmp/gone.txt","isDirty":true}}"#;
 
+  /// The one helper the field assertions need: a view, or a failure that says what the frame was.
+  fn view_of(frame: &str) -> ViewUpdate {
+    match inbound(frame) {
+      Inbound::View(view) => view,
+      other => panic!("expected a view, got {other:?}"),
+    }
+  }
+
   #[test]
   fn decodes_every_field_of_the_view_payload() {
-    let view = parse(FRAME).expect("a view frame");
+    let view = view_of(FRAME);
     assert!(view.full);
     assert_eq!(view.origin, 112);
     assert_eq!(
@@ -142,26 +184,49 @@ mod tests {
     assert_eq!(view.message, "loadFile: file not found: /tmp/gone.txt");
   }
 
+  /// The whole vocabulary this client speaks, and it is three addresses: a view to paint, a clipboard to write, and a
+  /// clipboard to read. Everything else is dropped — `keyWasPressed` and `modelWasChanged` are things a client *sends*,
+  /// and `connectionShouldClose` is a close frame rather than a message — including an address a newer server has not
+  /// invented yet, which has to be nothing at all rather than a panic in a client that is already on screen.
   #[test]
-  fn ignores_frames_that_are_not_views() {
-    assert_eq!(parse(r#"{"address":"keyWasPressed","body":{"key":"j"}}"#), None);
-    assert_eq!(parse(r#"{"address":"modelWasChanged","body":{}}"#), None);
+  fn three_addresses_mean_something_and_the_rest_of_the_bus_does_not() {
+    assert!(matches!(inbound(FRAME), Inbound::View(_)));
+    assert_eq!(
+      inbound(r#"{"address":"clipboardWriteRequested","body":{"text":"one "}}"#),
+      Inbound::WriteClipboard("one ".to_string())
+    );
+    assert_eq!(inbound(r#"{"address":"clipboardReadRequested","body":{}}"#), Inbound::ReadClipboard);
+
+    assert_eq!(inbound(r#"{"address":"keyWasPressed","body":{"key":"j"}}"#), Inbound::Unknown);
+    assert_eq!(inbound(r#"{"address":"modelWasChanged","body":{}}"#), Inbound::Unknown);
+    assert_eq!(inbound(r#"{"address":"connectionShouldClose","body":null}"#), Inbound::Unknown);
+    assert_eq!(inbound(r#"{"address":"whateverComesNext","body":{"a":1}}"#), Inbound::Unknown);
+    assert_eq!(inbound("not json at all"), Inbound::Unknown, "a frame that is not JSON is not a request");
+  }
+
+  #[test]
+  fn a_write_with_no_text_is_not_a_write_of_nothing() {
+    // An empty clipboard is written with `"text": ""`, which arrives as a write of "". No text field at all is a
+    // protocol mistake, and the two are not the same message: one says "put nothing here", the other says nothing.
+    assert_eq!(inbound(r#"{"address":"clipboardWriteRequested","body":{"text":""}}"#), Inbound::WriteClipboard(String::new()));
+    assert_eq!(inbound(r#"{"address":"clipboardWriteRequested","body":{}}"#), Inbound::Unknown);
   }
 
   #[test]
   fn tolerates_an_unknown_field_and_a_string_body() {
     let extra = FRAME.replace(r#""span":1"#, r#""span":1,"somethingNewer":"x""#);
-    assert!(parse(&extra).is_some(), "an added field must not break an older client");
+    assert!(matches!(inbound(&extra), Inbound::View(_)), "an added field must not break an older client");
 
-    // The SockJS bridge sends the same message with the body as a JSON string.
+    // A body carried as a JSON string inside the frame is the same view, and the server does this today for the view
+    // payload it puts on the bus as text.
     let doubled = r#"{"address":"viewWasChanged","body":"{\"rows\":[{\"start\":0,\"text\":\"hi\"}],\"cursorRow\":0}"}"#;
-    assert_eq!(parse(doubled).expect("a view frame").rows[0].text, "hi");
+    assert_eq!(view_of(doubled).rows[0].text, "hi");
   }
 
   #[test]
   fn defaults_absent_optional_fields() {
     let sparse = r#"{"address":"viewWasChanged","body":{"rows":[],"cursorRow":0,"cursorCol":0}}"#;
-    let view = parse(sparse).expect("a view frame");
+    let view = view_of(sparse);
     assert_eq!(view.span, 0);
     assert_eq!(view.search_target, "");
     assert_eq!(view.pending_count, 0, "no count typed is no count shown");

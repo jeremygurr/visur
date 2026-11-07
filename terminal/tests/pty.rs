@@ -768,3 +768,97 @@ fn the_client_paints_edits_searches_and_detaches() {
   let status = terminal.quit();
   assert_eq!(status.code(), Some(0), "ZQ should detach with exit code 0, got {status:?}");
 }
+
+// The clipboard, end to end: the fake server asks, the client asks the pty, and the pty — which is this test — answers
+// or does not. The unit tests in `clipboard.rs` cover the bytes; these cover that the bytes actually leave the process
+// and that a reply is not invented when the terminal stays quiet, which is the difference between a feature and a
+// clipboard that appears to work.
+
+/// A frame the server pushes at a client that asked for nothing, which is what a clipboard request is.
+fn request(frame: &str) -> Vec<String> {
+  vec![frame.to_string()]
+}
+
+/// What the client answered the server with, as the text of the clipboard it was given: `None` for a client that said
+/// it could not read, `Some("")` for an empty clipboard. The two are different frames, and the server treats them so.
+fn clipboard_answer(frames: &Arc<Mutex<Vec<String>>>) -> Option<Option<String>> {
+  frames.lock().unwrap().iter().find_map(|frame| {
+    let value: serde_json::Value = serde_json::from_str(frame).ok()?;
+    if value.get("address")?.as_str()? != "clipboardContents" {
+      return None;
+    }
+    Some(value.get("body")?.get("text").and_then(|text| text.as_str()).map(str::to_string))
+  })
+}
+
+#[test]
+fn a_clipboard_write_request_becomes_one_osc52_paste_sequence() {
+  let (port, _) = fake_server(Fake::Script(request(
+    r#"{"address":"clipboardWriteRequested","body":{"text":"one "}}"#,
+  )));
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.raw().contains("\x1b]52;c;b25lIA==\u{7}")),
+    "the clipboard is written with base64 of the text and the clipboard buffer: {:?}",
+    terminal.raw()
+  );
+  // ZQ after the write: a client that stops on the way to a clipboard would otherwise look like a passing test.
+  terminal.send("Z");
+  terminal.send("Q");
+  let status = terminal.quit();
+  assert_eq!(status.code(), Some(0), "the client should detach, got {status:?}");
+}
+
+#[test]
+fn a_clipboard_read_asks_permission_then_contents_and_reports_the_silence() {
+  let (port, frames) = fake_server(Fake::Script(request(r#"{"address":"clipboardReadRequested","body":{}}"#)));
+  let terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.raw().contains("\x1b]52;?;M\u{7}")),
+    "the paste-control query comes first, so a terminal that forbids reads is not asked twice: {:?}",
+    terminal.raw()
+  );
+  assert!(
+    terminal.wait_for(Duration::from_secs(2), |t| t.raw().contains("\x1b]52;c;?\u{7}")),
+    "then the clipboard itself is queried: {:?}",
+    terminal.raw()
+  );
+  let answered = terminal.wait_for(Duration::from_secs(3), |_| clipboard_answer(&frames).is_some());
+  assert!(answered, "a terminal that answers nothing must be reported as an unreadable clipboard");
+  assert_eq!(clipboard_answer(&frames), Some(None), "no text field is the failure, and nothing was typed here");
+}
+
+#[test]
+fn a_terminal_that_forbids_the_clipboard_is_not_asked_for_it() {
+  let (port, frames) = fake_server(Fake::Script(request(r#"{"address":"clipboardReadRequested","body":{}}"#)));
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+
+  terminal.wait_for(Duration::from_secs(2), |t| t.raw().contains("\x1b]52;?;M\u{7}"));
+  terminal.send("\x1b]52;?;n;M\u{7}"); // iTerm2's answer with clipboard access switched off
+
+  let answered = terminal.wait_for(Duration::from_secs(3), |_| clipboard_answer(&frames).is_some());
+  assert!(answered, "the refusal has to reach the server, or the user waits on a paste that cannot happen");
+  assert_eq!(clipboard_answer(&frames), Some(None));
+  assert!(
+    !terminal.raw().contains("\x1b]52;c;?\u{7}"),
+    "a terminal that said no is not asked for the contents as well: {:?}",
+    terminal.raw()
+  );
+}
+
+#[test]
+fn a_terminal_that_answers_the_clipboard_gets_its_text_to_the_server() {
+  let (port, frames) = fake_server(Fake::Script(request(r#"{"address":"clipboardReadRequested","body":{}}"#)));
+  let mut terminal = Terminal::spawn_with(&[("VISUR_WS", ws_to(port))]);
+
+  terminal.wait_for(Duration::from_secs(2), |t| t.raw().contains("\x1b]52;?;M\u{7}"));
+  terminal.send("\x1b]52;?;h;M\u{7}"); // allowed, no warning
+  terminal.wait_for(Duration::from_secs(2), |t| t.raw().contains("\x1b]52;c;?\u{7}"));
+  terminal.send("\x1b]52;c;b25lIA==\u{7}"); // the clipboard, base64, as every emulator that can does it
+
+  let answered = terminal.wait_for(Duration::from_secs(3), |_| clipboard_answer(&frames).is_some());
+  assert!(answered, "the terminal answered, so the server should hear about it");
+  assert_eq!(clipboard_answer(&frames), Some(Some("one ".to_string())), "decoded, not pasted as base64");
+}

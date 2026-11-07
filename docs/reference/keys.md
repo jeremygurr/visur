@@ -204,6 +204,26 @@ Intercepted by the terminal before the server sees them:
 
 `Ctrl-C` is a byte in raw mode, not a signal, which is why quitting needs its own binding.
 
+## The clipboard
+
+visur never touches an OS clipboard: it **asks the client**, because over SSH the client is the machine holding both the
+clipboard and the keyboard. Two questions go down the socket — write this text, and what does your clipboard hold — and
+an answer comes back up.
+
+**Copying out works over SSH** on the mainstream emulators (OSC 52, buffer `c`, the text base64'd). A yank, a delete and
+the text a paste covered are one request per command rather than one per keystroke, sent to the window whose keys made
+them. A copy bigger than 56 000 bytes is refused with a message instead of truncated — half a clipboard is worse than
+none, and the yank itself still stands, so `p` still works inside visur.
+
+**Copying in depends on the terminal, and mostly does not work.** Terminal.app has no OSC 52 read, iTerm2 gates it
+behind a preference, tmux swallows it, and visur's own terminal emulator — where both directions work — is the plan and
+not the present. So when the clipboard cannot be read the paste **does not happen**, and the window says
+`clipboard: cannot read it; paste with your terminal's own key`. That refusal also discards what visur remembers of the
+last thing it copied: a memory it can no longer check is a guess, and a guess pasted quietly into a document is the one
+answer worse than an error.
+
+Until then, paste with your terminal's own paste key. Bracketed paste arrives as text and needs no OSC 52 at all.
+
 ## Selections and separators
 
 **A selection covers the unit and whatever joins it to the next one**, so `s` on a line highlights one cell past the end

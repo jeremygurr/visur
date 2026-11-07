@@ -154,7 +154,7 @@ Facts established before a ticket was written, each of which changes how a ticke
 | ~~05~~ [closed](issues/05-command-key-and-grammar.md) | `:` replaces `;`, bare paths, `:w` `:open` `:q` `:q!`, and the keypress test `;` never had | 01, 04 |
 | ~~06~~ [closed](issues/06-swap-files.md) | Swap files: nameless pool, browser state dir, never overwrite, delete on save, vim's three-way prompt for named files | 01, 04, 05 |
 | ~~07~~ [closed](issues/07-launch-argument.md) | `visur /path/to/file`, with a warning when a server is already running | 05 |
-| [08](issues/08-clipboard-transport.md) | Clipboard transport: outbound write request, inbound contents, server-side cache, one write per command | 01 |
+| ~~08~~ [closed](issues/08-clipboard-transport.md) | Clipboard transport: outbound write request, inbound contents, server-side cache, one write per command | 01 |
 | [09](issues/09-register-model.md) | `|` selects a register: `|0` clipboard, `|1`–`|9` rotation, `|a`–`|z` named, freeze toggle | 03, 08 |
 | [10](issues/10-browser-clipboard.md) | Browser clipboard both ways: the `paste` event visur never wired, `writeText`, `readText` | 08 |
 
@@ -213,6 +213,16 @@ launcher starts exactly one kind of process: `java -jar` on the fat jar, with `-
 now has three levers (`visur.port`, `visur.file`, `visur.swapDir`), all JVM properties, all set by the launcher or by a
 test and none by an environment variable — which is the shape [08](issues/08-clipboard-transport.md) should copy if
 asking a client needs a knob at all.
+
+**08 left three contracts for the tickets after it.** First for [09](issues/09-register-model.md): an operator has
+neither a bus nor a `Vertx`, which is why the clipboard write waits for the end of the command — and the read is asked
+the same way, so `|0 p` marks the need and `ClipboardContents.ask` runs after the key. Second, also for 09: a failed read
+now *empties* the cache, so pasting from `|0` has three states and not two — text, nothing, and unknown — and treating
+unknown as the fast path is exactly the stale paste the map refuses. Third for [10](issues/10-browser-clipboard.md): the
+answer's shape is `{"text": …}` for an answer and `{}` for "my clipboard cannot be read", and unlike the terminal the
+browser can answer both truthfully, which is what makes that ticket smaller than this one. The client's address list —
+three entries in `protocol::inbound`, and a pty test where the fake server plays the terminal — is where any new outbound
+address has to be added, or a client silently does nothing.
 
 ## Known broken, nobody's ticket yet
 

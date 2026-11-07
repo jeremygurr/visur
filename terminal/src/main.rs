@@ -2,6 +2,7 @@
 // server sends and forwards keys. See docs/wayfinder/renderer-delivery/spec.md §5 and the component design.
 
 mod caps;
+mod clipboard;
 mod keys;
 mod lifecycle;
 mod paint;
@@ -76,8 +77,19 @@ fn probe_sync_output() -> caps::Sync {
   // Wrapped so dropping it does not close fd 1 under the rest of the client.
   let tty = std::mem::ManuallyDrop::new(unsafe { std::fs::File::from_raw_fd(1) });
   let _ = (&*tty).write_all(caps::PROBE.as_bytes());
+  let reply = terminal_reply(CAPS_TIMEOUT, |bytes| bytes.windows(2).any(|pair| pair == b"$y"));
+  caps::sync_output(&String::from_utf8_lossy(&reply))
+}
 
-  let deadline = Instant::now() + CAPS_TIMEOUT;
+/// Read fd 0 raw until `answered` is satisfied or the deadline passes, and hand back everything seen.
+///
+/// This exists because a terminal answers a query with bytes that are not a key event: crossterm's reader would take one
+/// and call it noise. shortcut: bytes typed inside the window are consumed along with the answer, and no other code may
+/// be reading stdin at the same time — which is why both callers are either before the event loop or the loop's own
+/// single reader. Upgrade by handing the leftovers to crossterm's parser once its buffer is reachable, or by owning the
+/// emulator, which is where visur is going.
+fn terminal_reply(patience: Duration, answered: impl Fn(&[u8]) -> bool) -> Vec<u8> {
+  let deadline = Instant::now() + patience;
   let mut reply: Vec<u8> = Vec::new();
   let mut buffer = [0u8; 64];
   while Instant::now() < deadline {
@@ -90,11 +102,43 @@ fn probe_sync_output() -> caps::Sync {
       continue;
     }
     reply.extend_from_slice(&buffer[..count as usize]);
-    if reply.windows(2).any(|pair| pair == b"$y") {
+    if answered(&reply) {
       break; // the answer is in; no need to wait out the rest of the window
     }
   }
-  caps::sync_output(&String::from_utf8_lossy(&reply))
+  reply
+}
+
+/// One OSC 52 paste request, and one flush: the sequence is the whole of the write, and an emulator that will not take
+/// it says nothing at all, so there is no outcome to check and nothing to retry.
+fn write_clipboard(out: &mut impl Write, text: &str) {
+  out.write_all(&clipboard::write(text)).ok();
+  out.flush().ok();
+}
+
+/// Tell the server what this machine's clipboard holds, or that this terminal will not say.
+///
+/// Two questions in a row, because asking blind is rude to the user: first whether reading the clipboard is allowed at
+/// all (iTerm2 answers `n` when its clipboard access is off, and answering that question is a dialog the user did not
+/// ask for mid-keystroke), then the contents. The two waits add up to less than the server's own patience for this
+/// question — see `ClipboardContents.PATIENCE_IN_MILLIS` — so the failure the user hears about is this client's honest
+/// no rather than the server's guess about a slow one.
+fn answer_clipboard_query(socket: &mut transport::Socket, out: &mut impl Write) {
+  out.write_all(&clipboard::paste_control_query()).ok();
+  out.flush().ok();
+  let permission = clipboard::paste_control(&String::from_utf8_lossy(&terminal_reply(
+    clipboard::PERMISSION_PATIENCE,
+    |bytes| clipboard::paste_control(&String::from_utf8_lossy(bytes)) != clipboard::Permission::Unknown,
+  )));
+  if permission == clipboard::Permission::Denied {
+    transport::send_clipboard(socket, None);
+    return;
+  }
+
+  out.write_all(&clipboard::read_request()).ok();
+  out.flush().ok();
+  let reply = terminal_reply(clipboard::REPLY_PATIENCE, |bytes| clipboard::reply_text(bytes).is_some());
+  transport::send_clipboard(socket, clipboard::reply_text(&reply).as_deref());
 }
 
 /// Close the probe window's blind spot: crossterm installs its `SIGWINCH` handler on the first poll, which happens after
@@ -117,7 +161,7 @@ fn run(socket: &mut transport::Socket, out: &mut impl Write, mut cols: usize, mu
   let mut pending = Pending::None;
 
   loop {
-    match take_view(socket) {
+    match take_frames(socket, out) {
       // The socket is gone: there is no server left to paint for, so the terminal goes back to the shell now rather
       // than spinning on a dead socket until somebody kills the client.
       // `:q` in the editor: this window is gone and the server is not, so the client leaves by the same door `ZQ` does.
@@ -217,15 +261,19 @@ enum Taken {
   Gone,
 }
 
-fn take_view(socket: &mut transport::Socket) -> Taken {
+fn take_frames(socket: &mut transport::Socket, out: &mut impl Write) -> Taken {
   let mut newest = None;
   loop {
     match transport::next(socket) {
-      transport::Incoming::Frame(frame) => {
-        if let Some(view) = protocol::parse(&frame) {
-          newest = Some(view);
-        }
-      }
+      transport::Incoming::Frame(frame) => match protocol::inbound(&frame) {
+        protocol::Inbound::View(view) => newest = Some(view),
+        // A clipboard request is answered in the middle of draining rather than after the paint, because the terminal's
+        // answer comes back on stdin and the loop's next read of stdin is crossterm's: the two readers take turns, and
+        // this is the turn the answer needs.
+        protocol::Inbound::WriteClipboard(text) => write_clipboard(out, &text),
+        protocol::Inbound::ReadClipboard => answer_clipboard_query(socket, out),
+        protocol::Inbound::Unknown => {}
+      },
       transport::Incoming::Idle => return Taken::Views(newest),
       transport::Incoming::Detached { code } => {
         return if transport::is_farewell(code) {

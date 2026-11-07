@@ -97,6 +97,12 @@ yesterday's editor. It does not fall back to `./gradlew run`: that starts a `--r
 that outlives its client and cannot be found by the `lsof` the launcher uses to stop what it owns. No binary is
 committed.
 
+**The clipboard belongs to the client**, never the server: the server asks the window to write its clipboard (OSC 52,
+which carries across SSH on the mainstream emulators) and asks what is in it, which Terminal.app, iTerm2's default and
+tmux each refuse in their own way. A refused read is a message on the screen and no paste — never a paste out of a
+clipboard that may have changed since visur last saw it. See
+[docs/reference/keys.md](docs/reference/keys.md) for the whole reality.
+
 The launcher, its tests (`./tests/launcher.sh`) and the client build on Java, Rust and bash only.
 
 == Help
